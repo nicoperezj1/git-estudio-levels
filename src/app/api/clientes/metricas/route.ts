@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
   // Tendencia: clientes nuevos por mes (ultimos 6 meses, segun fecha de registro),
   // desglosados por origen — para ver si un cambio (ej. una campaña) esta moviendo el
   // canal de captacion.
-  const monthly: Array<{ label: string } & Record<string, number>> = [];
+  const monthly: Array<Record<string, string | number>> = [];
   const monthNamesShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   const [chileYear, chileMonth1] = todayInChile().split("-").map(Number);
   const chileMonth = chileMonth1 - 1; // 0-indexed, para comparar con getUTCMonth()
