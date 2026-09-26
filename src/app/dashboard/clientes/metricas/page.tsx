@@ -17,19 +17,30 @@ interface ClientRow {
 
 interface MetricsData {
   summary: Array<{ source: string; label: string; count: number; percent: number }>;
-  monthly: Array<{ label: string; link: number; manual: number; promotion: number; unknown: number }>;
+  monthly: Array<{ label: string } & Record<string, number>>;
   clientsBySource: Record<string, ClientRow[]>;
 }
 
 // Punto 10 (Pablo): "Metricas" en Clientes — diferenciar origen (reserva por link /
 // agendado manualmente / desde promociones), visible solo para Administrador y
 // Recepcion, para remarketing/seguimiento/reseñas.
-const SOURCE_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
-  link: { bg: "bg-blue-50", text: "text-blue-700", bar: "bg-blue-400" },
-  manual: { bg: "bg-purple-50", text: "text-purple-700", bar: "bg-purple-400" },
-  promotion: { bg: "bg-orange-50", text: "text-orange-700", bar: "bg-orange-400" },
-  unknown: { bg: "bg-gray-50", text: "text-gray-600", bar: "bg-gray-300" },
+//
+// Segunda vuelta (26-sep): canales especificos en vez de un generico "Manual" — la
+// recepcion siempre pregunta de donde viene el cliente. "manual" se deja mapeado (con
+// su propio color) solo para no perder el historial de clientes cargados antes de este
+// cambio; ya no se ofrece como opcion nueva en el formulario.
+const SOURCE_COLORS: Record<string, { bg: string; text: string; bar: string; dot: string }> = {
+  link: { bg: "bg-blue-50", text: "text-blue-700", bar: "bg-blue-400", dot: "bg-blue-400" },
+  walk_in: { bg: "bg-teal-50", text: "text-teal-700", bar: "bg-teal-400", dot: "bg-teal-400" },
+  instagram: { bg: "bg-pink-50", text: "text-pink-700", bar: "bg-pink-400", dot: "bg-pink-400" },
+  tiktok: { bg: "bg-slate-50", text: "text-slate-700", bar: "bg-slate-500", dot: "bg-slate-500" },
+  google_maps: { bg: "bg-green-50", text: "text-green-700", bar: "bg-green-400", dot: "bg-green-400" },
+  promotion: { bg: "bg-orange-50", text: "text-orange-700", bar: "bg-orange-400", dot: "bg-orange-400" },
+  influencer: { bg: "bg-fuchsia-50", text: "text-fuchsia-700", bar: "bg-fuchsia-400", dot: "bg-fuchsia-400" },
+  manual: { bg: "bg-purple-50", text: "text-purple-700", bar: "bg-purple-400", dot: "bg-purple-400" },
+  unknown: { bg: "bg-gray-50", text: "text-gray-600", bar: "bg-gray-300", dot: "bg-gray-300" },
 };
+const SOURCE_KEYS = Object.keys(SOURCE_COLORS);
 
 export default function ClientesMetricasPage() {
   const router = useRouter();
@@ -66,10 +77,9 @@ export default function ClientesMetricasPage() {
   }
 
   const total = data.summary.reduce((s, r) => s + r.count, 0);
-  const maxMonthly = Math.max(
-    ...data.monthly.map((m) => m.link + m.manual + m.promotion + m.unknown),
-    1
-  );
+  const monthlyTotal = (m: MetricsData["monthly"][number]) =>
+    SOURCE_KEYS.reduce((s, k) => s + (m[k] || 0), 0);
+  const maxMonthly = Math.max(...data.monthly.map(monthlyTotal), 1);
   const activeList = activeSource ? data.clientsBySource[activeSource] || [] : [];
 
   return (
@@ -112,17 +122,17 @@ export default function ClientesMetricasPage() {
         <h3 className="font-bold text-gray-800 mb-4">Clientes nuevos por mes (últimos 6 meses)</h3>
         <div className="flex items-end justify-between gap-2 h-48">
           {data.monthly.map((m) => {
-            const mTotal = m.link + m.manual + m.promotion + m.unknown;
+            const mTotal = monthlyTotal(m);
             return (
               <div key={m.label} className="flex-1 flex flex-col items-center gap-1">
                 <div className="flex flex-col-reverse w-full max-w-[36px] h-36 rounded-t overflow-hidden">
-                  {(["link", "manual", "promotion", "unknown"] as const).map((key) =>
+                  {SOURCE_KEYS.map((key) =>
                     m[key] > 0 ? (
                       <div
                         key={key}
                         className={SOURCE_COLORS[key].bar}
                         style={{ height: `${(m[key] / maxMonthly) * 100}%` }}
-                        title={`${key}: ${m[key]}`}
+                        title={`${data.summary.find((s) => s.source === key)?.label || key}: ${m[key]}`}
                       />
                     ) : null
                   )}
@@ -134,10 +144,12 @@ export default function ClientesMetricasPage() {
           })}
         </div>
         <div className="flex flex-wrap gap-4 justify-center mt-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-400 rounded" /> Link</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-purple-400 rounded" /> Manual</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-orange-400 rounded" /> Promoción</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-300 rounded" /> Sin registrar</span>
+          {data.summary.map((row) => (
+            <span key={row.source} className="flex items-center gap-1">
+              <span className={`w-3 h-3 rounded ${(SOURCE_COLORS[row.source] || SOURCE_COLORS.unknown).dot}`} />
+              {row.label}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -158,8 +170,8 @@ export default function ClientesMetricasPage() {
                 <tr>
                   <th className="text-left p-3 font-medium text-gray-600">Cliente</th>
                   <th className="text-left p-3 font-medium text-gray-600">Contacto</th>
-                  {activeSource === "promotion" && (
-                    <th className="text-left p-3 font-medium text-gray-600">Código / Influencer</th>
+                  {(activeSource === "promotion" || activeSource === "influencer") && (
+                    <th className="text-left p-3 font-medium text-gray-600">{activeSource === "promotion" ? "Código" : "Influencer"}</th>
                   )}
                   <th className="text-right p-3 font-medium text-gray-600">Registrado</th>
                 </tr>
@@ -173,7 +185,7 @@ export default function ClientesMetricasPage() {
                   >
                     <td className="p-3 font-medium text-gray-800">{c.name}</td>
                     <td className="p-3 text-gray-500">{c.phone || c.email || "—"}</td>
-                    {activeSource === "promotion" && (
+                    {(activeSource === "promotion" || activeSource === "influencer") && (
                       <td className="p-3 text-gray-500">{c.detail || "—"}</td>
                     )}
                     <td className="p-3 text-right text-gray-500">
