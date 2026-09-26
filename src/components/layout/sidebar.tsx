@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { useTenant } from "@/lib/tenant-context";
 import { Role } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import {
@@ -165,6 +166,16 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
   const router = useRouter();
   const supabase = createClient();
   const { isAtLeast, loading: authLoading, role: userAuthRole, user } = useAuth();
+  // Bug (reportado por Nico, 26-sep): tenantName llega como prop desde el layout
+  // (Server Component), calculado con el tenant_id REAL de la cuenta del super_admin —
+  // ese componente corre en el servidor y no puede leer el override de localStorage.
+  // Resultado: al "Entrar" a otro negocio (ej. Saray Business), el banner azul de arriba
+  // decia "Viendo como: Saray Business" pero el nombre del sidebar seguia mostrando el
+  // negocio real de la cuenta del super_admin (ej. Estudio Levels), dando la impresion de
+  // datos cruzados. Se usa el tenant del contexto (que si respeta el override) cuando hay
+  // uno activo, y se cae al valor del servidor en cualquier otro caso.
+  const { tenant: overrideTenant, isOverriding } = useTenant();
+  const effectiveTenantName = isOverriding && overrideTenant ? overrideTenant.name : tenantName;
   // Punto 15 (Pablo): el espacio de la foto en la esquina inferior izquierda siempre
   // mostraba solo iniciales, nunca la foto real, aunque el profesional ya tuviera una
   // cargada en su ficha (misma foto que usa Mi Perfil / Profesionales). userName/userRole
@@ -424,7 +435,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
               <img src="/logo-horizontal.png" alt="re-booking" className="h-8 w-auto dark:hidden" />
               <img src="/logo-horizontal-white.png" alt="re-booking" className="h-8 w-auto hidden dark:block" />
             </Link>
-            {tenantName && <span className="text-xs text-brand-gray font-medium truncate max-w-[120px]">· {tenantName}</span>}
+            {effectiveTenantName && <span className="text-xs text-brand-gray font-medium truncate max-w-[120px]">· {effectiveTenantName}</span>}
           </div>
           <button onClick={() => setMobileOpen(false)} className="text-brand-gray hover:text-brand-dark"><X className="h-5 w-5" /></button>
         </div>
@@ -464,9 +475,9 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
         </div>
 
         {/* Tenant name */}
-        {!collapsed && tenantName && (
+        {!collapsed && effectiveTenantName && (
           <div className="px-4 pt-3 pb-1">
-            <p className="text-xs font-semibold text-brand-dark truncate">{tenantName}</p>
+            <p className="text-xs font-semibold text-brand-dark truncate">{effectiveTenantName}</p>
           </div>
         )}
 

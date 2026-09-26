@@ -13,12 +13,27 @@ import { todayInChile } from "@/lib/utils";
 // fijado una sola vez al crear el cliente (ver migracion 069), y la consulta recorre
 // TODOS los clientes del negocio, no solo los que ya tuvieron una cita.
 
+// Segunda vuelta (26-sep, Pablo): la recepcion siempre pregunta el origen del cliente,
+// asi que "Agendado manualmente" (generico) se reemplaza por canales especificos.
+// "manual" se deja mapeado para no perder el historial de clientes cargados antes de
+// este cambio (quedan agrupados bajo su propia etiqueta, no se migran ni se pierden).
 const SOURCE_LABELS: Record<string, string> = {
   link: "Reserva por link",
-  manual: "Agendado manualmente",
-  promotion: "Desde promociones",
+  walk_in: "Pasó por fuera",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  google_maps: "Google Maps",
+  promotion: "Promoción",
+  influencer: "Influencer",
+  manual: "Agendado manualmente (registro anterior)",
   unknown: "Sin registrar",
 };
+
+const EMPTY_SOURCE_BUCKETS = () => ({
+  link: [] as any[], walk_in: [] as any[], instagram: [] as any[], tiktok: [] as any[],
+  google_maps: [] as any[], promotion: [] as any[], influencer: [] as any[],
+  manual: [] as any[], unknown: [] as any[],
+});
 
 export async function GET(req: NextRequest) {
   const { ok } = await isManagerLevel();
@@ -38,7 +53,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado para ese negocio" }, { status: 403 });
   }
   if (!tenantId) {
-    return NextResponse.json({ summary: [], monthly: [], clientsBySource: { link: [], manual: [], promotion: [], unknown: [] } });
+    return NextResponse.json({ summary: [], monthly: [], clientsBySource: EMPTY_SOURCE_BUCKETS() });
   }
 
   let query = supabase
@@ -50,9 +65,7 @@ export async function GET(req: NextRequest) {
   const { data: clients } = await query;
 
   // Agrupa clientes por origen.
-  const bySource: Record<string, Array<{ id: string; name: string; email: string | null; phone: string | null; firstVisit: string; detail: string | null }>> = {
-    link: [], manual: [], promotion: [], unknown: [],
-  };
+  const bySource: Record<string, Array<{ id: string; name: string; email: string | null; phone: string | null; firstVisit: string; detail: string | null }>> = EMPTY_SOURCE_BUCKETS();
   for (const c of clients || []) {
     const key = c.acquisition_source && bySource[c.acquisition_source] ? c.acquisition_source : "unknown";
     bySource[key].push({
@@ -76,7 +89,7 @@ export async function GET(req: NextRequest) {
   // Tendencia: clientes nuevos por mes (ultimos 6 meses, segun fecha de registro),
   // desglosados por origen — para ver si un cambio (ej. una campaña) esta moviendo el
   // canal de captacion.
-  const monthly: Array<{ label: string; link: number; manual: number; promotion: number; unknown: number }> = [];
+  const monthly: Array<{ label: string } & Record<string, number>> = [];
   const monthNamesShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   const [chileYear, chileMonth1] = todayInChile().split("-").map(Number);
   const chileMonth = chileMonth1 - 1; // 0-indexed, para comparar con getUTCMonth()
@@ -87,7 +100,7 @@ export async function GET(req: NextRequest) {
     let y = chileYear;
     while (m < 0) { m += 12; y--; }
     const label = `${monthNamesShort[m]} ${String(y).slice(2)}`;
-    const bucket = { label, link: 0, manual: 0, promotion: 0, unknown: 0 };
+    const bucket = { label, ...Object.fromEntries(Object.keys(EMPTY_SOURCE_BUCKETS()).map((k) => [k, 0])) };
     for (const c of clients || []) {
       if (!c.created_at) continue;
       const cd = new Date(c.created_at);

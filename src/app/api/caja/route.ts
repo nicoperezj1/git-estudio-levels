@@ -38,6 +38,28 @@ export async function GET(req: NextRequest) {
   if (tenantId && tenantId !== "ALL") txQuery = txQuery.eq("tenant_id", tenantId);
   const { data: transactionsRaw } = await txQuery;
 
+  // Bug (reportado por Nico, 26-sep): un cobro dividido (ej. debito + efectivo) guarda
+  // payment_method = "mixed" en transactions (ver /api/pos/checkout), y el detalle real
+  // por metodo vive aparte en transaction_payments. Como el calculo de caja filtraba
+  // solo payment_method === "cash", la parte en efectivo de un cobro dividido quedaba
+  // afuera por completo de la cuadratura. Se resuelve trayendo, para las transacciones
+  // "mixed" del dia, cuanto de cada una fue efectivo.
+  const mixedIds = (transactionsRaw || [])
+    .filter((t: any) => t.payment_method === "mixed")
+    .map((t: any) => t.id);
+  const mixedCashById = new Map<string, number>();
+  if (mixedIds.length > 0) {
+    const { data: splitRows } = await supabase
+      .from("transaction_payments")
+      .select("transaction_id, payment_method, amount")
+      .in("transaction_id", mixedIds)
+      .eq("payment_method", "cash");
+    for (const row of splitRows || []) {
+      mixedCashById.set(row.transaction_id, (mixedCashById.get(row.transaction_id) || 0) + Number(row.amount));
+    }
+  }
+  const cashAmountOf = (t: any) => (t.payment_method === "mixed" ? (mixedCashById.get(t.id) || 0) : Number(t.total));
+
   // Flatten barber name + join item descriptions into a single "services" string.
   // `barberTakesCash` = a rental barber who pockets their own cash: their cash sales
   // never enter the salon's till, so they must be excluded from the expected cash count.
@@ -46,6 +68,7 @@ export async function GET(req: NextRequest) {
     type: t.type,
     total: t.total,
     payment_method: t.payment_method,
+    cashAmount: cashAmountOf(t),
     notes: t.notes,
     created_at: t.created_at,
     tip_amount: t.tip_amount || 0,
@@ -55,26 +78,29 @@ export async function GET(req: NextRequest) {
     services: Array.isArray(t.items) ? t.items.map((i: any) => i.description).filter(Boolean).join(", ") : "",
   }));
 
+  const isCashLike = (t: any) => t.payment_method === "cash" || (t.payment_method === "mixed" && t.cashAmount > 0);
+
   // Calculate cash movements. Exclude cash from rental barbers who take their own cash —
   // that money is theirs and never goes into the salon till, so counting it would make
-  // the till look short every day.
+  // the till look short every day. For "mixed" (split) sales, only the cash portion
+  // counts, not the full total.
   const cashIncome = (transactions || [])
-    .filter((t) => t.type === "income" && t.payment_method === "cash" && !t.barberTakesCash)
-    .reduce((sum, t) => sum + Number(t.total), 0);
+    .filter((t) => t.type === "income" && isCashLike(t) && !t.barberTakesCash)
+    .reduce((sum, t) => sum + Number(t.cashAmount), 0);
 
   // Cash that a rental barber pocketed directly (informational — shown separately, NOT
   // part of the salon's expected till).
   const rentalCashToBarber = (transactions || [])
-    .filter((t) => t.type === "income" && t.payment_method === "cash" && t.barberTakesCash)
-    .reduce((sum, t) => sum + Number(t.total), 0);
+    .filter((t) => t.type === "income" && isCashLike(t) && t.barberTakesCash)
+    .reduce((sum, t) => sum + Number(t.cashAmount), 0);
 
   const cashExpense = (transactions || [])
-    .filter((t) => t.type === "expense" && t.payment_method === "cash")
-    .reduce((sum, t) => sum + Number(t.total), 0);
+    .filter((t) => t.type === "expense" && isCashLike(t))
+    .reduce((sum, t) => sum + Number(t.cashAmount), 0);
 
   const cardIncome = (transactions || [])
     .filter((t) => t.type === "income" && t.payment_method !== "cash")
-    .reduce((sum, t) => sum + Number(t.total), 0);
+    .reduce((sum, t) => sum + (t.payment_method === "mixed" ? Number(t.total) - Number(t.cashAmount) : Number(t.total)), 0);
 
   const totalIncome = (transactions || [])
     .filter((t) => t.type === "income")
@@ -191,23 +217,43 @@ export async function PATCH(req: NextRequest) {
 
   const { data: transactions } = await supabase
     .from("transactions")
-    .select("type, total, payment_method, barber:profiles(work_mode, rental_cash_to_barber)")
+    .select("id, type, total, payment_method, barber:profiles(work_mode, rental_cash_to_barber)")
     .eq("status", "completed")
     .eq("tenant_id", tenantId)
     .gte("created_at", dayStart)
     .lt("created_at", dayEnd);
+
+  // Mismo fix que en el GET: un cobro dividido guarda payment_method = "mixed" y su
+  // detalle real por metodo vive en transaction_payments, asi que hay que traerlo aparte
+  // para no dejar la parte en efectivo fuera del cierre de caja.
+  const mixedIds = (transactions || [])
+    .filter((t: any) => t.payment_method === "mixed")
+    .map((t: any) => t.id);
+  const mixedCashById = new Map<string, number>();
+  if (mixedIds.length > 0) {
+    const { data: splitRows } = await supabase
+      .from("transaction_payments")
+      .select("transaction_id, amount")
+      .in("transaction_id", mixedIds)
+      .eq("payment_method", "cash");
+    for (const row of splitRows || []) {
+      mixedCashById.set(row.transaction_id, (mixedCashById.get(row.transaction_id) || 0) + Number(row.amount));
+    }
+  }
+  const cashAmountOf = (t: any) => (t.payment_method === "mixed" ? (mixedCashById.get(t.id) || 0) : Number(t.total));
+  const isCashLike = (t: any) => t.payment_method === "cash" || (t.payment_method === "mixed" && cashAmountOf(t) > 0);
 
   // Same exclusion as the GET summary: cash pocketed directly by a rental barber never
   // entered the till, so it must not be part of the expected amount at close.
   const barberTakesCash = (t: any) => t.barber?.work_mode === "rental" && !!t.barber?.rental_cash_to_barber;
 
   const cashIncome = (transactions || [])
-    .filter((t: any) => t.type === "income" && t.payment_method === "cash" && !barberTakesCash(t))
-    .reduce((sum: number, t: any) => sum + Number(t.total), 0);
+    .filter((t: any) => t.type === "income" && isCashLike(t) && !barberTakesCash(t))
+    .reduce((sum: number, t: any) => sum + Number(cashAmountOf(t)), 0);
 
   const cashExpense = (transactions || [])
-    .filter((t: any) => t.type === "expense" && t.payment_method === "cash")
-    .reduce((sum: number, t: any) => sum + Number(t.total), 0);
+    .filter((t: any) => t.type === "expense" && isCashLike(t))
+    .reduce((sum: number, t: any) => sum + Number(cashAmountOf(t)), 0);
 
   const expectedAmount = Number(register.opening_amount) + cashIncome - cashExpense;
   const difference = (closingAmount || 0) - expectedAmount;

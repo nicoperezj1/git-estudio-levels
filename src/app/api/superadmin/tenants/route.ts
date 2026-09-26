@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { name, slug, rut_empresa, admin_email, admin_name, phone, address, plan, logo_url, website, social_media, trial_days } = body;
+  const { name, slug, rut_empresa, admin_email, admin_name, phone, address, plan, logo_url, website, social_media, trial_days, max_professionals } = body;
 
   // Validations
   if (!name || !slug || !admin_email) {
@@ -77,7 +77,15 @@ export async function POST(req: NextRequest) {
     .eq("plan", selectedPlan)
     .single();
 
-  const maxProfessionals = planConfig?.max_professionals || 3;
+  // Pedido de Nico (26-sep): esta ruta solo la puede llamar super_admin (ver
+  // requireSuperAdmin arriba), asi que se permite desacoplar el limite de profesionales
+  // del plan elegido — ej. crear un negocio en plan Pro pero con solo 1-2 profesionales
+  // (para probar), o en plan Basic con 10 (un caso especial acordado con el cliente). Si
+  // no se manda max_professionals, se usa el default del plan como siempre.
+  const overrideMaxProfessionals = Number(max_professionals);
+  const maxProfessionals = Number.isFinite(overrideMaxProfessionals) && overrideMaxProfessionals > 0
+    ? Math.round(overrideMaxProfessionals)
+    : (planConfig?.max_professionals || 3);
   const maxBranches = planConfig?.max_branches || 1;
 
   // Trial: configurable, 15 dias por defecto.

@@ -43,7 +43,7 @@ export default function SuperAdminTenantsPage() {
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string; slug: string } | null>(null);
   const [form, setForm] = useState({
     name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "basic",
-    logo_url: "", website: "", social_media: "", trial_days: "15",
+    logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "",
   });
   const { showToast } = useToast();
   const { switchTenant } = useTenant();
@@ -191,7 +191,7 @@ export default function SuperAdminTenantsPage() {
     if (res.ok) {
       setCreatedInfo({ email: form.admin_email, password: data.temp_password, slug: form.slug });
       setShowCreate(false);
-      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15" });
+      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "" });
       fetchTenants();
       showToast("Empresa creada exitosamente", "success");
     } else {
@@ -448,6 +448,18 @@ export default function SuperAdminTenantsPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-brand-gray block mb-1">
+                    Cantidad de profesionales (opcional)
+                  </label>
+                  <input type="number" min={1} value={form.max_professionals}
+                    onChange={(e) => setForm({ ...form, max_professionals: e.target.value })}
+                    placeholder="Usar el default del plan"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" />
+                  <p className="text-[10px] text-brand-gray mt-1">
+                    Solo Superadmin: permite desacoplar el limite de profesionales del plan elegido (ej. Pro con 1-2 profesionales, o Basic con 10). Dejar vacio usa el default del plan.
+                  </p>
                 </div>
               </div>
 
