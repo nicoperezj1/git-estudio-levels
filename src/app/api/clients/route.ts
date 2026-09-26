@@ -61,11 +61,15 @@ export async function POST(req: NextRequest) {
 
   // Punto 10 (Pablo): alta manual desde el boton "Nuevo" en Clientes. El formulario
   // mandaba un campo "source" que nunca se guardaba (quedaba solo en el estado del
-  // formulario) — quedaba huerfano y Metricas nunca veia estos clientes. Por defecto es
-  // "manual"; si quien lo crea marca que llego por una promocion, se guarda como
-  // "promotion" junto al codigo/influencer que hayan escrito (sourceDetail).
-  const acquisitionSource = source === "promotion" ? "promotion" : "manual";
-  const acquisitionDetail = source === "promotion" ? (sourceDetail || null) : null;
+  // formulario) — quedaba huerfano y Metricas nunca veia estos clientes.
+  //
+  // Segunda vuelta (26-sep): Pablo pidio canales especificos en vez de un generico
+  // "Normal"/"Promocion" — la recepcion siempre pregunta de donde viene el cliente.
+  // "walk_in" (Paso por fuera) es el default cuando no se elige nada. "promotion" e
+  // "influencer" aceptan un detalle opcional (codigo de descuento / @handle).
+  const VALID_SOURCES = ["instagram", "tiktok", "google_maps", "promotion", "walk_in", "influencer"];
+  const acquisitionSource = VALID_SOURCES.includes(source) ? source : "walk_in";
+  const acquisitionDetail = (source === "promotion" || source === "influencer") ? (sourceDetail || null) : null;
 
   const { data, error } = await supabase
     .from("clients")
