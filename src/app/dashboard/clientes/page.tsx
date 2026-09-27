@@ -83,11 +83,21 @@ export default function ClientesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetch("/api/clients", {
+      // Bug (reportado por Nico, 27-sep): esto nunca revisaba si la respuesta fue exitosa
+      // — si el insert fallaba en el servidor (ej. error de base de datos), igual se
+      // mostraba "Cliente creado exitosamente" y se cerraba el modal, dando a entender
+      // que el origen (source) quedo guardado cuando en realidad el cliente ni siquiera
+      // se creo. Ahora se revisa la respuesta antes de celebrar el exito.
+      const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, tenantId: tenant?.id }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Error al crear cliente", "error");
+        return;
+      }
       showToast("Cliente creado exitosamente", "success");
       setShowModal(false);
       setFormData({ name: "", email: "", phone: "", notes: "", source: "walk_in", sourceDetail: "" });
