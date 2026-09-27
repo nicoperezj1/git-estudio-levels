@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { sendRetentionEmail } from "@/lib/resend";
 import { todayInChile, toChileDateStr } from "@/lib/utils";
+import { tryConsumeQuota } from "@/lib/message-quota";
 
 // POST: Send retention message to inactive clients OF THIS BUSINESS.
 //
@@ -101,8 +102,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Cuenta contra el cupo de correos del negocio (Nico, 27-sep: envios masivos de
+    // retencion si cuentan). Se detiene apenas se agota — el resto queda sin enviar y se
+    // informa en la respuesta.
     let sent = 0;
+    let quotaExceeded = false;
     for (const client of withEmail) {
+      const allowed = await tryConsumeQuota(tenantId, "email", "retention");
+      if (!allowed) {
+        quotaExceeded = true;
+        break;
+      }
       try {
         await sendRetentionEmail({
           to: client.email!,
@@ -119,28 +129,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, sent, total: withEmail.length });
+    return NextResponse.json({ success: true, sent, total: withEmail.length, quotaExceeded });
   }
 
   if (type === "whatsapp") {
     const bookingUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
     const withPhone = inactiveClients.filter((c) => c.phone);
 
-    const links = withPhone.map((c) => {
+    if (preview) {
+      return NextResponse.json({
+        preview: true,
+        total: withPhone.length,
+        sample: withPhone.slice(0, 5).map((c) => ({ name: c.name, phone: c.phone })),
+      });
+    }
+
+    // Cada link generado aqui cuenta contra el cupo de WhatsApp del negocio (es un envio
+    // masivo deliberado, no una recarga de pantalla como en /cron/reminders/whatsapp, asi
+    // que no hace falta el dedup por referenceId — cada ejecucion de este boton es una
+    // tanda nueva de mensajes). Se corta la lista apenas se agota el cupo.
+    const links: Array<{ name: string; phone: string | null; url: string }> = [];
+    let quotaExceeded = false;
+    for (const c of withPhone) {
+      const allowed = await tryConsumeQuota(tenantId, "whatsapp", "retention");
+      if (!allowed) {
+        quotaExceeded = true;
+        break;
+      }
       const phone = c.phone!.replace(/\D/g, "").replace(/^0/, "56");
       const whatsappPhone = phone.startsWith("56") ? phone : `56${phone}`;
       let msg = message || `Hola ${c.name}! Te extrañamos.`;
       if (couponCode) msg += `\n\nUsa tu cupon: ${couponCode}`;
       msg += `\n\nAgenda: ${bookingUrl}/booking`;
 
-      return {
+      links.push({
         name: c.name,
         phone: c.phone,
         url: `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(msg)}`,
-      };
-    });
+      });
+    }
 
-    return NextResponse.json({ success: true, links, total: links.length });
+    return NextResponse.json({ success: true, links, total: links.length, quotaExceeded });
   }
 
   return NextResponse.json({ error: "Tipo invalido" }, { status: 400 });

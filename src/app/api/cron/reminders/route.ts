@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     if (client.email) {
       try {
         const tenantId = (appt as any).tenant_id as string | null;
-        const allowed = !tenantId || (await tryConsumeQuota(tenantId, "email", "reminder"));
+        const allowed = !tenantId || (await tryConsumeQuota(tenantId, "email", "reminder", appt.id));
         if (allowed) {
           await sendAppointmentReminder({
             to: client.email,

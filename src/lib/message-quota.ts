@@ -102,15 +102,38 @@ export async function getRemainingQuota(tenantId: string, channel: MessageChanne
  * Intenta consumir UNA unidad de cuota (un mensaje) y la registra en message_usage si hay
  * espacio. Devuelve false (y no registra nada) si el negocio ya alcanzo el limite del
  * ciclo actual — el llamador debe entonces NO enviar/generar ese mensaje.
+ *
+ * `referenceId` (opcional) identifica algo que puede volver a pedirse sin ser un envio
+ * nuevo — ej. el mismo appointmentId al recargar la pagina de Recordatorios, o el mismo
+ * clientId en un reenvio de retencion. Si ya existe un registro con el mismo
+ * tenant+channel+category+referenceId en el ciclo actual, se considera ya contado: no
+ * inserta de nuevo ni descuenta cupo otra vez, pero igual devuelve true (el llamador puede
+ * seguir mostrando/generando ese mensaje puntual).
  */
 export async function tryConsumeQuota(
   tenantId: string,
   channel: MessageChannel,
-  category: MessageCategory
+  category: MessageCategory,
+  referenceId?: string
 ): Promise<boolean> {
   const supabase = createAdminSupabase();
   const quota = await resolvePlanQuota(supabase, tenantId);
   if (!quota) return false; // sin tenant valido, no se envia nada
+
+  if (referenceId) {
+    const { startUtc } = chileDayBoundsUtc(quota.cycleStart);
+    const { data: existing } = await supabase
+      .from("message_usage")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("channel", channel)
+      .eq("category", category)
+      .eq("reference_id", referenceId)
+      .gte("created_at", startUtc)
+      .limit(1)
+      .maybeSingle();
+    if (existing) return true; // ya se conto en este ciclo, no descontar de nuevo
+  }
 
   const limit = channel === "whatsapp" ? quota.whatsapp : quota.email;
   if (limit !== null) {
@@ -118,6 +141,6 @@ export async function tryConsumeQuota(
     if (used >= limit) return false;
   }
 
-  await supabase.from("message_usage").insert({ tenant_id: tenantId, channel, category });
+  await supabase.from("message_usage").insert({ tenant_id: tenantId, channel, category, reference_id: referenceId || null });
   return true;
 }

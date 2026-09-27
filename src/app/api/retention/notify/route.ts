@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { sendRetentionEmail } from "@/lib/resend";
+import { tryConsumeQuota } from "@/lib/message-quota";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
   // Get client
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email, phone")
+    .select("id, name, email, phone, tenant_id")
     .eq("id", clientId)
     .single();
 
@@ -34,6 +35,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cliente no tiene email" }, { status: 400 });
     }
 
+    if (client.tenant_id) {
+      const allowed = await tryConsumeQuota(client.tenant_id, "email", "retention");
+      if (!allowed) {
+        return NextResponse.json({ error: "Se agoto el cupo de correos de este mes. Mejora tu plan o compra mas para seguir enviando." }, { status: 403 });
+      }
+    }
+
     try {
       await sendRetentionEmail({
         to: client.email,
@@ -53,6 +61,13 @@ export async function POST(req: NextRequest) {
   if (type === "whatsapp") {
     if (!client.phone) {
       return NextResponse.json({ error: "Cliente no tiene telefono" }, { status: 400 });
+    }
+
+    if (client.tenant_id) {
+      const allowed = await tryConsumeQuota(client.tenant_id, "whatsapp", "retention");
+      if (!allowed) {
+        return NextResponse.json({ error: "Se agoto el cupo de WhatsApp de este mes. Mejora tu plan o compra mas para seguir enviando." }, { status: 403 });
+      }
     }
 
     // Generate WhatsApp URL
