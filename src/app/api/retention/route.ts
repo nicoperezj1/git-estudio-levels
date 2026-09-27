@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { todayInChile } from "@/lib/utils";
+
+// Bug (reportado por Nico, 27-sep): "dato exacto" de retencion — daysSinceVisit se
+// calculaba con new Date(sinceRef).getTime() vs Date.now(), mezclando una fecha
+// calendario pura (appointments.date, sin hora ni zona) contra un instante UTC. Como
+// Chile esta detras de UTC, eso corre el conteo unas horas y puede hacer que un cliente
+// se vea inactivo (o activo) un dia antes/despues de lo real justo en el borde de la
+// medianoche chilena — el mismo tipo de bug ya corregido en Caja (ver lib/utils.ts).
+// Se resuelve comparando siempre fechas-calendario de Chile, nunca instantes UTC.
+function toChileDateStr(value: string): string {
+  // Un DATE puro (YYYY-MM-DD, sin hora) no tiene ambiguedad de zona horaria — se usa tal
+  // cual. Un TIMESTAMPTZ (con hora) se convierte al dia calendario de Chile.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date(value));
+}
+
+function daysBetweenDateStrs(fromStr: string, toStr: string): number {
+  const [y1, m1, d1] = fromStr.split("-").map(Number);
+  const [y2, m2, d2] = toStr.split("-").map(Number);
+  const from = Date.UTC(y1, m1 - 1, d1);
+  const to = Date.UTC(y2, m2 - 1, d2);
+  return Math.floor((from - to) / (1000 * 60 * 60 * 24));
+}
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -67,15 +90,16 @@ export async function GET(req: NextRequest) {
       // account predates go-live (import, testing, etc.) would look artificially
       // ancient/inactive from day one, distorting the stats the same way a real
       // pre-launch visit would if it were still being counted.
-      let sinceRef = lastVisitMap[client.id] || client.created_at;
-      if (!lastVisitMap[client.id] && retentionStartDate && new Date(client.created_at) < new Date(retentionStartDate)) {
-        sinceRef = retentionStartDate;
+      let sinceRefDateStr = lastVisitMap[client.id] || toChileDateStr(client.created_at);
+      if (!lastVisitMap[client.id] && retentionStartDate) {
+        const retentionStartDateStr = toChileDateStr(retentionStartDate);
+        if (sinceRefDateStr < retentionStartDateStr) sinceRefDateStr = retentionStartDateStr;
       }
       return {
         ...client,
         lastVisit: lastVisitMap[client.id] || null,
         totalVisits: visitCountMap[client.id] || 0,
-        daysSinceVisit: Math.floor((Date.now() - new Date(sinceRef).getTime()) / (1000 * 60 * 60 * 24)),
+        daysSinceVisit: daysBetweenDateStrs(todayInChile(), sinceRefDateStr),
       };
     })
     .filter((c) => c.daysSinceVisit >= days)
