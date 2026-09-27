@@ -41,6 +41,32 @@ export async function POST(req: NextRequest) {
 
   // If userId provided, link user to tenant
   if (userId) {
+    // Bug (reportado por Nico, 27-sep): mismo problema que en POST /api/barberos — esto
+    // unia al usuario como "barber" sin validar tenants.max_professionals, permitiendo
+    // eludir el limite del plan por esta via (codigo de invitacion) aunque el alta manual
+    // desde el panel ya estuviera bloqueada.
+    const { data: tenantRow } = await supabase
+      .from("tenants")
+      .select("max_professionals")
+      .eq("id", invite.tenant_id)
+      .single();
+
+    if (tenantRow && typeof tenantRow.max_professionals === "number") {
+      const { count } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", invite.tenant_id)
+        .eq("role", "barber")
+        .eq("active", true);
+
+      if ((count || 0) >= tenantRow.max_professionals) {
+        return NextResponse.json(
+          { error: "Ups, este negocio ya alcanzó la cantidad máxima de profesionales permitida por su plan." },
+          { status: 403 }
+        );
+      }
+    }
+
     await supabase
       .from("profiles")
       .update({ tenant_id: invite.tenant_id, role: "barber" })

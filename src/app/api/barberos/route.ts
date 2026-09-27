@@ -76,6 +76,45 @@ export async function POST(req: NextRequest) {
   const tempPassword = password || Math.random().toString(36).slice(-8);
   const userRole = role || "barber";
 
+  // Bug (reportado por Nico, 27-sep): esto nunca validaba tenants.max_professionals —
+  // se podian crear profesionales sin limite sin importar el plan contratado (probado en
+  // vivo: negocio con max_professionals=1 permitio crear 3). El limite de "profesionales"
+  // en precios/landing corresponde a los perfiles con role="barber" (admin/recepcion no
+  // cuentan como asiento de profesional). Se valida ANTES de crear el usuario en Auth para
+  // no dejar una cuenta huerfana si se rechaza.
+  if (userRole === "barber") {
+    let resolvedTenantId = tenantId;
+    if (!resolvedTenantId) {
+      const { getCurrentTenantId } = await import("@/lib/supabase/server");
+      resolvedTenantId = await getCurrentTenantId();
+      if (resolvedTenantId === "ALL") resolvedTenantId = null;
+    }
+
+    if (resolvedTenantId) {
+      const { data: tenantRow } = await adminSupabase
+        .from("tenants")
+        .select("max_professionals")
+        .eq("id", resolvedTenantId)
+        .single();
+
+      if (tenantRow && typeof tenantRow.max_professionals === "number") {
+        const { count } = await adminSupabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", resolvedTenantId)
+          .eq("role", "barber")
+          .eq("active", true);
+
+        if ((count || 0) >= tenantRow.max_professionals) {
+          return NextResponse.json(
+            { error: "Ups, has alcanzado la cantidad máxima de profesionales permitida por tu plan. Mejora tu plan para agregar más." },
+            { status: 403 }
+          );
+        }
+      }
+    }
+  }
+
   // Create user in Supabase Auth
   const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
     email,
