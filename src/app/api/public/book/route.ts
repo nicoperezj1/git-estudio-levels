@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { sendBookingConfirmation } from "@/lib/resend";
+import { tryConsumeQuota } from "@/lib/message-quota";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -152,20 +153,26 @@ export async function POST(req: NextRequest) {
     businessLogoUrl = tenantRow?.logo_url || null;
   }
 
-  // Send confirmation email (non-blocking)
+  // Send confirmation email (non-blocking). Cuenta contra el cupo de correos del negocio
+  // (Nico, 27-sep: confirmaciones si cuentan) — si ya lo agoto, no se envia.
   if (clientEmail) {
     try {
-      await sendBookingConfirmation({
-        to: clientEmail,
-        clientName,
-        barberName: barber?.name || "Tu profesional",
-        serviceName: serviceNames,
-        date: start,
-        duration: totalDuration,
-        price: totalPrice,
-        appointmentId: appointment!.id,
-        businessLogoUrl,
-      });
+      const allowed = !tenantId || (await tryConsumeQuota(tenantId, "email", "confirmation"));
+      if (allowed) {
+        await sendBookingConfirmation({
+          to: clientEmail,
+          clientName,
+          barberName: barber?.name || "Tu profesional",
+          serviceName: serviceNames,
+          date: start,
+          duration: totalDuration,
+          price: totalPrice,
+          appointmentId: appointment!.id,
+          businessLogoUrl,
+        });
+      } else {
+        console.warn(`Cupo de correos agotado para tenant ${tenantId}, no se envia confirmacion a ${clientEmail}`);
+      }
     } catch (e) {
       console.error("Error sending confirmation email:", e);
     }

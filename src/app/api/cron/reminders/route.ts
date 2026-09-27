@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { sendAppointmentReminder } from "@/lib/resend";
+import { tryConsumeQuota } from "@/lib/message-quota";
 
 // This endpoint is called by Vercel Cron Jobs every hour
 // It finds appointments in the next 24h that haven't been reminded yet
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
   const { data: appointments } = await supabase
     .from("appointments")
     .select(`
-      id, start_time, date,
+      id, start_time, date, tenant_id,
       client:clients(id, name, email, phone),
       barber:profiles(name),
       services:appointment_services(
@@ -59,19 +60,25 @@ export async function GET(req: NextRequest) {
     let emailSent = false;
     let whatsappReady = false;
 
-    // Send email reminder
+    // Send email reminder (cuenta contra el cupo de correos del negocio).
     if (client.email) {
       try {
-        await sendAppointmentReminder({
-          to: client.email,
-          clientName: client.name,
-          barberName: barber?.name || "Tu profesional",
-          serviceName,
-          date: startTime,
-          appointmentId: appt.id,
-        });
-        emailSent = true;
-        emailsSent++;
+        const tenantId = (appt as any).tenant_id as string | null;
+        const allowed = !tenantId || (await tryConsumeQuota(tenantId, "email", "reminder"));
+        if (allowed) {
+          await sendAppointmentReminder({
+            to: client.email,
+            clientName: client.name,
+            barberName: barber?.name || "Tu profesional",
+            serviceName,
+            date: startTime,
+            appointmentId: appt.id,
+          });
+          emailSent = true;
+          emailsSent++;
+        } else {
+          console.warn(`Cupo de correos agotado para tenant ${tenantId}, no se envia recordatorio a ${client.email}`);
+        }
       } catch (e) {
         console.error(`Error sending reminder to ${client.email}:`, e);
       }
