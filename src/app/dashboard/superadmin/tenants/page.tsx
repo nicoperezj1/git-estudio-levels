@@ -40,6 +40,10 @@ const planColors: Record<string, string> = {
 export default function SuperAdminTenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  // Cambio rapido de plan (Nico, 26-sep, item 33: "poder ver facil el plan actual y
+  // cambiarlo desde ahi") — antes solo se podia cambiar el plan abriendo el modal
+  // completo de Editar. Este id marca que negocio esta guardando su cambio de plan.
+  const [changingPlanId, setChangingPlanId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string; slug: string } | null>(null);
@@ -112,6 +116,33 @@ export default function SuperAdminTenantsPage() {
       fetchTenants();
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const changePlanQuick = async (t: Tenant, newPlan: string) => {
+    if (newPlan === t.plan) return;
+    const previous = t.plan;
+    setChangingPlanId(t.id);
+    // Optimista: refleja el cambio al toque, revierte si falla.
+    setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, plan: newPlan } : x)));
+    try {
+      const res = await fetch(`/api/superadmin/tenants/${t.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, plan: previous } : x)));
+        showToast(data.error || "No se pudo cambiar el plan", "error");
+        return;
+      }
+      showToast(`Plan de ${t.name} cambiado a ${newPlan}`, "success");
+    } catch {
+      setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, plan: previous } : x)));
+      showToast("No se pudo cambiar el plan", "error");
+    } finally {
+      setChangingPlanId(null);
     }
   };
 
@@ -288,9 +319,20 @@ export default function SuperAdminTenantsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-brand-dark">{t.name}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${planColors[t.plan] || ""}`}>
-                        {t.plan}
-                      </span>
+                      {/* Cambio rapido de plan (item 33): antes solo era una etiqueta de
+                          solo lectura, habia que abrir Editar para cambiarlo. */}
+                      <select
+                        value={t.plan}
+                        disabled={changingPlanId === t.id}
+                        onChange={(e) => changePlanQuick(t, e.target.value)}
+                        title="Cambiar plan"
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium border-0 cursor-pointer disabled:opacity-50 ${planColors[t.plan] || ""}`}
+                      >
+                        <option value="basic">basic</option>
+                        <option value="starter">starter</option>
+                        <option value="pro">pro</option>
+                        <option value="enterprise">enterprise</option>
+                      </select>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[t.status] || ""}`}>
                         {t.status === "trial" ? `Trial (${daysLeft(t.trial_ends_at)}d)` : t.status}
                       </span>
