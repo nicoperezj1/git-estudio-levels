@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
-import { Copy, ExternalLink, Globe, Clock, Building2, Image as ImageIcon, Lock, Moon, Sun } from "lucide-react";
+import { Copy, ExternalLink, Globe, Clock, Building2, Image as ImageIcon, Lock, Moon, Sun, MessageCircle, Mail } from "lucide-react";
 import { compressImage } from "@/lib/image-compress";
 
 const dayNames = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
@@ -65,6 +65,14 @@ export default function ConfiguracionPage() {
   const [cancellationHours, setCancellationHours] = useState(24);
   const [depositMessage, setDepositMessage] = useState("Este servicio requiere un abono para confirmar tu cita.");
   const [depositSaving, setDepositSaving] = useState(false);
+
+  // Cupo de mensajeria (Nico, 27-sep: "sistema de tokens... similar a la opcion que tiene
+  // Claude"). Solo lectura aca: se calcula del lado del servidor (GET /api/message-quota)
+  // cada vez que las rutas de envio consumen cupo; esta seccion solo muestra el estado.
+  interface QuotaStatus { channel: "whatsapp" | "email"; limit: number | null; used: number; remaining: number | null; cycleStart: string }
+  const [quota, setQuota] = useState<{ whatsapp: QuotaStatus | null; email: QuotaStatus | null } | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(true);
+  const [requestingQuota, setRequestingQuota] = useState<"whatsapp" | "email" | null>(null);
 
   // Generate time options from 06:00 to 23:00
   const timeOptions: string[] = [];
@@ -266,6 +274,34 @@ export default function ConfiguracionPage() {
       showToast("No se pudo cambiar el tema", "error");
     } finally {
       setSavingTheme(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!tenantId) return;
+    setQuotaLoading(true);
+    fetch(`/api/message-quota?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((data) => setQuota(data.whatsapp !== undefined ? data : null))
+      .catch(() => setQuota(null))
+      .finally(() => setQuotaLoading(false));
+  }, [tenantId]);
+
+  const requestMoreQuota = async (channel: "whatsapp" | "email") => {
+    if (!tenantId || requestingQuota) return;
+    setRequestingQuota(channel);
+    try {
+      const res = await fetch(`/api/message-quota/request?tenantId=${tenantId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel }),
+      });
+      if (!res.ok) throw new Error();
+      showToast("Solicitud enviada. Te contactaremos a la brevedad.", "success");
+    } catch {
+      showToast("No se pudo enviar la solicitud. Intenta de nuevo.", "error");
+    } finally {
+      setRequestingQuota(null);
     }
   };
 
@@ -690,6 +726,79 @@ export default function ConfiguracionPage() {
           </div>
         )}
       </div>
+
+      {/* Cupo de mensajeria (Nico, 27-sep): barra de uso tipo "limites de Claude" para
+          WhatsApp y correo. Visible para todo el que entra a Configuracion (afecta el dia
+          a dia de todo el equipo), pero "Comprar mas" solo tiene sentido para quien decide
+          el plan del negocio. */}
+      {!quotaLoading && quota && (quota.whatsapp || quota.email) && (
+        <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-5">
+          <div>
+            <h2 className="font-bold text-brand-dark">Cupo de Mensajeria</h2>
+            <p className="text-xs text-brand-gray">Cuantos WhatsApp y correos de confirmacion, recordatorio y retencion te quedan este ciclo</p>
+          </div>
+
+          {([
+            { channel: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle, status: quota.whatsapp, barColor: "bg-green-500" },
+            { channel: "email" as const, label: "Correos", icon: Mail, status: quota.email, barColor: "bg-brand-blue" },
+          ]).map(({ channel, label, icon: Icon, status, barColor }) => {
+            if (!status) return null;
+            const unlimited = status.limit === null;
+            const pct = unlimited ? 0 : Math.min(100, Math.round((status.used / Math.max(status.limit!, 1)) * 100));
+            const exhausted = !unlimited && (status.remaining ?? 0) <= 0;
+            const low = !unlimited && !exhausted && (status.remaining ?? 0) <= Math.max(1, Math.round((status.limit || 0) * 0.1));
+            return (
+              <div key={channel} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-brand-dark font-medium">
+                    <Icon className="w-4 h-4 text-brand-gray" />
+                    {label}
+                  </div>
+                  <span className="text-xs text-brand-gray">
+                    {unlimited ? "Ilimitado" : `${status.used} / ${status.limit} usados`}
+                  </span>
+                </div>
+                {!unlimited && (
+                  <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${exhausted ? "bg-red-500" : low ? "bg-amber-500" : barColor}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                )}
+                {exhausted && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Ups, agotaste tu cupo de {label.toLowerCase()} de este mes. Los envios estan pausados hasta el proximo ciclo.</span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => requestMoreQuota(channel)}
+                        disabled={requestingQuota === channel}
+                        className="shrink-0 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {requestingQuota === channel ? "Enviando..." : "Comprar mas tokens"}
+                      </button>
+                    )}
+                  </p>
+                )}
+                {!exhausted && low && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Te quedan pocos {label.toLowerCase()} este mes ({status.remaining} restantes).</span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => requestMoreQuota(channel)}
+                        disabled={requestingQuota === channel}
+                        className="shrink-0 px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 disabled:opacity-50"
+                      >
+                        {requestingQuota === channel ? "Enviando..." : "Comprar mas tokens"}
+                      </button>
+                    )}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Tema (Punto Nico, 25-sep): solo Administrador — a diferencia del resto de esta
           pagina (admin + recepcion), el tema es de todo el negocio: lo elige el admin y
