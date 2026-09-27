@@ -735,6 +735,18 @@ export default function ConfiguracionPage() {
           <p className="text-xs text-brand-gray">
             Este cambio aplica a todo el sistema para {businessData.name || "tu negocio"}: colores, tarjetas y el logo de re-booking se adaptan automaticamente.
           </p>
+          {/* Bug (reportado por Nico, 26-sep): "aparece boton verde, pero no realiza
+              cambios" — el toggle SI guarda y aplica el tema (activa .dark en <html>), pero
+              hoy solo un grupo reducido de pantallas tiene estilos dark: definidos, asi que
+              elegir "Oscuro" se veia como si el boton "no hiciera nada" en el resto del
+              sistema. Se avisa esto en vez de ocultar el selector (evitaria que un negocio
+              que ya eligio "Oscuro" pueda volver a "Claro") o prometer una cobertura que
+              todavia no existe. La ampliacion a todas las pantallas queda pendiente
+              (tarea de mayor costo, evaluada aparte con Nico).
+          */}
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Por ahora el tema oscuro se ve reflejado en una parte del sistema — seguimos ampliándolo al resto de las pantallas.
+          </p>
         </div>
       )}
 
