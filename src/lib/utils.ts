@@ -133,3 +133,33 @@ export function daysBetweenDateStrs(fromStr: string, toStr: string): number {
   const to = Date.UTC(y2, m2 - 1, d2);
   return Math.floor((from - to) / (1000 * 60 * 60 * 24));
 }
+
+/**
+ * Start (YYYY-MM-DD, Chile calendar) of a tenant's CURRENT monthly billing/usage cycle,
+ * anchored to the day-of-month it signed up (Nico, 27-sep — cuotas de mensajeria: "cada
+ * negocio tiene su propio ciclo de 30 dias desde que se suscribio", not a shared calendar
+ * month for everyone). Clamps to the last day of a shorter month (a business created on
+ * the 31st cycles on Feb 28/29, Apr 30, etc. instead of overflowing into the next month),
+ * and never returns a date before the tenant's own creation date.
+ */
+export function tenantCycleStart(createdAtIso: string): string {
+  const created = toChileDateStr(createdAtIso);
+  const [cy, cm, cd] = created.split("-").map(Number);
+  const today = todayInChile();
+  const [ty, tm] = today.split("-").map(Number);
+
+  const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // m: 1-indexed
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const clamp = (y: number, m: number, d: number) => Math.min(d, daysInMonth(y, m));
+
+  let candY = ty, candM = tm;
+  let candidate = `${candY}-${pad(candM)}-${pad(clamp(candY, candM, cd))}`;
+
+  if (candidate > today) {
+    candM -= 1;
+    if (candM === 0) { candM = 12; candY -= 1; }
+    candidate = `${candY}-${pad(candM)}-${pad(clamp(candY, candM, cd))}`;
+  }
+
+  return candidate < created ? created : candidate;
+}
