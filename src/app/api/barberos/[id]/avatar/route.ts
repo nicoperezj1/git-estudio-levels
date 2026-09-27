@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 
 // POST: Upload avatar for a professional
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await authorizeBarberManagement(params.id, { allowSelf: true });
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const supabase = createAdminSupabase();
 
   const formData = await req.formData();
@@ -48,6 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
 // DELETE: Remove avatar
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await authorizeBarberManagement(params.id, { allowSelf: true });
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const supabase = createAdminSupabase();
 
   // Remove from storage

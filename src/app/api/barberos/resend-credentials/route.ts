@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
   if (!profile) {
     return NextResponse.json({ error: "No se encontro el perfil de este profesional." }, { status: 404 });
   }
+
+  // SEGURIDAD: antes cualquiera podia resetear la clave de cualquier usuario.
+  const auth = await authorizeBarberManagement(profile.id);
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const targetEmail = (email || profile.email || "").trim();
   if (!targetEmail) {

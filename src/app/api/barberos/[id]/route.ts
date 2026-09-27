@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
 // GET: Get single professional profile
@@ -7,6 +7,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: devolvia el perfil completo (email, PIN, tarifas) sin login.
+  const auth = await authorizeBarberManagement(params.id, { allowSelf: true });
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
   const supabase = createAdminSupabase();
   const { data, error } = await supabase
     .from("profiles")
@@ -23,6 +27,12 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: antes cualquiera podia editar cualquier perfil. Ahora: admin/recepcion del
+  // mismo negocio (o super_admin); el propio profesional solo sus datos publicos.
+  const auth = await authorizeBarberManagement(params.id, { allowSelf: true });
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const selfEditableFields = ["phone", "avatar_url", "bio", "specialties", "intro_video_url", "years_experience", "instagram"];
+
   const supabase = createAdminSupabase();
   const body = await req.json();
 
@@ -37,7 +47,7 @@ export async function PATCH(
   ];
 
   const update: Record<string, any> = {};
-  for (const key of allowedFields) {
+  for (const key of auth.self ? selfEditableFields : allowedFields) {
     if (body[key] !== undefined) update[key] = body[key];
   }
 
@@ -89,8 +99,12 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createAdminSupabase();
   const barberId = params.id;
+  const auth = await authorizeBarberManagement(barberId);
+  if (!auth.ok || auth.role === "receptionist") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+  const supabase = createAdminSupabase();
 
   const { data: profile } = await supabase
     .from("profiles")
