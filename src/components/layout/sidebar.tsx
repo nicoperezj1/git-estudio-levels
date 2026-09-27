@@ -214,6 +214,15 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     if (isSoloBusiness && SOLO_BUSINESS_HIDDEN_ROUTES.includes(item.href)) return null;
     if (TEMP_HIDDEN_ROUTES.includes(item.href)) return null;
 
+    // Seguridad/UX (Nico, 26-sep): "Super Admin" es un rol, no algo que se desbloquee
+    // pagando un plan — antes, un admin/recepcion/profesional que no fuera super_admin
+    // veia estos items igual, marcados con la insignia "PRO" (pensada para funciones que
+    // SI se pueden desbloquear con otro plan). Eso confundia: parecia que "actualizando"
+    // el plan del negocio se podia llegar a Empresas/Auditoria/Sesiones/Horarios, cuando
+    // en realidad ningun plan da ese acceso. Ahora se ocultan por completo para cualquiera
+    // que no sea super_admin, en vez de mostrarse bloqueados.
+    if (item.minRole === "super_admin" && effectiveRole !== "super_admin") return null;
+
     const whitelist = ROLE_MENU_ACCESS[effectiveRole];
     const locked = whitelist ? !whitelist.includes(item.href) : !isAtLeast(item.minRole);
 
