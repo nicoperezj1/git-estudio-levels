@@ -24,6 +24,10 @@ interface NavItem {
   // Configuracion), para comprimir la barra lateral — el padre sigue siendo un link a su
   // propia pagina, y un chevron aparte expande/colapsa sus hijos.
   children?: NavItem[];
+  // Item 34 (Nico, 26-sep): "matriz de accesos por plan" — un modulo cuyo acceso depende
+  // del plan contratado (no del rol). Cuando el plan del negocio no incluye esta feature,
+  // el item se muestra bloqueado con la misma insignia "PRO" que ya existia para roles.
+  feature?: string;
 }
 
 interface NavSection {
@@ -36,7 +40,7 @@ const sections: NavSection[] = [
     title: "Principal",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, minRole: "admin" },
-      { name: "Caja", href: "/dashboard/caja", icon: Wallet, minRole: "admin" },
+      { name: "Caja", href: "/dashboard/caja", icon: Wallet, minRole: "admin", feature: "cash_register" },
       { name: "Punto de Venta", href: "/dashboard/pos", icon: ShoppingCart, minRole: "receptionist" },
       { name: "Standby", href: "/dashboard/standby", icon: Zap, minRole: "barber" },
     ],
@@ -50,7 +54,7 @@ const sections: NavSection[] = [
         // Fidelidad y Retencion anidadas bajo Clientes en vez de como filas propias.
         children: [
           { name: "Métricas", href: "/dashboard/clientes/metricas", icon: BarChart3, minRole: "receptionist" },
-          { name: "Fidelidad", href: "/dashboard/fidelidad", icon: Star, minRole: "admin" },
+          { name: "Fidelidad", href: "/dashboard/fidelidad", icon: Star, minRole: "admin", feature: "loyalty" },
           { name: "Retencion", href: "/dashboard/retencion", icon: Heart, minRole: "admin" },
         ],
       },
@@ -81,13 +85,13 @@ const sections: NavSection[] = [
       { name: "Mi Billetera", href: "/dashboard/mi-billetera", icon: Wallet, minRole: "barber" },
       { name: "Cierre Mensual", href: "/dashboard/reportes", icon: BarChart3, minRole: "admin" },
       { name: "Boletas", href: "/dashboard/boletas", icon: Receipt, minRole: "admin" },
-      { name: "Facturas", href: "/dashboard/facturas", icon: Receipt, minRole: "admin" },
+      { name: "Facturas", href: "/dashboard/facturas", icon: Receipt, minRole: "admin", feature: "invoices" },
     ],
   },
   {
     title: "Catalogo",
     items: [
-      { name: "Cupones", href: "/dashboard/cupones", icon: CreditCard, minRole: "admin" },
+      { name: "Cupones", href: "/dashboard/cupones", icon: CreditCard, minRole: "admin", feature: "coupons" },
       { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
       { name: "Galeria", href: "/dashboard/galeria", icon: Image, minRole: "admin" },
     ],
@@ -104,11 +108,11 @@ const sections: NavSection[] = [
         // Punto (Nico, 25-sep): Comisiones/Arriendo/Terminal POS (antes en Finanzas) y
         // Servicios/Inventario (antes en Catalogo) pasan a ser hijos de Configuracion.
         children: [
-          { name: "Comisiones", href: "/dashboard/comisiones", icon: Zap, minRole: "barber" },
-          { name: "Arriendo", href: "/dashboard/arriendo", icon: Zap, minRole: "admin" },
-          { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin" },
+          { name: "Comisiones", href: "/dashboard/comisiones", icon: Zap, minRole: "barber", feature: "commissions" },
+          { name: "Arriendo", href: "/dashboard/arriendo", icon: Zap, minRole: "admin", feature: "rental" },
+          { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin", feature: "pos" },
           { name: "Servicios", href: "/dashboard/servicios", icon: Tag, minRole: "admin" },
-          { name: "Inventario", href: "/dashboard/inventario", icon: Package, minRole: "admin" },
+          { name: "Inventario", href: "/dashboard/inventario", icon: Package, minRole: "admin", feature: "inventory" },
         ],
       },
     ],
@@ -174,7 +178,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
   // negocio real de la cuenta del super_admin (ej. Estudio Levels), dando la impresion de
   // datos cruzados. Se usa el tenant del contexto (que si respeta el override) cuando hay
   // uno activo, y se cae al valor del servidor en cualquier otro caso.
-  const { tenant: overrideTenant, isOverriding } = useTenant();
+  const { tenant: overrideTenant, isOverriding, hasPlanFeature } = useTenant();
   const effectiveTenantName = isOverriding && overrideTenant ? overrideTenant.name : tenantName;
   // Punto 15 (Pablo): el espacio de la foto en la esquina inferior izquierda siempre
   // mostraba solo iniciales, nunca la foto real, aunque el profesional ya tuviera una
@@ -224,12 +228,20 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     if (item.minRole === "super_admin" && effectiveRole !== "super_admin") return null;
 
     const whitelist = ROLE_MENU_ACCESS[effectiveRole];
-    const locked = whitelist ? !whitelist.includes(item.href) : !isAtLeast(item.minRole);
+    const roleLocked = whitelist ? !whitelist.includes(item.href) : !isAtLeast(item.minRole);
 
-    // Para roles con whitelist explicita (receptionist/barber): un item bloqueado se saca
-    // por completo en vez de mostrarse como "PRO" — mismo comportamiento de antes, ahora
-    // recursivo para que tambien aplique a los hijos.
-    if (whitelist && locked) return null;
+    // Item 34 (Nico, 26-sep): "matriz de accesos por plan" — ademas del rol, un item puede
+    // requerir una feature que el plan del negocio no incluya (ej. Caja en Basic/Starter).
+    // super_admin sin tenant activo (hasPlanFeature devuelve true sin tenant) ve todo.
+    const planLocked = !!item.feature && !hasPlanFeature(item.feature);
+    const locked = roleLocked || planLocked;
+
+    // Para roles con whitelist explicita (receptionist/barber): un item bloqueado POR ROL
+    // se saca por completo en vez de mostrarse como "PRO" — mismo comportamiento de antes,
+    // ahora recursivo para que tambien aplique a los hijos. Uno bloqueado solo por el plan
+    // SI se muestra (con la insignia), para que reception/barber tambien vean que existe
+    // ese modulo y que hace falta mejorar el plan para usarlo.
+    if (whitelist && roleLocked) return null;
 
     const children = item.children
       ?.map(processItem)

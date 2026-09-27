@@ -3,6 +3,7 @@ import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/ser
 import { sendRetentionEmail } from "@/lib/resend";
 import { todayInChile, toChileDateStr } from "@/lib/utils";
 import { tryConsumeQuota } from "@/lib/message-quota";
+import { tenantHasFeature } from "@/lib/plan-features";
 
 // POST: Send retention message to inactive clients OF THIS BUSINESS.
 //
@@ -29,6 +30,13 @@ export async function POST(req: NextRequest) {
       { error: "No se pudo identificar el negocio. Recarga la pagina e intenta de nuevo." },
       { status: 400 }
     );
+  }
+
+  // Item 34 (Nico, 26-sep): "Mensajes masivos" es feature de plan (Starter+, Basic no la
+  // incluye). Se corta antes del preview tambien — si el plan no lo tiene, no hay nada que
+  // previsualizar.
+  if (!(await tenantHasFeature(tenantId, "whatsapp_bulk"))) {
+    return NextResponse.json({ error: "Los mensajes masivos no estan incluidos en tu plan actual. Mejora tu plan para usarlos." }, { status: 403 });
   }
 
   // Bug (reportado por Nico, 27-sep): mismo problema encontrado en GET /api/retention —

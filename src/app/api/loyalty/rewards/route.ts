@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { tenantHasFeature } from "@/lib/plan-features";
 
 // POST: Create a reward
 export async function POST(req: NextRequest) {
@@ -16,6 +17,11 @@ export async function POST(req: NextRequest) {
   }
   if (!tenantId) {
     return NextResponse.json({ error: "No se pudo determinar el negocio para la recompensa." }, { status: 400 });
+  }
+
+  // Item 34: "Sistema de fidelizacion" es feature de plan (Pro+).
+  if (!(await tenantHasFeature(tenantId, "loyalty"))) {
+    return NextResponse.json({ error: "El sistema de fidelizacion no esta incluido en tu plan actual. Mejora tu plan para usarlo." }, { status: 403 });
   }
 
   const { data, error } = await supabase

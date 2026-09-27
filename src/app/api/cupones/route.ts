@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentTenantId, resolveTenantForRequest } from "@/lib/supabase/server";
+import { tenantHasFeature } from "@/lib/plan-features";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -34,6 +35,11 @@ export async function POST(req: NextRequest) {
   // this, coupons were created with no tenant and then never showed up in the
   // (tenant-filtered) list.
   const { tenantId } = await resolveTenantForRequest(body.tenantId);
+
+  // Item 34: "Cupones de descuento" es feature de plan (Starter+) — Basic no la incluye.
+  if (!(await tenantHasFeature(tenantId, "coupons"))) {
+    return NextResponse.json({ error: "Los cupones de descuento no estan incluidos en tu plan actual. Mejora tu plan para usarlos." }, { status: 403 });
+  }
 
   const { data, error } = await supabase
     .from("coupons")
