@@ -16,6 +16,8 @@ interface Tenant {
   admin_name: string | null;
   phone: string | null;
   max_professionals: number;
+  whatsapp_quota_override: number | null;
+  email_quota_override: number | null;
   trial_ends_at: string | null;
   active: boolean;
   created_at: string;
@@ -86,6 +88,8 @@ export default function SuperAdminTenantsPage() {
       plan: t.plan,
       status: t.status,
       max_professionals: t.max_professionals,
+      whatsapp_quota_override: t.whatsapp_quota_override,
+      email_quota_override: t.email_quota_override,
     });
   };
 
@@ -595,6 +599,24 @@ export default function SuperAdminTenantsPage() {
                 <input type="number" min={1} value={editForm.max_professionals ?? ""}
                   onChange={(e) => setEditForm({ ...editForm, max_professionals: Number(e.target.value) })}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+              </div>
+              {/* Cupos de mensajeria (Nico, 27-sep): override por negocio, mismo patron que
+                  Max. profesionales — vacio = usa el default del plan elegido arriba. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Cupo WhatsApp/mes</label>
+                  <input type="number" min={0} placeholder="Default del plan"
+                    value={editForm.whatsapp_quota_override ?? ""}
+                    onChange={(e) => setEditForm({ ...editForm, whatsapp_quota_override: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Cupo correos/mes</label>
+                  <input type="number" min={0} placeholder="Default del plan"
+                    value={editForm.email_quota_override ?? ""}
+                    onChange={(e) => setEditForm({ ...editForm, email_quota_override: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                </div>
               </div>
             </div>
             <div className="flex gap-2 pt-4">
