@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { sendRetentionEmail } from "@/lib/resend";
+import { todayInChile, toChileDateStr } from "@/lib/utils";
 
 // POST: Send retention message to inactive clients OF THIS BUSINESS.
 //
@@ -29,8 +30,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - (days || 30));
+  // Bug (reportado por Nico, 27-sep): mismo problema encontrado en GET /api/retention —
+  // esto comparaba una fecha calendario pura (appointments.date) contra un instante UTC
+  // (new Date()/setDate()), corriendo el corte unas horas por el desfase de Chile con UTC.
+  // Ademas, a diferencia de esa pantalla, este envio masivo NUNCA aplicaba
+  // tenants.retention_start_date (Punto 13, Pablo) — asi que un cliente cuya unica señal
+  // era una visita/alta anterior al inicio real del negocio en re-booking (importacion,
+  // pruebas) SI podia recibir el mensaje masivo, aunque la pantalla de Retencion ya lo
+  // excluye a propósito por ser "dato no confiable". Se alinea con la misma logica.
+  const cutoffDateStr = (() => {
+    const [y, m, d] = todayInChile().split("-").map(Number);
+    const anchor = new Date(Date.UTC(y, m - 1, d, 12));
+    anchor.setUTCDate(anchor.getUTCDate() - (days || 30));
+    return anchor.toISOString().split("T")[0];
+  })();
+
+  let retentionStartDate: string | null = null;
+  {
+    const { data: tenantRow } = await supabase
+      .from("tenants")
+      .select("retention_start_date, created_at")
+      .eq("id", tenantId)
+      .single();
+    retentionStartDate = tenantRow?.retention_start_date || tenantRow?.created_at || null;
+  }
 
   // Clients of THIS business only.
   const { data: clients } = await supabase
@@ -38,16 +61,19 @@ export async function POST(req: NextRequest) {
     .select("id, name, email, phone, created_at")
     .eq("tenant_id", tenantId);
 
-  // Last completed visit per client (scoped to this business's clients).
+  // Last completed visit per client (scoped to this business's clients and, same as la
+  // pantalla de Retencion, nunca antes del inicio real del negocio en re-booking).
   const clientIds = (clients || []).map((c) => c.id);
   const lastVisitMap: Record<string, string> = {};
   if (clientIds.length > 0) {
-    const { data: appointments } = await supabase
+    let apptQuery = supabase
       .from("appointments")
       .select("client_id, date")
       .eq("status", "completed")
       .in("client_id", clientIds)
       .order("date", { ascending: false });
+    if (retentionStartDate) apptQuery = apptQuery.gte("date", retentionStartDate);
+    const { data: appointments } = await apptQuery;
     for (const appt of appointments || []) {
       if (!lastVisitMap[appt.client_id]) lastVisitMap[appt.client_id] = appt.date;
     }
@@ -55,9 +81,12 @@ export async function POST(req: NextRequest) {
 
   // Filter inactive
   const inactiveClients = (clients || []).filter((c) => {
-    const lastVisit = lastVisitMap[c.id];
-    const referenceDate = lastVisit ? new Date(lastVisit) : new Date(c.created_at);
-    return referenceDate < cutoffDate;
+    let sinceRefDateStr = lastVisitMap[c.id] || toChileDateStr(c.created_at);
+    if (!lastVisitMap[c.id] && retentionStartDate) {
+      const retentionStartDateStr = toChileDateStr(retentionStartDate);
+      if (sinceRefDateStr < retentionStartDateStr) sinceRefDateStr = retentionStartDateStr;
+    }
+    return sinceRefDateStr < cutoffDateStr;
   });
 
   if (type === "email") {

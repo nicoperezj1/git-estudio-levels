@@ -1,28 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
-import { todayInChile } from "@/lib/utils";
-
-// Bug (reportado por Nico, 27-sep): "dato exacto" de retencion — daysSinceVisit se
-// calculaba con new Date(sinceRef).getTime() vs Date.now(), mezclando una fecha
-// calendario pura (appointments.date, sin hora ni zona) contra un instante UTC. Como
-// Chile esta detras de UTC, eso corre el conteo unas horas y puede hacer que un cliente
-// se vea inactivo (o activo) un dia antes/despues de lo real justo en el borde de la
-// medianoche chilena — el mismo tipo de bug ya corregido en Caja (ver lib/utils.ts).
-// Se resuelve comparando siempre fechas-calendario de Chile, nunca instantes UTC.
-function toChileDateStr(value: string): string {
-  // Un DATE puro (YYYY-MM-DD, sin hora) no tiene ambiguedad de zona horaria — se usa tal
-  // cual. Un TIMESTAMPTZ (con hora) se convierte al dia calendario de Chile.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date(value));
-}
-
-function daysBetweenDateStrs(fromStr: string, toStr: string): number {
-  const [y1, m1, d1] = fromStr.split("-").map(Number);
-  const [y2, m2, d2] = toStr.split("-").map(Number);
-  const from = Date.UTC(y1, m1 - 1, d1);
-  const to = Date.UTC(y2, m2 - 1, d2);
-  return Math.floor((from - to) / (1000 * 60 * 60 * 24));
-}
+import { todayInChile, toChileDateStr, daysBetweenDateStrs } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();

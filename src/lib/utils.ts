@@ -107,3 +107,29 @@ export function chileDayBoundsUtc(dateStr: string): { startUtc: string; endUtc: 
   const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
   return { startUtc: startUtc.toISOString(), endUtc: endUtc.toISOString() };
 }
+
+/**
+ * Normalizes either a plain DATE (YYYY-MM-DD, no time/zone — used as-is, since it has no
+ * timezone ambiguity to begin with) or a TIMESTAMPTZ string to Chile's calendar date.
+ * Used (Nico, 27-sep) anywhere a value needs to be compared against another calendar date
+ * without mixing in a raw UTC instant — see daysBetweenDateStrs below.
+ */
+export function toChileDateStr(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date(value));
+}
+
+/**
+ * Whole calendar days between two YYYY-MM-DD strings (fromStr - toStr), computed on pure
+ * date arithmetic (UTC-midnight anchors, matching dateStrOffset above) so it never mixes
+ * in a raw UTC instant (Date.now()) against a calendar-only date — the bug found in
+ * /api/retention, which could show a client inactive/active a day off from reality right
+ * at the Chile midnight boundary.
+ */
+export function daysBetweenDateStrs(fromStr: string, toStr: string): number {
+  const [y1, m1, d1] = fromStr.split("-").map(Number);
+  const [y2, m2, d2] = toStr.split("-").map(Number);
+  const from = Date.UTC(y1, m1 - 1, d1);
+  const to = Date.UTC(y2, m2 - 1, d2);
+  return Math.floor((from - to) / (1000 * 60 * 60 * 24));
+}
