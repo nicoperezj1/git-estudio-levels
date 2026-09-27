@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, todayInChile, chileDateOffset } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
@@ -40,6 +40,19 @@ const assignedToLabels: Record<string, string> = {
   business: "Negocio general",
 };
 
+// Item 38 (Nico, 26-sep): selector de rango para el valor mostrado (antes solo se podia
+// elegir fecha a mano, sin atajos, y en la practica se veia "el mes" porque el limite de
+// 1000 filas mas recientes solia cubrir mas o menos eso). Mismos rangos que se manejan en
+// otras pantallas del sistema (Dashboard, Billetera), en dias hacia atras desde hoy.
+const QUICK_RANGES = [
+  { key: "today", label: "Hoy", days: 0 },
+  { key: "week", label: "Semana", days: 7 },
+  { key: "month", label: "Mes", days: 30 },
+  { key: "3m", label: "3 meses", days: 90 },
+  { key: "6m", label: "6 meses", days: 180 },
+  { key: "1y", label: "1 año", days: 365 },
+] as const;
+
 const emptyFormData = {
   type: "income" as "income" | "expense",
   description: "",
@@ -54,8 +67,12 @@ export default function FinanzasPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [filter, setFilter] = useState<"all" | "income" | "expense">("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Default a "Mes" (item 38): es lo mas parecido a lo que se veia antes por el limite de
+  // filas, pero ahora es explicito y se puede cambiar con un clic en vez de tener que
+  // adivinar/escribir fechas a mano.
+  const [quickRange, setQuickRange] = useState<string>("month");
+  const [dateFrom, setDateFrom] = useState(() => chileDateOffset(-30));
+  const [dateTo, setDateTo] = useState(() => todayInChile());
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   // Punto 5: null = creando una transaccion nueva; con id = editando una existente
@@ -124,6 +141,13 @@ export default function FinanzasPage() {
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + Number(t.total), 0);
   const balance = totalIncome - totalExpenses;
+  const rangeLabel = QUICK_RANGES.find((r) => r.key === quickRange)?.label || null;
+
+  const applyQuickRange = (key: string, days: number) => {
+    setQuickRange(key);
+    setDateFrom(chileDateOffset(-days));
+    setDateTo(todayInChile());
+  };
 
   const closeModal = () => {
     setShowModal(false);
@@ -220,18 +244,19 @@ export default function FinanzasPage() {
         </button>
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards — el rango entre parentesis aclara a que periodo corresponde el
+          numero, ya que ahora es elegible (item 38) en vez de fijo. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-          <p className="text-sm text-gray-500">Total Ingresos</p>
+          <p className="text-sm text-gray-500">Total Ingresos {rangeLabel && `(${rangeLabel})`}</p>
           <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
-          <p className="text-sm text-gray-500">Total Egresos</p>
+          <p className="text-sm text-gray-500">Total Egresos {rangeLabel && `(${rangeLabel})`}</p>
           <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow border-l-4 border-indigo-500">
-          <p className="text-sm text-gray-500">Balance</p>
+          <p className="text-sm text-gray-500">Balance {rangeLabel && `(${rangeLabel})`}</p>
           <p className="text-2xl font-bold text-indigo-600">{formatCurrency(balance)}</p>
         </div>
       </div>
@@ -257,18 +282,34 @@ export default function FinanzasPage() {
             </button>
           ))}
         </div>
+        {/* Item 38: atajos de rango en vez de tener que escribir fechas a mano cada vez. */}
+        <div className="flex gap-2 flex-wrap">
+          {QUICK_RANGES.map((r) => (
+            <button
+              key={r.key}
+              onClick={() => applyQuickRange(r.key, r.days)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                quickRange === r.key
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-2 items-center">
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => { setQuickRange("custom"); setDateFrom(e.target.value); }}
             className="border rounded-lg px-3 py-2 text-sm"
           />
           <span className="text-gray-500">a</span>
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => { setQuickRange("custom"); setDateTo(e.target.value); }}
             className="border rounded-lg px-3 py-2 text-sm"
           />
         </div>
