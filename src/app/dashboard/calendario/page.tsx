@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
-import { formatCurrency, todayInChile } from "@/lib/utils";
+import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
@@ -90,6 +90,14 @@ export default function CalendarioPage() {
   const [view, setView] = useState<"calendario" | "lista">("calendario");
   const [listBarberFilter, setListBarberFilter] = useState("");
   const [date, setDate] = useState(todayInChile());
+  // Vista por profesional a 1/3/7 dias (Nico, 28-sep), inspirada en Setmore: al elegir un
+  // profesional puntual (en vez de "Todos"), la grilla normal de "una columna por
+  // profesional en un solo dia" se reemplaza por "una columna por dia" para ESE
+  // profesional, y aparecen los botones 1/3/7 dias. Version simple (primera entrega,
+  // a pedido de Nico): solo lectura — click para ver el detalle, sin arrastrar para crear
+  // ni mover/redimensionar citas en esta vista todavia (eso sigue solo en la vista normal).
+  const [professionalFilter, setProfessionalFilter] = useState("");
+  const [rangeDays, setRangeDays] = useState<1 | 3 | 7>(1);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -308,18 +316,33 @@ export default function CalendarioPage() {
     if (tenantLoading) return;
     fetchAppointments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, tenantLoading, tenant?.id, isBarber, user?.id]);
+  }, [date, tenantLoading, tenant?.id, isBarber, user?.id, professionalFilter, rangeDays]);
+
+  // Cuando hay un profesional elegido (vista 1/3/7 dias), se pide el rango completo de
+  // dias de una sola vez en vez de un fetch por dia -- ver dateFrom/dateTo en
+  // /api/appointments. Sin profesional elegido, se comporta exactamente igual que antes
+  // (un solo dia, todos los profesionales).
+  const rangeDates = professionalFilter
+    ? Array.from({ length: rangeDays }, (_, i) => dateStrOffset(date, i))
+    : [date];
 
   const fetchAppointments = async () => {
     setLoading(true);
     try {
       const t = getActiveTenantId();
       const params = new URLSearchParams();
-      params.set("date", date);
+      if (professionalFilter) {
+        params.set("dateFrom", rangeDates[0]);
+        params.set("dateTo", rangeDates[rangeDates.length - 1]);
+      } else {
+        params.set("date", date);
+      }
       if (t) params.set("tenantId", t);
       // A barber only fetches their own appointments (don't ship the whole team's data
-      // to their browser).
+      // to their browser). El filtro de profesional (para admin/recepcion) solo aplica
+      // cuando el usuario no es ya un barbero restringido a si mismo.
       if (isBarber && user?.id) params.set("barberId", user.id);
+      else if (professionalFilter) params.set("barberId", professionalFilter);
       const res = await fetch(`/api/appointments?${params.toString()}`);
       const data = await res.json();
       // Filter out cancelled and no_show appointments
@@ -394,8 +417,12 @@ export default function CalendarioPage() {
 
   // Navigation
   const changeDate = (delta: number) => {
+    // En la vista por profesional a varios dias, "siguiente/anterior" avanza el bloque
+    // completo (ej. la semana entera), no un solo dia -- si no, avanzar "1" solo movería
+    // la primera columna y dejaría 6 dias repetidos.
+    const step = professionalFilter ? rangeDays : 1;
     const d = new Date(date);
-    d.setDate(d.getDate() + delta);
+    d.setDate(d.getDate() + delta * step);
     setDate(d.toISOString().split("T")[0]);
   };
   const isToday = date === todayInChile();
@@ -838,6 +865,34 @@ export default function CalendarioPage() {
               {fullDay ? "Horario reducido" : "Ver todo el dia"}
             </button>
           )}
+          {/* Vista por profesional a 1/3/7 dias (Nico, 28-sep). "Todos" = la grilla de
+              siempre (una columna por profesional, un solo dia). Al elegir uno puntual
+              aparecen los botones de rango. */}
+          {view === "calendario" && (
+            <select
+              value={professionalFilter}
+              onChange={(e) => { setProfessionalFilter(e.target.value); setRangeDays(1); }}
+              className="border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">Todos los profesionales</option>
+              {displayBarbers.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
+          {view === "calendario" && professionalFilter && (
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              {([1, 3, 7] as const).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setRangeDays(n)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${rangeDays === n ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+                >
+                  {n === 1 ? "1 dia" : `${n} dias`}
+                </button>
+              ))}
+            </div>
+          )}
           {view === "lista" && (
             <select value={listBarberFilter} onChange={(e) => setListBarberFilter(e.target.value)}
               className="border rounded-lg px-3 py-2 text-sm">
@@ -855,11 +910,94 @@ export default function CalendarioPage() {
       </div>
 
       <p className="text-center text-sm text-gray-600 font-medium">
-        {new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
-        <span className="text-gray-400 ml-2">· Toca "Agendar" o arrastra sobre el horario</span>
+        {professionalFilter && rangeDays > 1 ? (
+          <>
+            {new Date(rangeDates[0] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
+            {" – "}
+            {new Date(rangeDates[rangeDates.length - 1] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
+            <span className="text-gray-400 ml-2">· {displayBarbers.find((b) => b.id === professionalFilter)?.name} · solo lectura, toca una cita para ver el detalle</span>
+          </>
+        ) : (
+          <>
+            {new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
+            <span className="text-gray-400 ml-2">· Toca "Agendar" o arrastra sobre el horario</span>
+          </>
+        )}
       </p>
 
-      {view === "calendario" && (loading ? <Spinner /> : (
+      {/* Vista por profesional a 1/3/7 dias — una columna por dia, solo lectura (version
+          simple, punto pendiente pulir drag-to-create/mover en esta vista mas adelante). */}
+      {view === "calendario" && professionalFilter && (loading ? <Spinner /> : (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+          <div className="min-w-[800px]">
+            <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
+              <div className="w-14 flex-shrink-0 border-r border-gray-100" />
+              {rangeDates.map((d) => {
+                const isColTodayHeader = d === todayInChile();
+                const label = new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
+                return (
+                  <div key={d} className={`flex-1 p-2 text-center border-r border-gray-100 min-w-[120px] ${isColTodayHeader ? "bg-blue-50" : ""}`}>
+                    <p className={`text-[11px] font-medium truncate mt-0.5 ${isColTodayHeader ? "text-blue-700" : "text-gray-700"}`}>{label}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="relative flex">
+              <div className="w-14 flex-shrink-0 border-r border-gray-100">
+                {hours.map((h) => (
+                  <div key={h} className="h-16 flex items-start justify-end pr-1.5">
+                    <span className="text-[10px] text-gray-400 -mt-1.5">{h.toString().padStart(2, "0")}:00</span>
+                  </div>
+                ))}
+              </div>
+              {rangeDates.map((d) => {
+                const dayAppts = appointments.filter((a: any) => a.date === d && a.barber_id === professionalFilter);
+                const isColToday = d === todayInChile();
+                return (
+                  <div key={d} className="flex-1 relative border-r border-gray-50 min-w-[120px]">
+                    {hours.map((h) => (
+                      <div key={h} className="h-16 border-b border-gray-50" />
+                    ))}
+                    {isColToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60 && (
+                      <div
+                        className="absolute left-0 right-0 z-20 pointer-events-none h-[2px] bg-red-500"
+                        style={{ top: `${((nowMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT}px` }}
+                      />
+                    )}
+                    {dayAppts.map((appt: any) => {
+                      const sm = appt.start_time?.match(/(\d{2}):(\d{2})/);
+                      const em = appt.end_time?.match(/(\d{2}):(\d{2})/);
+                      const timeLabel = sm && em ? `${parseInt(sm[1])}:${sm[2]} – ${parseInt(em[1])}:${em[2]}` : "";
+                      return (
+                        <div
+                          key={appt.id}
+                          onClick={() => openApptDetails(appt.id)}
+                          className="absolute left-1 right-1 rounded-md border-l-[3px] bg-blue-100 border-l-blue-500 text-blue-800 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10"
+                          style={getBlockStyle(appt)}
+                        >
+                          <p className="text-[11px] font-bold truncate">{appt.client?.name || "Cliente"}</p>
+                          <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
+                            <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
+                              {(statusBadge[appt.status] || statusBadge.scheduled).label}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {dayAppts.length === 0 && (
+                      <p className="absolute inset-x-0 top-4 text-center text-[11px] text-gray-300">Sin citas</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {view === "calendario" && !professionalFilter && (loading ? <Spinner /> : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
           <div className="min-w-[800px]">
             {/* Barber headers */}

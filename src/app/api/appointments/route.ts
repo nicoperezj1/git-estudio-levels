@@ -5,6 +5,11 @@ export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
+  // Item (Nico, 28-sep): vista de calendario por profesional a 1/3/7 dias — necesita
+  // traer varios dias en una sola consulta en vez de una por dia. `date` sigue funcionando
+  // igual que siempre (match exacto) cuando no se manda un rango.
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
   const barberId = searchParams.get("barberId");
   // SEGURIDAD: nunca confiar directo en el tenantId de la URL — resolveTenantForRequest lo
   // reemplaza por el negocio real del usuario logueado salvo que sea super_admin.
@@ -25,6 +30,8 @@ export async function GET(req: NextRequest) {
 
   if (tenantId && tenantId !== "ALL") query = query.eq("tenant_id", tenantId);
   if (date) query = query.eq("date", date);
+  if (dateFrom) query = query.gte("date", dateFrom);
+  if (dateTo) query = query.lte("date", dateTo);
   if (barberId) query = query.eq("barber_id", barberId);
 
   const { data, error } = await query;
