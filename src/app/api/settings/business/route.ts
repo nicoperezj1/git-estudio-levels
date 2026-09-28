@@ -28,6 +28,11 @@ export async function POST(req: NextRequest) {
         address: business.address,
         phone: business.phone,
         website: business.website ?? null,
+        // Item 37 (Nico, 27-sep): el wizard de onboarding tambien pide redes sociales en
+        // el mismo paso que los datos del negocio; solo se toca si vino en el body, para
+        // no pisar el valor existente cuando Configuracion llama a este endpoint sin el
+        // campo (formulario que no lo incluye).
+        ...(business.social_media !== undefined ? { social_media: business.social_media } : {}),
       })
       .eq("id", tenantId);
     if (error) {

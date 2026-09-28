@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // Get tenant
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, slug, plan, status, max_professionals, max_branches, trial_ends_at, theme")
+    .select("id, name, slug, plan, status, max_professionals, max_branches, trial_ends_at, theme, onboarding_completed, onboarding_step")
     .eq("id", tenantId)
     .single();
 

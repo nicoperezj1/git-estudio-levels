@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState, EmptyIcons } from "@/components/ui/empty-state";
@@ -54,9 +55,22 @@ export default function DashboardPage() {
   // para ir viendo el crecimiento del negocio de forma comoda.
   const [chartRange, setChartRange] = useState<ChartRange>("7d");
   const [chartLoading, setChartLoading] = useState(false);
-  const { user } = useAuth();
+  const { user, effectiveRole } = useAuth();
   const { tenant, loading: tenantLoading } = useTenant();
   const isToday = selectedDate === todayInChile();
+  const router = useRouter();
+
+  // Item 37 (Nico, 27-sep): un negocio nuevo (admin) que aun no completo el wizard de
+  // bienvenida es mandado ahi apenas cae en el dashboard, en vez de ver metricas vacias.
+  // Solo aplica al admin del negocio -- un barbero/recepcionista que se loguea despues no
+  // tiene por que ver el wizard de puesta en marcha, eso lo hace el dueño una sola vez.
+  // Un super_admin sin tenant (tenant === null) tampoco cae aca.
+  useEffect(() => {
+    if (tenantLoading || !tenant) return;
+    if (effectiveRole === "admin" && !tenant.onboarding_completed) {
+      router.replace("/dashboard/onboarding");
+    }
+  }, [tenantLoading, tenant, effectiveRole, router]);
 
   useEffect(() => {
     if (tenantLoading) return;

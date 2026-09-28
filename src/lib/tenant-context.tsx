@@ -17,6 +17,10 @@ interface TenantInfo {
   // Punto (Nico, 25-sep): tema claro/oscuro elegido por el Administrador en
   // Configuracion, aplicado a todo el sistema para ese negocio.
   theme: "light" | "dark";
+  // Item 37 (Nico, 27-sep): wizard de bienvenida para negocios nuevos. Ver
+  // src/app/dashboard/onboarding/page.tsx y supabase/migrations/077_onboarding.sql.
+  onboarding_completed: boolean;
+  onboarding_step: number;
 }
 
 interface TenantContextType {
