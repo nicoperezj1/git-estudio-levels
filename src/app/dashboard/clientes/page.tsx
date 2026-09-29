@@ -171,6 +171,14 @@ export default function ClientesPage() {
 
               let clients: Array<{ name: string; email: string | null; phone: string | null }> = [];
 
+              // Algunos exportadores (ej. Setmore) escriben el texto literal "null"/"undefined"
+              // en celdas vacias en vez de dejarlas en blanco. Sin este filtro, esos valores
+              // terminaban concatenados al nombre (ej. "Agustin null").
+              const cleanField = (v: unknown): string => {
+                const s = String(v ?? "").trim();
+                return /^(null|undefined|n\/a|nan)$/i.test(s) ? "" : s;
+              };
+
               if (file.name.endsWith(".csv")) {
                 // Parse CSV
                 const text = await file.text();
@@ -188,14 +196,14 @@ export default function ClientesPage() {
                   const cols = line.split(",").map((c: string) => c.trim().replace(/"/g, ""));
                   let name = "";
                   if (nameIdx !== -1) {
-                    name = cols[nameIdx] || "";
+                    name = cleanField(cols[nameIdx]);
                   } else {
                     // Concatenate First Name + Last Name (Setmore format)
-                    const first = cols[firstNameIdx] || "";
-                    const last = lastNameIdx !== -1 ? cols[lastNameIdx] || "" : "";
+                    const first = cleanField(cols[firstNameIdx]);
+                    const last = lastNameIdx !== -1 ? cleanField(cols[lastNameIdx]) : "";
                     name = `${first} ${last}`.trim();
                   }
-                  return { name, email: cols[emailIdx] || null, phone: cols[phoneIdx] || null };
+                  return { name, email: cleanField(cols[emailIdx]) || null, phone: cleanField(cols[phoneIdx]) || null };
                 }).filter((c: any) => c.name);
               } else {
                 // Parse Excel
@@ -218,16 +226,16 @@ export default function ClientesPage() {
                 clients = rows.map((row: any) => {
                   let name = "";
                   if (nameKey) {
-                    name = String(row[nameKey] || "").trim();
+                    name = cleanField(row[nameKey]);
                   } else {
-                    const first = String(row[firstNameKey!] || "").trim();
-                    const last = lastNameKey ? String(row[lastNameKey] || "").trim() : "";
+                    const first = cleanField(row[firstNameKey!]);
+                    const last = lastNameKey ? cleanField(row[lastNameKey]) : "";
                     name = `${first} ${last}`.trim();
                   }
                   return {
                     name,
-                    email: emailKey ? String(row[emailKey] || "").trim() || null : null,
-                    phone: phoneKey ? String(row[phoneKey] || "").trim() || null : null,
+                    email: emailKey ? cleanField(row[emailKey]) || null : null,
+                    phone: phoneKey ? cleanField(row[phoneKey]) || null : null,
                   };
                 }).filter((c) => c.name);
               }
