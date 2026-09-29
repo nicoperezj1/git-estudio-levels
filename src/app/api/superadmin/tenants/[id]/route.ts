@@ -53,6 +53,9 @@ const EDITABLE_FIELDS = [
   // Cupos de mensajeria (Nico, 27-sep): override por negocio, mismo patron que
   // max_professionals — vacio/null usa el default del plan (ver migracion 073).
   "whatsapp_quota_override", "email_quota_override",
+  // Rubro del negocio y carga de documentos en la ficha de cliente (Nico, 28-sep,
+  // migracion 078).
+  "business_category", "client_files_enabled",
 ] as const;
 
 // PATCH: editar datos de una empresa (Punto de Pablo, 25-sep). El slug NO es editable

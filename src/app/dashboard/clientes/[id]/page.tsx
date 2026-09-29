@@ -78,9 +78,61 @@ export default function ClienteDetailPage() {
   const [photos, setPhotos] = useState<Array<{ id: string; url: string; caption: string | null; created_at: string; barber: { name: string } | null }>>([]);
   const [uploading, setUploading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Documentos PDF/Word del cliente (Nico, 28-sep). Solo se muestra la seccion si el
+  // negocio tiene habilitada la carga de archivos (tenants.client_files_enabled).
+  const [docsEnabled, setDocsEnabled] = useState(false);
+  const [documents, setDocuments] = useState<Array<{ id: string; file_name: string; size_bytes: number | null; created_at: string; uploaded_by_name: string | null; url: string | null }>>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docError, setDocError] = useState("");
+
+  const loadDocuments = async () => {
+    try {
+      const res = await fetch(`/api/clients/${params.id}/documents`, { cache: "no-store" });
+      const d = await res.json();
+      setDocsEnabled(!!d.enabled);
+      setDocuments(Array.isArray(d.documents) ? d.documents : []);
+    } catch {
+      setDocsEnabled(false);
+    }
+  };
+
+  const uploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDocError("");
+    setUploadingDoc(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`/api/clients/${params.id}/documents`, { method: "POST", body: formData });
+      if (res.ok) {
+        await loadDocuments();
+      } else {
+        const r = await res.json().catch(() => ({}));
+        setDocError(r.error || "No se pudo subir el archivo");
+      }
+    } catch {
+      setDocError("No se pudo subir el archivo. Revisa tu conexion.");
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = "";
+    }
+  };
+
+  const deleteDocument = async (documentId: string) => {
+    if (!window.confirm("¿Eliminar este documento? Esta accion no se puede deshacer.")) return;
+    const res = await fetch(`/api/clients/${params.id}/documents?documentId=${documentId}`, { method: "DELETE" });
+    if (res.ok) {
+      setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+    } else {
+      const r = await res.json().catch(() => ({}));
+      setDocError(r.error || "No se pudo eliminar el documento");
+    }
+  };
 
   useEffect(() => {
     if (params.id) {
+      loadDocuments();
       fetch(`/api/clients/${params.id}`)
         .then((r) => r.json())
         .then((d) => { if (d.client) setData(d); })
@@ -322,6 +374,61 @@ export default function ClienteDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Documentos (PDF / Word) — solo si el negocio lo tiene habilitado (clinicas,
+          kinesiologia, estetica, etc.; ver Superadmin > Negocios). */}
+      {docsEnabled && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-4 border-b flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-gray-800">Documentos</h3>
+              <p className="text-xs text-gray-400">Fichas, examenes o consentimientos del cliente (PDF o Word, hasta 10MB)</p>
+            </div>
+            <label className={`px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 cursor-pointer whitespace-nowrap ${uploadingDoc ? "opacity-50 pointer-events-none" : ""}`}>
+              {uploadingDoc ? "Subiendo..." : "Subir archivo"}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={uploadDocument}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <div className="p-4">
+            {docError && <p className="text-sm text-red-600 mb-3">{docError}</p>}
+            {documents.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-gray-400 text-sm">Sin documentos</p>
+                <p className="text-gray-400 text-xs">Sube un PDF o Word para tener mas datos del cliente</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {documents.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      {doc.url ? (
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-indigo-600 hover:underline truncate block">
+                          {doc.file_name}
+                        </a>
+                      ) : (
+                        <span className="text-sm font-medium text-gray-700 truncate block">{doc.file_name}</span>
+                      )}
+                      <p className="text-xs text-gray-400">
+                        {new Date(doc.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}
+                        {doc.uploaded_by_name && ` · ${doc.uploaded_by_name}`}
+                        {doc.size_bytes ? ` · ${(doc.size_bytes / 1024 / 1024).toFixed(1)} MB` : ""}
+                      </p>
+                    </div>
+                    <button onClick={() => deleteDocument(doc.id)} className="text-xs text-red-500 hover:text-red-700 whitespace-nowrap">
+                      Eliminar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Two columns: appointments & transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

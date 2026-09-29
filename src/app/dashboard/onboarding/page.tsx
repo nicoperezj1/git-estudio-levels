@@ -6,6 +6,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { useToast } from "@/components/ui/toast";
 import { Spinner, SpinnerInline } from "@/components/ui/spinner";
 import { compressImage } from "@/lib/image-compress";
+import { BUSINESS_CATEGORIES } from "@/lib/business-categories";
 import {
   PartyPopper,
   Building2,
@@ -60,7 +61,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
 
   // Paso 2: Datos del negocio
-  const [businessData, setBusinessData] = useState({ name: "", address: "", phone: "", website: "", social_media: "" });
+  const [businessData, setBusinessData] = useState({ name: "", address: "", phone: "", website: "", social_media: "", business_category: "" });
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
@@ -344,6 +345,19 @@ export default function OnboardingPage() {
                   onChange={(e) => setBusinessData((p) => ({ ...p, name: e.target.value }))}
                   className="w-full mt-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent"
                 />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-brand-gray">Rubro del negocio</label>
+                <select
+                  value={businessData.business_category}
+                  onChange={(e) => setBusinessData((p) => ({ ...p, business_category: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-lg text-sm bg-transparent"
+                >
+                  <option value="">Selecciona una opcion</option>
+                  {BUSINESS_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-brand-gray">Direccion</label>

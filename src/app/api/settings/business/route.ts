@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { BUSINESS_CATEGORY_VALUES } from "@/lib/business-categories";
 
 // POST: Save business profile (name/phone/address) and weekly business hours.
 //
@@ -33,6 +34,9 @@ export async function POST(req: NextRequest) {
         // no pisar el valor existente cuando Configuracion llama a este endpoint sin el
         // campo (formulario que no lo incluye).
         ...(business.social_media !== undefined ? { social_media: business.social_media } : {}),
+        // Rubro (Nico, 28-sep, migracion 078): solo si vino en el body y es un valor valido,
+        // para que Configuracion (que no lo manda) no lo pise.
+        ...(BUSINESS_CATEGORY_VALUES.includes(business.business_category) ? { business_category: business.business_category } : {}),
       })
       .eq("id", tenantId);
     if (error) {

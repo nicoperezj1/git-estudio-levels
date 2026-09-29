@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { BUSINESS_CATEGORIES, businessCategoryLabel } from "@/lib/business-categories";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { formatCurrency } from "@/lib/utils";
@@ -18,6 +19,8 @@ interface Tenant {
   max_professionals: number;
   whatsapp_quota_override: number | null;
   email_quota_override: number | null;
+  business_category: string | null;
+  client_files_enabled: boolean;
   trial_ends_at: string | null;
   active: boolean;
   created_at: string;
@@ -44,12 +47,14 @@ export default function SuperAdminTenantsPage() {
   // cambiarlo desde ahi") — antes solo se podia cambiar el plan abriendo el modal
   // completo de Editar. Este id marca que negocio esta guardando su cambio de plan.
   const [changingPlanId, setChangingPlanId] = useState<string | null>(null);
+  // Filtro por rubro (Nico, 28-sep): "" = todos, "none" = sin clasificar.
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string; slug: string } | null>(null);
   const [form, setForm] = useState({
     name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "basic",
-    logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "",
+    logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "",
   });
   const { showToast } = useToast();
   const { switchTenant } = useTenant();
@@ -94,6 +99,8 @@ export default function SuperAdminTenantsPage() {
       max_professionals: t.max_professionals,
       whatsapp_quota_override: t.whatsapp_quota_override,
       email_quota_override: t.email_quota_override,
+      business_category: t.business_category || "",
+      client_files_enabled: !!t.client_files_enabled,
     });
   };
 
@@ -226,7 +233,7 @@ export default function SuperAdminTenantsPage() {
     if (res.ok) {
       setCreatedInfo({ email: form.admin_email, password: data.temp_password, slug: form.slug });
       setShowCreate(false);
-      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "" });
+      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "" });
       fetchTenants();
       showToast("Empresa creada exitosamente", "success");
     } else {
@@ -274,6 +281,32 @@ export default function SuperAdminTenantsPage() {
         </div>
       </div>
 
+      {/* Negocios por rubro (Nico, 28-sep): cuantos hay de barberia, estetica, etc. Clic en
+          un rubro filtra la lista de abajo. */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <p className="text-xs font-medium text-brand-gray mb-2">Negocios por rubro</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCategoryFilter("")}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium ${categoryFilter === "" ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          >
+            Todos ({tenants.length})
+          </button>
+          {[...BUSINESS_CATEGORIES.map((c) => ({ value: c.value as string, label: c.label as string })), { value: "none", label: "Sin clasificar" }]
+            .map((c) => ({ ...c, count: tenants.filter((t) => (c.value === "none" ? !t.business_category : t.business_category === c.value)).length }))
+            .filter((c) => c.count > 0 || categoryFilter === c.value)
+            .map((c) => (
+              <button
+                key={c.value}
+                onClick={() => setCategoryFilter(c.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium ${categoryFilter === c.value ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                {c.label} ({c.count})
+              </button>
+            ))}
+        </div>
+      </div>
+
       {/* Created info banner */}
       {createdInfo && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
@@ -309,7 +342,7 @@ export default function SuperAdminTenantsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {tenants.map((t) => (
+          {tenants.filter((t) => !categoryFilter || (categoryFilter === "none" ? !t.business_category : t.business_category === categoryFilter)).map((t) => (
             <div key={t.id} className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -338,7 +371,7 @@ export default function SuperAdminTenantsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-brand-gray mt-0.5">
-                      {t.admin_email} · /{t.slug} · {t.max_professionals} profesionales max
+                      {t.admin_email} · /{t.slug} · {t.max_professionals} profesionales max · {businessCategoryLabel(t.business_category)}
                     </p>
                   </div>
                 </div>
@@ -494,6 +527,16 @@ export default function SuperAdminTenantsPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Rubro del negocio</label>
+                  <select value={form.business_category} onChange={(e) => setForm({ ...form, business_category: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                    <option value="">Sin clasificar</option>
+                    {BUSINESS_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-brand-gray block mb-1">
@@ -660,6 +703,26 @@ export default function SuperAdminTenantsPage() {
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
                 </div>
               </div>
+              {/* Rubro + carga de documentos en la ficha de cliente (Nico, 28-sep). */}
+              <div>
+                <label className="text-xs font-medium text-brand-gray block mb-1">Rubro del negocio</label>
+                <select value={editForm.business_category || ""} onChange={(e) => setEditForm({ ...editForm, business_category: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                  <option value="">Sin clasificar</option>
+                  {BUSINESS_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-start gap-2 text-sm text-brand-dark cursor-pointer">
+                <input type="checkbox" checked={!!editForm.client_files_enabled}
+                  onChange={(e) => setEditForm({ ...editForm, client_files_enabled: e.target.checked })}
+                  className="mt-0.5" />
+                <span>
+                  Habilitar carga de archivos en la ficha de cliente
+                  <span className="block text-[10px] text-brand-gray">PDF/Word por cliente. Pensado para clinicas, kinesiologia y estetica; para barberia no hace falta.</span>
+                </span>
+              </label>
             </div>
             <div className="flex gap-2 pt-4">
               <button onClick={() => setEditingTenant(null)}

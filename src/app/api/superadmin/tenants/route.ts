@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { BUSINESS_CATEGORY_VALUES } from "@/lib/business-categories";
 
 // SEGURIDAD (Nico, 25-sep): esta ruta lista/crea TODAS las empresas de la plataforma
 // (no solo la del que llama) y antes no verificaba el rol en el servidor — cualquiera
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { name, slug, rut_empresa, admin_email, admin_name, phone, address, plan, logo_url, website, social_media, trial_days, max_professionals } = body;
+  const { name, slug, rut_empresa, admin_email, admin_name, phone, address, plan, logo_url, website, social_media, trial_days, max_professionals, business_category } = body;
 
   // Validations
   if (!name || !slug || !admin_email) {
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
       logo_url: logo_url || null,
       website: website || null,
       social_media: social_media || null,
+      // Rubro (migracion 078): solo valores validos; cualquier otra cosa = sin clasificar.
+      business_category: BUSINESS_CATEGORY_VALUES.includes(business_category) ? business_category : null,
     })
     .select()
     .single();
