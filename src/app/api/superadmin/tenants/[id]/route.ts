@@ -47,9 +47,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 const EDITABLE_FIELDS = [
-  "name", "rut_empresa", "admin_email", "admin_name", "phone", "address",
+  "name", "rut_empresa", "admin_email", "admin_name", "phone", "address", "city",
   "plan", "status", "logo_url", "website", "social_media", "max_professionals",
   "max_branches", "active",
+  // Cupos de mensajeria (Nico, 27-sep): override por negocio, mismo patron que
+  // max_professionals — vacio/null usa el default del plan (ver migracion 073).
+  "whatsapp_quota_override", "email_quota_override",
+  // Rubro del negocio y carga de documentos en la ficha de cliente (Nico, 28-sep,
+  // migracion 078).
+  "business_category", "client_files_enabled",
 ] as const;
 
 // PATCH: editar datos de una empresa (Punto de Pablo, 25-sep). El slug NO es editable
@@ -124,7 +130,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   if (cascadeError) {
     // Un error aca significa que la funcion (o alguna tabla que referencia al tenant sin
-    // cascade) todavia no existe en produccion, o que algo quedo fuera de la migracion
+    // cascade) todavía no existe en produccion, o que algo quedo fuera de la migracion
     // 071 — gracias a que todo corre dentro de una sola funcion, Postgres hizo rollback
     // completo: no se borro nada a medias.
     return NextResponse.json({

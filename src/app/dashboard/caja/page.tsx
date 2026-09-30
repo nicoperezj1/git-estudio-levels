@@ -505,7 +505,7 @@ export default function CajaPage() {
           </div>
 
           {/* Additional stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
               <p className="text-xs text-gray-500 uppercase">Ventas Tarjeta</p>
               <p className="text-lg font-bold text-purple-600">{formatCurrency(data.summary.cardIncome)}</p>
@@ -526,10 +526,10 @@ export default function CajaPage() {
               <span className="text-xl">💵</span>
               <div className="flex-1">
                 <p className="text-sm font-medium text-orange-800">
-                  Efectivo de barberos en arriendo: {formatCurrency(data.summary.rentalCashToBarber)}
+                  Efectivo de profesionales en arriendo: {formatCurrency(data.summary.rentalCashToBarber)}
                 </p>
                 <p className="text-xs text-orange-600">
-                  Este efectivo se lo llevan los barberos directamente. No cuenta en la caja ni en los ingresos del salon.
+                  Este efectivo se lo llevan los profesionales directamente. No cuenta en la caja ni en los ingresos del salon.
                 </p>
               </div>
             </div>
@@ -571,7 +571,7 @@ export default function CajaPage() {
               Number(data.register.difference) > 0 ? "border-blue-300" : "border-red-300"
             }`}>
               <h3 className="font-bold text-gray-800 mb-3">Resultado del Cierre</h3>
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-1 gap-3 text-center sm:grid-cols-3 sm:gap-4">
                 <div>
                   <p className="text-xs text-gray-500">Esperado</p>
                   <p className="text-lg font-bold">{formatCurrency(Number(data.register.expected_amount))}</p>

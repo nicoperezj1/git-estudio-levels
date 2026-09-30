@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { chileDateOffset } from "@/lib/utils";
+import { tryConsumeQuota } from "@/lib/message-quota";
 
 // Returns WhatsApp links for tomorrow's appointments (for manual batch sending)
 export async function GET(req: NextRequest) {
@@ -52,8 +53,14 @@ export async function GET(req: NextRequest) {
     timeZone: "America/Santiago",
   }).format(new Date(Date.UTC(ty, tm - 1, td, 12)));
 
-  const links = (appointments || [])
-    .map((a: any) => {
+  // Cupo de WhatsApp (Nico, 27-sep): esta ruta se re-pide cada vez que la pagina de
+  // Recordatorios carga o cambia de fecha, asi que no se puede simplemente descontar 1 por
+  // link en cada GET (recargar la pagina agotaria el cupo sin enviar nada). tryConsumeQuota
+  // con referenceId=appointmentId hace esto idempotente: la primera vez que se ve una cita
+  // descuenta cupo, las siguientes veces (mismo dia, misma cita) no vuelve a descontar. Si
+  // el cupo ya esta agotado para una cita nueva, no se genera su link (whatsappUrl: null).
+  const links = await Promise.all(
+    (appointments || []).map(async (a: any) => {
       const client = a.client;
       const barber = a.barber;
       const services = (a.services || []).map((s: any) => s.service?.name).filter(Boolean).join(", ");
@@ -70,6 +77,11 @@ export async function GET(req: NextRequest) {
         `Te esperamos!\n` +
         `Si necesitas cancelar: 9 4266 6172`;
 
+      let quotaOk = true;
+      if (phone) {
+        quotaOk = await tryConsumeQuota(tenantId, "whatsapp", "reminder", a.id);
+      }
+
       return {
         appointmentId: a.id,
         clientName: client?.name || "Sin cliente",
@@ -77,9 +89,11 @@ export async function GET(req: NextRequest) {
         time,
         service: services,
         barber: barber?.name,
-        whatsappUrl: phone ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}` : null,
+        whatsappUrl: phone && quotaOk ? `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}` : null,
+        quotaExceeded: phone && !quotaOk,
       };
-    });
+    })
+  );
 
   return NextResponse.json(links);
 }

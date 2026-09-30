@@ -27,6 +27,8 @@ interface SendReceiptParams {
   // Business's own logo (tenants.logo_url). Falls back to the generic re-booking
   // logo when the salon hasn't uploaded one.
   businessLogoUrl?: string | null;
+  // Nombre del negocio: se muestra si el negocio no tiene logo cargado.
+  businessName?: string | null;
 }
 
 export async function sendReceipt(params: SendReceiptParams) {
@@ -42,6 +44,7 @@ export async function sendReceipt(params: SendReceiptParams) {
     date,
     barberName,
     businessLogoUrl,
+    businessName,
   } = params;
 
   const paymentLabel: Record<string, string> = {
@@ -52,69 +55,122 @@ export async function sendReceipt(params: SendReceiptParams) {
     mixed: "Mixto",
   };
 
+  const esc = (v: string) =>
+    String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const money = (n: number) => `$${Number(n).toLocaleString("es-CL")}`;
+  const FONT = "'Plus Jakarta Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif";
+  const ACCENT = "#0F8B8D"; // color corporativo re-booking
+  const dateLabel = new Date(date).toLocaleDateString("es-CL", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "America/Santiago",
+  });
+  const receiptNumber = transactionId.slice(-8).toUpperCase();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
+
   const itemsHtml = items
     .map(
       (item) => `
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #333; color: #ddd;">${item.description}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #333; text-align: center; color: #ddd;">${item.quantity}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #333; text-align: right; color: #ddd;">$${item.unitPrice.toLocaleString("es-CL")}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #333; text-align: right; color: #fff; font-weight: bold;">$${item.total.toLocaleString("es-CL")}</td>
-    </tr>`
+        <tr>
+          <td style="padding:14px 0;border-bottom:1px solid #EEF0F2;font-size:14px;color:#111827;font-weight:600;">${esc(item.description)}</td>
+          <td align="center" style="padding:14px 8px;border-bottom:1px solid #EEF0F2;font-size:14px;color:#6B7280;">${item.quantity}</td>
+          <td align="right" style="padding:14px 8px;border-bottom:1px solid #EEF0F2;font-size:14px;color:#6B7280;">${money(item.unitPrice)}</td>
+          <td align="right" style="padding:14px 0;border-bottom:1px solid #EEF0F2;font-size:14px;color:#111827;font-weight:700;">${money(item.total)}</td>
+        </tr>`
     )
     .join("");
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>Boleta re-booking</title></head>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a;">
-  <div style="background: #111; padding: 30px; border-radius: 12px; border: 1px solid #333;">
-    <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0F8B8D; padding-bottom: 20px;">
-      ${businessLogoUrl
-        // A business's own logo is usually dark (made for light backgrounds), so it
-        // disappeared against this dark email. Put it on a white rounded card so any
-        // logo — light or dark — is readable. The generic re-booking logo is already
-        // white, so it stays directly on the dark header.
-        ? `<div style="display: inline-block; background: #ffffff; padding: 12px 20px; border-radius: 12px; margin-bottom: 10px;"><img src="${businessLogoUrl}" alt="Logo" style="height: 48px; max-width: 220px; object-fit: contain; display: block;" /></div>`
-        : `<img src="https://re-booking.cl/logo-horizontal-white.png" alt="re-booking" style="height: 32px; max-width: 240px; object-fit: contain; margin-bottom: 10px;" />
-      <p style="color: #0F8B8D; margin: 8px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 3px;">Gestiona. Reserva. Repite el exito.</p>`}
-    </div>
+  // Encabezado: el logo del negocio es lo principal. Si no tiene, se usa el nombre del
+  // negocio en texto y, como ultimo recurso, el logo de re-booking (version a color).
+  const headerBrand = businessLogoUrl
+    ? `<img src="${esc(businessLogoUrl)}" alt="${esc(businessName || "Logo")}" height="56" style="display:block;height:56px;max-width:240px;width:auto;object-fit:contain;border:0;" />`
+    : businessName
+      ? `<div style="font-size:22px;font-weight:800;letter-spacing:-0.3px;color:#111827;">${esc(businessName)}</div>`
+      : `<img src="https://re-booking.cl/logo-horizontal.png" alt="re-booking" height="32" style="display:block;height:32px;width:auto;border:0;" />`;
 
-    <div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-      <p style="margin: 4px 0; font-size: 14px; color: #ccc;"><strong style="color: #fff;">Boleta N:</strong> ${transactionId.slice(-8).toUpperCase()}</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #ccc;"><strong style="color: #fff;">Fecha:</strong> ${new Date(date).toLocaleDateString("es-CL")}</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #ccc;"><strong style="color: #fff;">Cliente:</strong> ${clientName}</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #ccc;"><strong style="color: #fff;">Profesional:</strong> ${barberName}</p>
-    </div>
+  const infoCell = (label: string, value: string) => `
+        <td valign="top" style="padding:0 16px 14px 0;width:50%;">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#9CA3AF;font-weight:600;">${label}</div>
+          <div style="font-size:14px;color:#111827;font-weight:600;margin-top:3px;">${value}</div>
+        </td>`;
 
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-      <thead>
-        <tr style="background: #0F8B8D; color: white;">
-          <th style="padding: 10px; text-align: left; font-size: 13px;">Descripcion</th>
-          <th style="padding: 10px; text-align: center; font-size: 13px;">Cant.</th>
-          <th style="padding: 10px; text-align: right; font-size: 13px;">Precio</th>
-          <th style="padding: 10px; text-align: right; font-size: 13px;">Total</th>
-        </tr>
-      </thead>
-      <tbody>${itemsHtml}</tbody>
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<title>Boleta ${receiptNumber}</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>:root{color-scheme:light only;supported-color-schemes:light only;}</style>
+</head>
+<body bgcolor="#F4F6F8" style="margin:0;padding:0;background:#F4F6F8;font-family:${FONT};-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F6F8" style="background:#F4F6F8;">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:600px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;">
+      <tr><td style="height:4px;background:${ACCENT};border-radius:16px 16px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <tr><td style="padding:32px 36px 8px 36px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td valign="middle">${headerBrand}</td>
+          <td valign="middle" align="right">
+            <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:${ACCENT};font-weight:700;">Boleta</div>
+            <div style="font-size:16px;color:#111827;font-weight:800;margin-top:2px;">N° ${receiptNumber}</div>
+          </td>
+        </tr></table>
+      </td></tr>
+
+      <tr><td style="padding:20px 36px 4px 36px;">
+        <div style="border-top:1px solid #EEF0F2;padding-top:22px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>${infoCell("Fecha", dateLabel)}${infoCell("Cliente", esc(clientName))}</tr>
+            <tr>${infoCell("Profesional", esc(barberName))}${infoCell("Forma de pago", esc(paymentLabel[paymentMethod] || paymentMethod))}</tr>
+          </table>
+        </div>
+      </td></tr>
+
+      <tr><td style="padding:8px 36px 0 36px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <thead>
+            <tr>
+              <th align="left" style="padding:10px 0;border-bottom:2px solid #111827;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;font-weight:700;">Detalle</th>
+              <th align="center" style="padding:10px 8px;border-bottom:2px solid #111827;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;font-weight:700;">Cant.</th>
+              <th align="right" style="padding:10px 8px;border-bottom:2px solid #111827;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;font-weight:700;">Precio</th>
+              <th align="right" style="padding:10px 0;border-bottom:2px solid #111827;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#6B7280;font-weight:700;">Total</th>
+            </tr>
+          </thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+      </td></tr>
+
+      <tr><td style="padding:18px 36px 8px 36px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td align="right" style="padding:3px 0;font-size:14px;color:#6B7280;">Subtotal</td>
+            <td align="right" width="130" style="padding:3px 0;font-size:14px;color:#111827;font-weight:600;">${money(subtotal)}</td>
+          </tr>
+          ${discount > 0 ? `<tr>
+            <td align="right" style="padding:3px 0;font-size:14px;color:${ACCENT};">Descuento</td>
+            <td align="right" width="130" style="padding:3px 0;font-size:14px;color:${ACCENT};font-weight:600;">-${money(discount)}</td>
+          </tr>` : ""}
+          <tr>
+            <td align="right" style="padding:14px 0 0 0;font-size:14px;color:#111827;font-weight:700;">Total pagado</td>
+            <td align="right" width="130" style="padding:14px 0 0 0;font-size:24px;color:#111827;font-weight:800;letter-spacing:-0.4px;">${money(total)}</td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <tr><td align="center" style="padding:28px 36px 8px 36px;">
+        <a href="${appUrl}/review/${transactionId}" style="display:inline-block;background:${ACCENT};color:#FFFFFF;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700;font-size:14px;">Califica tu atención</a>
+        <div style="font-size:13px;color:#6B7280;margin-top:14px;">¡Gracias por tu preferencia!</div>
+      </td></tr>
+
+      <tr><td style="padding:24px 36px 28px 36px;">
+        <div style="border-top:1px solid #EEF0F2;padding-top:18px;text-align:center;font-size:11px;color:#9CA3AF;">
+          Comprobante emitido con <a href="https://re-booking.cl" style="color:${ACCENT};text-decoration:none;font-weight:700;">re-booking</a> · Gestiona. Reserva. Repite el éxito.
+        </div>
+      </td></tr>
     </table>
-
-    <div style="text-align: right; margin-bottom: 20px;">
-      <p style="margin: 4px 0; font-size: 14px; color: #ccc;">Subtotal: <strong style="color: #fff;">$${subtotal.toLocaleString("es-CL")}</strong></p>
-      ${discount > 0 ? `<p style="margin: 4px 0; font-size: 14px; color: #0F8B8D;">Descuento: -$${discount.toLocaleString("es-CL")}</p>` : ""}
-      <p style="margin: 8px 0 0; font-size: 20px; font-weight: bold; color: #fff;">Total: $${total.toLocaleString("es-CL")}</p>
-      <p style="margin: 4px 0; font-size: 13px; color: #888;">Pago: ${paymentLabel[paymentMethod] || paymentMethod}</p>
-    </div>
-
-    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #333;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app"}/review/${transactionId}" style="display: inline-block; background: #0F8B8D; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; font-size: 13px; margin-bottom: 12px;">
-        Califica tu atencion ★
-      </a>
-      <p style="color: #888; font-size: 13px; margin: 4px 0;">Gracias por tu preferencia!</p>
-      <p style="color: #555; font-size: 11px; margin: 4px 0;">re-booking | re-booking.cl</p>
-    </div>
-  </div>
+  </td></tr>
+</table>
 </body>
 </html>`;
 
@@ -122,7 +178,7 @@ export async function sendReceipt(params: SendReceiptParams) {
   const { data, error } = await resend.emails.send({
     from: process.env.EMAIL_FROM || "re-booking <no-reply@re-booking.cl>",
     to,
-    subject: `Boleta re-booking - ${new Date(date).toLocaleDateString("es-CL")}`,
+    subject: `Tu boleta${businessName ? ` de ${businessName}` : ""} - ${new Date(date).toLocaleDateString("es-CL", { timeZone: "America/Santiago" })}`,
     html,
   });
 
@@ -221,10 +277,16 @@ interface SendRetentionEmailParams {
   couponDescription: string | null;
   discountType: string | null;
   discountValue: number | null;
+  /** Link de reserva del negocio (si no se pasa, cae al link generico de la plataforma). */
+  bookingUrl?: string | null;
 }
 
 export async function sendRetentionEmail(params: SendRetentionEmailParams) {
-  const { to, clientName, message, couponCode, couponDescription, discountType, discountValue } = params;
+  const { to, couponCode, couponDescription, discountType, discountValue } = params;
+  // El nombre y el mensaje los escribe el negocio/cliente: se escapan antes de ir al HTML.
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const clientName = esc(params.clientName);
+  const message = esc(params.message);
 
   const couponHtml = couponCode ? `
     <div style="background: #0F8B8D22; border: 2px dashed #0F8B8D; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
@@ -237,7 +299,9 @@ export async function sendRetentionEmail(params: SendRetentionEmailParams) {
     </div>
   ` : "";
 
-  const bookingUrl = process.env.NEXT_PUBLIC_APP_URL
+  const bookingUrl = params.bookingUrl
+    ? params.bookingUrl
+    : process.env.NEXT_PUBLIC_APP_URL
     ? `${process.env.NEXT_PUBLIC_APP_URL}/booking`
     : "https://barberia-kappa-weld.vercel.app/booking";
 
@@ -273,7 +337,7 @@ export async function sendRetentionEmail(params: SendRetentionEmailParams) {
   await resend.emails.send({
     from: process.env.EMAIL_FROM || "re-booking <no-reply@rebooking.cl>",
     to,
-    subject: `Te extrañamos ${clientName}! | re-booking`,
+    subject: `Te extrañamos ${params.clientName}! | re-booking`,
     html,
   });
 }

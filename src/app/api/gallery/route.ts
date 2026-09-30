@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const { barberId, imageUrl, caption, serviceId } = body;
 
   if (!barberId || !imageUrl) {
-    return NextResponse.json({ error: "Barbero e imagen requeridos" }, { status: 400 });
+    return NextResponse.json({ error: "Profesional e imagen requeridos" }, { status: 400 });
   }
 
   const { data, error } = await supabase

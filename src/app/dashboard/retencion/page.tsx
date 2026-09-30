@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { Users, UserMinus, Percent, Mail, MessageCircle, HeartHandshake, Send } from "lucide-react";
+import { PageHeader, StatCard, Panel, primaryButton, ghostButton, inputClass } from "@/components/ui/premium";
+import { MessageQuotaBar } from "@/components/dashboard/message-quota-bar";
+import { formatPhoneCL } from "@/lib/phone";
 
 interface InactiveClient {
   id: string;
@@ -15,9 +19,12 @@ interface InactiveClient {
   daysSinceVisit: number;
 }
 
+const DAY_PRESETS = [15, 30, 45, 60, 90, 120, 180, 365];
+
 export default function RetencionPage() {
   const [clients, setClients] = useState<InactiveClient[]>([]);
-  const [stats, setStats] = useState({ total: 0, inactive: 0, percentage: 0 });
+  const [stats, setStats] = useState({ total: 0, inactive: 0, percentage: 0, contactable: 0 });
+  const [quotaRefresh, setQuotaRefresh] = useState(0);
   const [days, setDays] = useState(30);
   // Punto 12 (Pablo): "Personalizado..." ponia days=0, y el input numerico solo se
   // mostraba mientras days===0 — apenas se escribia un numero valido, days dejaba de
@@ -66,9 +73,63 @@ export default function RetencionPage() {
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.error || "Error al enviar", "error"); return; }
-      showToast(`${data.sent || 0} de ${data.total || 0} correos enviados`, "success");
+      showToast(
+        data.quotaExceeded
+          ? `Se enviaron ${data.sent || 0} de ${data.total || 0} correos: se agotó tu cupo de correos de este ciclo.`
+          : `${data.sent || 0} de ${data.total || 0} correos enviados`,
+        data.quotaExceeded ? "info" : "success"
+      );
+      setQuotaRefresh((k) => k + 1);
     } catch {
       showToast("Error al enviar", "error");
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
+  // Copiar lista para una Lista de difusion de WhatsApp. Primero se pide una vista previa
+  // (sin gastar cupo) y se confirma; recien ahi se generan los mensajes, que si descuentan cupo.
+  const copyForBroadcast = async () => {
+    setBulkSending(true);
+    try {
+      const body = { days, couponCode: selectedCoupon || null, message: customMessage || null, type: "whatsapp" };
+      const previewRes = await fetch("/api/retention/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, preview: true }),
+      });
+      const preview = await previewRes.json();
+      if (!previewRes.ok) { showToast(preview.error || "No se pudo preparar la lista", "error"); return; }
+      if (!preview.total) { showToast("No hay clientes con teléfono para copiar", "info"); return; }
+
+      const ok = await confirm({
+        title: `Copiar ${preview.total} contacto${preview.total === 1 ? "" : "s"}?`,
+        message: `Se preparará el mensaje para ${preview.total} cliente${preview.total === 1 ? "" : "s"} y se descontará ${preview.total} del cupo de WhatsApp de este ciclo.`,
+        confirmText: `Sí, copiar ${preview.total}`,
+        variant: "warning",
+      });
+      if (!ok) return;
+
+      const res = await fetch("/api/retention/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Error al preparar la lista", "error"); return; }
+      if (data.links && data.links.length > 0) {
+        const phones = data.links.map((l: any) => formatPhoneCL(l.phone)).join("\n");
+        const msg = customMessage || "Te extrañamos! Agenda tu cita.";
+        const fullText = `MENSAJE:\n${msg}${selectedCoupon ? `\n\nCupon: ${selectedCoupon}` : ""}\n\n---\nDESTINATARIOS (${data.links.length}):\n${phones}`;
+        await navigator.clipboard.writeText(fullText);
+        showToast(
+          data.quotaExceeded
+            ? `Se copiaron ${data.links.length} contactos: se agotó tu cupo de WhatsApp de este ciclo.`
+            : `Lista de ${data.links.length} contactos copiada. Pégala en tu Lista de difusión de WhatsApp Business.`,
+          data.quotaExceeded ? "info" : "success"
+        );
+      } else if (data.quotaExceeded) {
+        showToast("Se agotó tu cupo de WhatsApp de este ciclo.", "error");
+      }
+      setQuotaRefresh((k) => k + 1);
+    } catch {
+      showToast("Error al preparar la lista", "error");
     } finally {
       setBulkSending(false);
     }
@@ -83,7 +144,7 @@ export default function RetencionPage() {
     const retData = await retRes.json();
     const coupData = await coupRes.json();
     setClients(retData.clients || []);
-    setStats(retData.stats || { total: 0, inactive: 0, percentage: 0 });
+    setStats(retData.stats || { total: 0, inactive: 0, percentage: 0, contactable: 0 });
     setCoupons(Array.isArray(coupData) ? coupData : []);
     setLoading(false);
   };
@@ -112,227 +173,179 @@ export default function RetencionPage() {
       } else {
         showToast("Email enviado", "success");
       }
+      setQuotaRefresh((k) => k + 1);
     } else {
       showToast(data.error || "Error al notificar", "error");
     }
   };
 
+  const withEmail = clients.filter((c) => c.email).length;
+  const withPhone = clients.filter((c) => c.phone).length;
+
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Retencion de Clientes</h1>
-          <p className="text-gray-500 text-sm">Recupera clientes que no han vuelto</p>
-        </div>
-        {clients.length > 0 && (
-          <div className="flex gap-2">
-            <button
-              onClick={sendBulkEmail}
-              disabled={bulkSending}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {bulkSending ? "Enviando..." : `Email Masivo (${clients.filter((c) => c.email).length})`}
-            </button>
-            <button
-              onClick={async () => {
-                setBulkSending(true);
-                const res = await fetch("/api/retention/bulk", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    days,
-                    couponCode: selectedCoupon || null,
-                    message: customMessage || null,
-                    type: "whatsapp",
-                  }),
-                });
-                const data = await res.json();
-                setBulkSending(false);
-                if (data.links && data.links.length > 0) {
-                  // Copy phone list + message to clipboard for WhatsApp Broadcast
-                  const phones = data.links.map((l: any) => l.phone).join("\n");
-                  const msg = customMessage || "Te extrañamos! Agenda tu cita.";
-                  const fullText = `MENSAJE:\n${msg}${selectedCoupon ? `\n\nCupon: ${selectedCoupon}` : ""}\n\n---\nDESTINATARIOS (${data.links.length}):\n${phones}`;
-                  await navigator.clipboard.writeText(fullText);
-                  showToast(`Lista de ${data.links.length} contactos copiada. Usa WhatsApp Broadcast para enviar.`, "success");
-                }
-              }}
-              disabled={bulkSending}
-              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              Copiar para Broadcast ({clients.filter((c) => c.phone).length})
-            </button>
-          </div>
-        )}
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6 animate-fade-in">
+      <PageHeader
+        title="Retención de clientes"
+        subtitle="Recupera a los clientes que hace tiempo no vuelven"
+        actions={
+          clients.length > 0 ? (
+            <>
+              <button onClick={copyForBroadcast} disabled={bulkSending || withPhone === 0} className={ghostButton}>
+                <MessageCircle className="h-4 w-4 text-emerald-500" strokeWidth={2} /> Copiar para difusión ({withPhone})
+              </button>
+              <button onClick={sendBulkEmail} disabled={bulkSending || withEmail === 0} className={primaryButton}>
+                <Send className="h-4 w-4" strokeWidth={2} /> {bulkSending ? "Procesando..." : `Email masivo (${withEmail})`}
+              </button>
+            </>
+          ) : undefined
+        }
+      />
+
+      <MessageQuotaBar refreshKey={quotaRefresh} />
+
+      {/* Metricas */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total de clientes" value={stats.total} Icon={Users} tone="teal" hint="Registrados en tu negocio" />
+        <StatCard label={`Inactivos (${days}+ días)`} value={stats.inactive} Icon={UserMinus} tone="amber" hint="Sin visita ni cita por venir" />
+        <StatCard label="% inactivos" value={`${stats.percentage}%`} Icon={Percent} tone={stats.percentage >= 30 ? "red" : "green"} hint="Del total de clientes" />
+        <StatCard label="Contactables" value={stats.contactable} Icon={HeartHandshake} tone="green" hint="Con correo o teléfono" />
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-lg shadow border-l-4 border-blue-500">
-          <p className="text-sm text-gray-500">Total Clientes</p>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </div>
-        <div className="bg-white p-5 rounded-lg shadow border-l-4 border-yellow-500">
-          <p className="text-sm text-gray-500">Inactivos (+{days} dias)</p>
-          <p className="text-2xl font-bold text-yellow-600">{stats.inactive}</p>
-        </div>
-        <div className="bg-white p-5 rounded-lg shadow border-l-4 border-red-500">
-          <p className="text-sm text-gray-500">% Inactivos</p>
-          <p className="text-2xl font-bold text-red-600">{stats.percentage}%</p>
-        </div>
-      </div>
-
-      {/* Filters & Config */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <div className="flex flex-wrap gap-4 items-end">
+      {/* Filtros y mensaje */}
+      <Panel title="A quién y qué decirles">
+        <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Dias sin visita</label>
-            <select
-              value={isCustomDays ? 0 : days}
-              onChange={(e) => {
-                const v = parseInt(e.target.value);
-                if (v === 0) {
-                  // Entrar en modo personalizado no dispara la busqueda todavia — recien
-                  // cuando el usuario termine de escribir un numero valido (ver abajo).
-                  setIsCustomDays(true);
-                  setCustomDaysInput("");
-                } else {
-                  setIsCustomDays(false);
-                  setDays(v);
-                }
-              }}
-              className="border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value={15}>15 dias</option>
-              <option value={30}>30 dias</option>
-              <option value={45}>45 dias</option>
-              <option value={60}>60 dias</option>
-              <option value={90}>90 dias</option>
-              <option value={120}>120 dias</option>
-              <option value={180}>180 dias</option>
-              <option value={365}>365 dias</option>
-              <option value={0}>Personalizado...</option>
-            </select>
-            {isCustomDays && (
+            <p className="mb-2 text-xs font-semibold text-brand-gray">Días sin visita</p>
+            <div className="-mx-1 flex flex-wrap gap-2 px-1">
+              {DAY_PRESETS.map((d) => {
+                const active = !isCustomDays && days === d;
+                return (
+                  <button
+                    key={d}
+                    onClick={() => { setIsCustomDays(false); setDays(d); }}
+                    className={`rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                      active ? "border-transparent bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "border-gray-200 bg-white text-brand-gray hover:border-brand-blue/40"
+                    }`}
+                  >
+                    {d} días
+                  </button>
+                );
+              })}
+              {/* Punto 12 (Pablo): el modo personalizado es un estado propio, para que el input
+                  no desaparezca mientras se escribe. */}
+              <button
+                onClick={() => { setIsCustomDays(true); setCustomDaysInput(""); }}
+                className={`rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                  isCustomDays ? "border-transparent bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "border-gray-200 bg-white text-brand-gray hover:border-brand-blue/40"
+                }`}
+              >
+                Personalizado
+              </button>
+              {isCustomDays && (
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  placeholder="Días"
+                  value={customDaysInput}
+                  onChange={(e) => setCustomDaysInput(e.target.value)}
+                  onBlur={() => { const v = parseInt(customDaysInput); if (v > 0) setDays(v); }}
+                  onKeyDown={(e) => { if (e.key !== "Enter") return; const v = parseInt(customDaysInput); if (v > 0) setDays(v); }}
+                  className="w-24 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm outline-none focus:border-brand-blue"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Cupón a incluir</label>
+              <select value={selectedCoupon} onChange={(e) => setSelectedCoupon(e.target.value)} className={inputClass}>
+                <option value="">Sin cupón</option>
+                {coupons.map((c: any) => (
+                  <option key={c.code} value={c.code}>{c.code} - {c.description}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Mensaje personalizado</label>
               <input
-                type="number"
-                min={1}
-                max={999}
-                placeholder="Dias"
-                value={customDaysInput}
-                onChange={(e) => setCustomDaysInput(e.target.value)}
-                onBlur={() => {
-                  const v = parseInt(customDaysInput);
-                  if (v > 0) setDays(v);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  const v = parseInt(customDaysInput);
-                  if (v > 0) setDays(v);
-                }}
-                className="border rounded-lg px-3 py-2 text-sm w-24 mt-1"
+                type="text"
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder="Te extrañamos! Vuelve pronto..."
+                className={inputClass}
               />
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Cupon a incluir</label>
-            <select
-              value={selectedCoupon}
-              onChange={(e) => setSelectedCoupon(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Sin cupon</option>
-              {coupons.map((c: any) => (
-                <option key={c.code} value={c.code}>{c.code} - {c.description}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje personalizado</label>
-            <input
-              type="text"
-              value={customMessage}
-              onChange={(e) => setCustomMessage(e.target.value)}
-              placeholder="Te extrañamos! Vuelve pronto..."
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-            />
+            </div>
           </div>
         </div>
-      </div>
+      </Panel>
 
-      {/* Clients list */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left p-4 font-medium text-gray-600">Cliente</th>
-              <th className="text-left p-4 font-medium text-gray-600">Contacto</th>
-              <th className="text-center p-4 font-medium text-gray-600">Visitas</th>
-              <th className="text-center p-4 font-medium text-gray-600">Ultima Visita</th>
-              <th className="text-center p-4 font-medium text-gray-600">Dias Inactivo</th>
-              <th className="text-center p-4 font-medium text-gray-600">Notificar</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={6}><Spinner /></td></tr>
-            ) : clients.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-gray-500">No hay clientes inactivos. Todos al dia!</td></tr>
-            ) : clients.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="p-4 font-medium">{c.name}</td>
-                <td className="p-4">
-                  <div className="text-xs text-gray-500">
-                    {c.email && <p>{c.email}</p>}
-                    {c.phone && <p>{c.phone}</p>}
+      {/* Lista */}
+      <Panel title={`Clientes inactivos (${clients.length})`} subtitle="Ordenados del más antiguo al más reciente" flush>
+        {loading ? (
+          <Spinner />
+        ) : clients.length === 0 ? (
+          <div className="flex flex-col items-center px-6 pb-10 pt-4 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+              <HeartHandshake className="h-6 w-6" strokeWidth={1.5} />
+            </div>
+            <p className="text-sm font-semibold text-brand-dark">¡Todos al día!</p>
+            <p className="mt-1 text-xs text-brand-gray">No hay clientes con {days} días o más sin volver.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50 px-2 pb-2 md:px-3">
+            {clients.map((c) => {
+              const initials = c.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+              const tone = c.daysSinceVisit >= 60 ? "bg-red-500/15 text-red-500" : c.daysSinceVisit >= 30 ? "bg-amber-500/15 text-amber-500" : "bg-brand-light text-brand-gray";
+              return (
+                <div key={c.id} className="flex flex-wrap items-center gap-3 px-3 py-3.5 transition-colors hover:bg-brand-blue/[0.04] md:flex-nowrap">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-blue/25 to-brand-accent/10 text-sm font-bold text-brand-blue ring-1 ring-brand-blue/20">
+                    {initials}
                   </div>
-                </td>
-                <td className="p-4 text-center">{c.totalVisits}</td>
-                <td className="p-4 text-center text-gray-500">
-                  {c.lastVisit ? new Date(c.lastVisit).toLocaleDateString("es-CL") : "Nunca"}
-                </td>
-                <td className="p-4 text-center">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    c.daysSinceVisit >= 60 ? "bg-red-100 text-red-700" :
-                    c.daysSinceVisit >= 30 ? "bg-yellow-100 text-yellow-700" :
-                    "bg-gray-100 text-gray-700"
-                  }`}>
-                    {c.daysSinceVisit} dias
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p className="truncate text-sm font-semibold capitalize text-brand-dark">{c.name}</p>
+                    <p className="truncate text-xs text-brand-gray">
+                      {c.email || "Sin correo"}{c.phone ? ` · ${formatPhoneCL(c.phone)}` : " · Sin teléfono"}
+                    </p>
+                  </div>
+                  <div className="hidden w-24 text-center md:block">
+                    <p className="text-sm font-bold tabular-nums text-brand-dark">{c.totalVisits}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-brand-gray">{c.totalVisits === 1 ? "visita" : "visitas"}</p>
+                  </div>
+                  <div className="hidden w-28 text-center md:block">
+                    <p className="text-sm font-semibold text-brand-dark">{c.lastVisit ? new Date(c.lastVisit + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "Nunca"}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-brand-gray">última visita</p>
+                  </div>
+                  <span className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold tabular-nums ${tone}`}>
+                    {c.daysSinceVisit} {c.daysSinceVisit === 1 ? "día" : "días"}
                   </span>
-                </td>
-                <td className="p-4">
-                  <div className="flex gap-2 justify-center">
+                  <div className="flex flex-shrink-0 gap-2">
                     {c.phone && (
                       <button
                         onClick={() => notifyClient(c.id, "whatsapp")}
                         disabled={sendingId === `${c.id}-whatsapp`}
-                        className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-500 ring-1 ring-emerald-500/20 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
                       >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                        WhatsApp
+                        <MessageCircle className="h-3.5 w-3.5" strokeWidth={2} /> WhatsApp
                       </button>
                     )}
                     {c.email && (
                       <button
                         onClick={() => notifyClient(c.id, "email")}
                         disabled={sendingId === `${c.id}-email`}
-                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-brand-dark transition-colors hover:border-brand-blue/40 disabled:opacity-50"
                       >
-                        {sendingId === `${c.id}-email` ? "..." : "Email"}
+                        <Mail className="h-3.5 w-3.5" strokeWidth={2} /> {sendingId === `${c.id}-email` ? "..." : "Email"}
                       </button>
                     )}
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

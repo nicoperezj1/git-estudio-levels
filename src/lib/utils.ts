@@ -107,3 +107,59 @@ export function chileDayBoundsUtc(dateStr: string): { startUtc: string; endUtc: 
   const endUtc = new Date(startUtc.getTime() + 24 * 60 * 60 * 1000);
   return { startUtc: startUtc.toISOString(), endUtc: endUtc.toISOString() };
 }
+
+/**
+ * Normalizes either a plain DATE (YYYY-MM-DD, no time/zone — used as-is, since it has no
+ * timezone ambiguity to begin with) or a TIMESTAMPTZ string to Chile's calendar date.
+ * Used (Nico, 27-sep) anywhere a value needs to be compared against another calendar date
+ * without mixing in a raw UTC instant — see daysBetweenDateStrs below.
+ */
+export function toChileDateStr(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago" }).format(new Date(value));
+}
+
+/**
+ * Whole calendar days between two YYYY-MM-DD strings (fromStr - toStr), computed on pure
+ * date arithmetic (UTC-midnight anchors, matching dateStrOffset above) so it never mixes
+ * in a raw UTC instant (Date.now()) against a calendar-only date — the bug found in
+ * /api/retention, which could show a client inactive/active a day off from reality right
+ * at the Chile midnight boundary.
+ */
+export function daysBetweenDateStrs(fromStr: string, toStr: string): number {
+  const [y1, m1, d1] = fromStr.split("-").map(Number);
+  const [y2, m2, d2] = toStr.split("-").map(Number);
+  const from = Date.UTC(y1, m1 - 1, d1);
+  const to = Date.UTC(y2, m2 - 1, d2);
+  return Math.floor((from - to) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Start (YYYY-MM-DD, Chile calendar) of a tenant's CURRENT monthly billing/usage cycle,
+ * anchored to the day-of-month it signed up (Nico, 27-sep — cuotas de mensajeria: "cada
+ * negocio tiene su propio ciclo de 30 dias desde que se suscribio", not a shared calendar
+ * month for everyone). Clamps to the last day of a shorter month (a business created on
+ * the 31st cycles on Feb 28/29, Apr 30, etc. instead of overflowing into the next month),
+ * and never returns a date before the tenant's own creation date.
+ */
+export function tenantCycleStart(createdAtIso: string): string {
+  const created = toChileDateStr(createdAtIso);
+  const [cy, cm, cd] = created.split("-").map(Number);
+  const today = todayInChile();
+  const [ty, tm] = today.split("-").map(Number);
+
+  const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // m: 1-indexed
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const clamp = (y: number, m: number, d: number) => Math.min(d, daysInMonth(y, m));
+
+  let candY = ty, candM = tm;
+  let candidate = `${candY}-${pad(candM)}-${pad(clamp(candY, candM, cd))}`;
+
+  if (candidate > today) {
+    candM -= 1;
+    if (candM === 0) { candM = 12; candY -= 1; }
+    candidate = `${candY}-${pad(candM)}-${pad(clamp(candY, candM, cd))}`;
+  }
+
+  return candidate < created ? created : candidate;
+}

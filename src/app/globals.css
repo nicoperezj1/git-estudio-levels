@@ -316,3 +316,250 @@
 .feature-card:hover .icon-float {
   animation: float 2s ease-in-out infinite;
 }
+
+/* ---------------------------------------------------------------------------
+   Tema oscuro (Nico, 28-sep): revision completa de colores.
+   La mayoria de las pantallas usan la paleta fija de Tailwind (bg-white,
+   text-gray-900, bg-red-50...) en vez de los tokens brand.*, asi que en tema
+   oscuro quedaban tarjetas blancas, textos oscuros sobre fondo oscuro y avisos
+   amarillos/rojos deslavados. En lugar de tocar ~44 pantallas una por una, se
+   reasignan aqui esas utilidades cuando <html> tiene la clase .dark. No afecta
+   al tema claro. Botones solidos (bg-indigo-600, text-white, etc.) no se tocan.
+   --------------------------------------------------------------------------- */
+.dark .bg-white{background-color:hsl(222 20% 11%)}
+.dark .bg-gray-50{background-color:hsl(222 18% 14%)}
+.dark .bg-gray-100{background-color:hsl(222 16% 17%)}
+.dark .bg-gray-200{background-color:hsl(222 14% 22%)}
+.dark .bg-gray-300{background-color:hsl(222 12% 28%)}
+.dark .hover\:bg-gray-50:hover{background-color:hsl(222 18% 15%)}
+.dark .hover\:bg-gray-100:hover{background-color:hsl(222 16% 19%)}
+.dark .hover\:bg-gray-200:hover{background-color:hsl(222 14% 24%)}
+.dark .hover\:bg-white:hover{background-color:hsl(222 18% 15%)}
+.dark .text-gray-900{color:hsl(210 20% 96%)}
+.dark .text-gray-800{color:hsl(210 20% 94%)}
+.dark .text-gray-700{color:hsl(210 16% 88%)}
+.dark .text-gray-600{color:hsl(214 12% 76%)}
+.dark .text-gray-500{color:hsl(216 10% 66%)}
+.dark .text-gray-400{color:hsl(216 9% 58%)}
+.dark .hover\:text-gray-600:hover{color:hsl(210 20% 92%)}
+.dark .hover\:text-gray-500:hover{color:hsl(214 12% 80%)}
+.dark .text-black{color:hsl(210 20% 96%)}
+.dark .border-gray-50{border-color:hsl(222 16% 15%)}
+.dark .divide-gray-50>:not([hidden])~:not([hidden]){border-color:hsl(222 16% 15%)}
+.dark .border-gray-100{border-color:hsl(222 16% 17%)}
+.dark .divide-gray-100>:not([hidden])~:not([hidden]){border-color:hsl(222 16% 17%)}
+.dark .border-gray-200{border-color:hsl(222 16% 22%)}
+.dark .divide-gray-200>:not([hidden])~:not([hidden]){border-color:hsl(222 16% 22%)}
+.dark .border-gray-300{border-color:hsl(222 14% 28%)}
+.dark .hover\:border-gray-300:hover{border-color:hsl(222 14% 34%)}
+.dark .bg-red-50{background-color:hsl(0 70% 50%/0.1)}
+.dark .hover\:bg-red-50:hover{background-color:hsl(0 70% 50%/0.16)}
+.dark .bg-red-100{background-color:hsl(0 70% 50%/0.16)}
+.dark .hover\:bg-red-100:hover{background-color:hsl(0 70% 50%/0.22)}
+.dark .bg-red-200{background-color:hsl(0 70% 50%/0.24)}
+.dark .hover\:bg-red-200:hover{background-color:hsl(0 70% 50%/0.30)}
+.dark .text-red-600{color:hsl(0 85% 72%)}
+.dark .text-red-700{color:hsl(0 85% 72%)}
+.dark .text-red-800{color:hsl(0 85% 72%)}
+.dark .text-red-900{color:hsl(0 85% 72%)}
+.dark .text-red-500{color:hsl(0 80% 66%)}
+.dark .border-red-200{border-color:hsl(0 60% 50%/.35)}
+.dark .border-red-300{border-color:hsl(0 60% 50%/.35)}
+.dark .bg-orange-50{background-color:hsl(25 70% 50%/0.1)}
+.dark .hover\:bg-orange-50:hover{background-color:hsl(25 70% 50%/0.16)}
+.dark .bg-orange-100{background-color:hsl(25 70% 50%/0.16)}
+.dark .hover\:bg-orange-100:hover{background-color:hsl(25 70% 50%/0.22)}
+.dark .bg-orange-200{background-color:hsl(25 70% 50%/0.24)}
+.dark .hover\:bg-orange-200:hover{background-color:hsl(25 70% 50%/0.30)}
+.dark .text-orange-600{color:hsl(25 85% 72%)}
+.dark .text-orange-700{color:hsl(25 85% 72%)}
+.dark .text-orange-800{color:hsl(25 85% 72%)}
+.dark .text-orange-900{color:hsl(25 85% 72%)}
+.dark .text-orange-500{color:hsl(25 80% 66%)}
+.dark .border-orange-200{border-color:hsl(25 60% 50%/.35)}
+.dark .border-orange-300{border-color:hsl(25 60% 50%/.35)}
+.dark .bg-amber-50{background-color:hsl(38 70% 50%/0.1)}
+.dark .hover\:bg-amber-50:hover{background-color:hsl(38 70% 50%/0.16)}
+.dark .bg-amber-100{background-color:hsl(38 70% 50%/0.16)}
+.dark .hover\:bg-amber-100:hover{background-color:hsl(38 70% 50%/0.22)}
+.dark .bg-amber-200{background-color:hsl(38 70% 50%/0.24)}
+.dark .hover\:bg-amber-200:hover{background-color:hsl(38 70% 50%/0.30)}
+.dark .text-amber-600{color:hsl(38 85% 72%)}
+.dark .text-amber-700{color:hsl(38 85% 72%)}
+.dark .text-amber-800{color:hsl(38 85% 72%)}
+.dark .text-amber-900{color:hsl(38 85% 72%)}
+.dark .text-amber-500{color:hsl(38 80% 66%)}
+.dark .border-amber-200{border-color:hsl(38 60% 50%/.35)}
+.dark .border-amber-300{border-color:hsl(38 60% 50%/.35)}
+.dark .bg-yellow-50{background-color:hsl(48 70% 50%/0.1)}
+.dark .hover\:bg-yellow-50:hover{background-color:hsl(48 70% 50%/0.16)}
+.dark .bg-yellow-100{background-color:hsl(48 70% 50%/0.16)}
+.dark .hover\:bg-yellow-100:hover{background-color:hsl(48 70% 50%/0.22)}
+.dark .bg-yellow-200{background-color:hsl(48 70% 50%/0.24)}
+.dark .hover\:bg-yellow-200:hover{background-color:hsl(48 70% 50%/0.30)}
+.dark .text-yellow-600{color:hsl(48 85% 72%)}
+.dark .text-yellow-700{color:hsl(48 85% 72%)}
+.dark .text-yellow-800{color:hsl(48 85% 72%)}
+.dark .text-yellow-900{color:hsl(48 85% 72%)}
+.dark .text-yellow-500{color:hsl(48 80% 66%)}
+.dark .border-yellow-200{border-color:hsl(48 60% 50%/.35)}
+.dark .border-yellow-300{border-color:hsl(48 60% 50%/.35)}
+.dark .bg-green-50{background-color:hsl(142 70% 50%/0.1)}
+.dark .hover\:bg-green-50:hover{background-color:hsl(142 70% 50%/0.16)}
+.dark .bg-green-100{background-color:hsl(142 70% 50%/0.16)}
+.dark .hover\:bg-green-100:hover{background-color:hsl(142 70% 50%/0.22)}
+.dark .bg-green-200{background-color:hsl(142 70% 50%/0.24)}
+.dark .hover\:bg-green-200:hover{background-color:hsl(142 70% 50%/0.30)}
+.dark .text-green-600{color:hsl(142 85% 72%)}
+.dark .text-green-700{color:hsl(142 85% 72%)}
+.dark .text-green-800{color:hsl(142 85% 72%)}
+.dark .text-green-900{color:hsl(142 85% 72%)}
+.dark .text-green-500{color:hsl(142 80% 66%)}
+.dark .border-green-200{border-color:hsl(142 60% 50%/.35)}
+.dark .border-green-300{border-color:hsl(142 60% 50%/.35)}
+.dark .bg-emerald-50{background-color:hsl(160 70% 50%/0.1)}
+.dark .hover\:bg-emerald-50:hover{background-color:hsl(160 70% 50%/0.16)}
+.dark .bg-emerald-100{background-color:hsl(160 70% 50%/0.16)}
+.dark .hover\:bg-emerald-100:hover{background-color:hsl(160 70% 50%/0.22)}
+.dark .bg-emerald-200{background-color:hsl(160 70% 50%/0.24)}
+.dark .hover\:bg-emerald-200:hover{background-color:hsl(160 70% 50%/0.30)}
+.dark .text-emerald-600{color:hsl(160 85% 72%)}
+.dark .text-emerald-700{color:hsl(160 85% 72%)}
+.dark .text-emerald-800{color:hsl(160 85% 72%)}
+.dark .text-emerald-900{color:hsl(160 85% 72%)}
+.dark .text-emerald-500{color:hsl(160 80% 66%)}
+.dark .border-emerald-200{border-color:hsl(160 60% 50%/.35)}
+.dark .border-emerald-300{border-color:hsl(160 60% 50%/.35)}
+.dark .bg-blue-50{background-color:hsl(217 70% 50%/0.1)}
+.dark .hover\:bg-blue-50:hover{background-color:hsl(217 70% 50%/0.16)}
+.dark .bg-blue-100{background-color:hsl(217 70% 50%/0.16)}
+.dark .hover\:bg-blue-100:hover{background-color:hsl(217 70% 50%/0.22)}
+.dark .bg-blue-200{background-color:hsl(217 70% 50%/0.24)}
+.dark .hover\:bg-blue-200:hover{background-color:hsl(217 70% 50%/0.30)}
+.dark .text-blue-600{color:hsl(217 85% 72%)}
+.dark .text-blue-700{color:hsl(217 85% 72%)}
+.dark .text-blue-800{color:hsl(217 85% 72%)}
+.dark .text-blue-900{color:hsl(217 85% 72%)}
+.dark .text-blue-500{color:hsl(217 80% 66%)}
+.dark .border-blue-200{border-color:hsl(217 60% 50%/.35)}
+.dark .border-blue-300{border-color:hsl(217 60% 50%/.35)}
+.dark .bg-indigo-50{background-color:hsl(239 70% 50%/0.1)}
+.dark .hover\:bg-indigo-50:hover{background-color:hsl(239 70% 50%/0.16)}
+.dark .bg-indigo-100{background-color:hsl(239 70% 50%/0.16)}
+.dark .hover\:bg-indigo-100:hover{background-color:hsl(239 70% 50%/0.22)}
+.dark .bg-indigo-200{background-color:hsl(239 70% 50%/0.24)}
+.dark .hover\:bg-indigo-200:hover{background-color:hsl(239 70% 50%/0.30)}
+.dark .text-indigo-600{color:hsl(239 85% 72%)}
+.dark .text-indigo-700{color:hsl(239 85% 72%)}
+.dark .text-indigo-800{color:hsl(239 85% 72%)}
+.dark .text-indigo-900{color:hsl(239 85% 72%)}
+.dark .text-indigo-500{color:hsl(239 80% 66%)}
+.dark .border-indigo-200{border-color:hsl(239 60% 50%/.35)}
+.dark .border-indigo-300{border-color:hsl(239 60% 50%/.35)}
+.dark .bg-purple-50{background-color:hsl(270 70% 50%/0.1)}
+.dark .hover\:bg-purple-50:hover{background-color:hsl(270 70% 50%/0.16)}
+.dark .bg-purple-100{background-color:hsl(270 70% 50%/0.16)}
+.dark .hover\:bg-purple-100:hover{background-color:hsl(270 70% 50%/0.22)}
+.dark .bg-purple-200{background-color:hsl(270 70% 50%/0.24)}
+.dark .hover\:bg-purple-200:hover{background-color:hsl(270 70% 50%/0.30)}
+.dark .text-purple-600{color:hsl(270 85% 72%)}
+.dark .text-purple-700{color:hsl(270 85% 72%)}
+.dark .text-purple-800{color:hsl(270 85% 72%)}
+.dark .text-purple-900{color:hsl(270 85% 72%)}
+.dark .text-purple-500{color:hsl(270 80% 66%)}
+.dark .border-purple-200{border-color:hsl(270 60% 50%/.35)}
+.dark .border-purple-300{border-color:hsl(270 60% 50%/.35)}
+.dark .bg-pink-50{background-color:hsl(330 70% 50%/0.1)}
+.dark .hover\:bg-pink-50:hover{background-color:hsl(330 70% 50%/0.16)}
+.dark .bg-pink-100{background-color:hsl(330 70% 50%/0.16)}
+.dark .hover\:bg-pink-100:hover{background-color:hsl(330 70% 50%/0.22)}
+.dark .bg-pink-200{background-color:hsl(330 70% 50%/0.24)}
+.dark .hover\:bg-pink-200:hover{background-color:hsl(330 70% 50%/0.30)}
+.dark .text-pink-600{color:hsl(330 85% 72%)}
+.dark .text-pink-700{color:hsl(330 85% 72%)}
+.dark .text-pink-800{color:hsl(330 85% 72%)}
+.dark .text-pink-900{color:hsl(330 85% 72%)}
+.dark .text-pink-500{color:hsl(330 80% 66%)}
+.dark .border-pink-200{border-color:hsl(330 60% 50%/.35)}
+.dark .border-pink-300{border-color:hsl(330 60% 50%/.35)}
+.dark .bg-sky-50{background-color:hsl(199 70% 50%/0.1)}
+.dark .hover\:bg-sky-50:hover{background-color:hsl(199 70% 50%/0.16)}
+.dark .bg-sky-100{background-color:hsl(199 70% 50%/0.16)}
+.dark .hover\:bg-sky-100:hover{background-color:hsl(199 70% 50%/0.22)}
+.dark .bg-sky-200{background-color:hsl(199 70% 50%/0.24)}
+.dark .hover\:bg-sky-200:hover{background-color:hsl(199 70% 50%/0.30)}
+.dark .text-sky-600{color:hsl(199 85% 72%)}
+.dark .text-sky-700{color:hsl(199 85% 72%)}
+.dark .text-sky-800{color:hsl(199 85% 72%)}
+.dark .text-sky-900{color:hsl(199 85% 72%)}
+.dark .text-sky-500{color:hsl(199 80% 66%)}
+.dark .border-sky-200{border-color:hsl(199 60% 50%/.35)}
+.dark .border-sky-300{border-color:hsl(199 60% 50%/.35)}
+.dark .bg-teal-50{background-color:hsl(173 70% 50%/0.1)}
+.dark .hover\:bg-teal-50:hover{background-color:hsl(173 70% 50%/0.16)}
+.dark .bg-teal-100{background-color:hsl(173 70% 50%/0.16)}
+.dark .hover\:bg-teal-100:hover{background-color:hsl(173 70% 50%/0.22)}
+.dark .bg-teal-200{background-color:hsl(173 70% 50%/0.24)}
+.dark .hover\:bg-teal-200:hover{background-color:hsl(173 70% 50%/0.30)}
+.dark .text-teal-600{color:hsl(173 85% 72%)}
+.dark .text-teal-700{color:hsl(173 85% 72%)}
+.dark .text-teal-800{color:hsl(173 85% 72%)}
+.dark .text-teal-900{color:hsl(173 85% 72%)}
+.dark .text-teal-500{color:hsl(173 80% 66%)}
+.dark .border-teal-200{border-color:hsl(173 60% 50%/.35)}
+.dark .border-teal-300{border-color:hsl(173 60% 50%/.35)}
+
+/* Campos de formulario sin fondo propio + controles nativos (fecha, select, scroll) */
+.dark { color-scheme: dark; }
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.dark select,
+.dark textarea {
+  background-color: hsl(222 18% 14%);
+  color: hsl(210 20% 96%);
+  border-color: hsl(222 16% 24%);
+}
+.dark input::placeholder, .dark textarea::placeholder { color: hsl(216 9% 50%); }
+.dark option { background-color: hsl(222 20% 11%); color: hsl(210 20% 96%); }
+
+/* Celebracion de venta exitosa del POS (ver components/pos/sale-celebration.tsx) */
+@keyframes sale-confetti {
+  0%   { transform: translate(0, 0) rotate(0) scale(0.3); opacity: 0; }
+  8%   { opacity: 1; }
+  38%  { transform: translate(calc(var(--dx) * 0.75), var(--up)) rotate(calc(var(--rot) * 0.45)) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--down)) rotate(var(--rot)) scale(1); opacity: 0; }
+}
+.sale-confetti {
+  opacity: 0;
+  animation-name: sale-confetti;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes sale-card-in {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.92); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sale-card-in { animation: sale-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes sale-draw { to { stroke-dashoffset: 0; } }
+@keyframes sale-ring {
+  0%   { transform: scale(0.6); opacity: 0; }
+  50%  { opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.sale-ring { animation: sale-ring 0.9s 0.2s ease-out both; }
+@keyframes sale-glow {
+  0%   { opacity: 0; transform: scale(0.8); }
+  40%  { opacity: 1; }
+  100% { opacity: 0.55; transform: scale(1); }
+}
+.sale-glow { animation: sale-glow 1.2s ease-out both; }
+@keyframes sale-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.sale-rise { opacity: 0; animation: sale-rise 0.4s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .sale-confetti { display: none; }
+  .sale-card-in, .sale-ring, .sale-glow, .sale-rise { animation: none; opacity: 1; }
+  .sale-ring, .sale-glow { display: none; }
+}

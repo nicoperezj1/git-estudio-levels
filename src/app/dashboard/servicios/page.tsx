@@ -18,6 +18,25 @@ interface Service {
   active: boolean;
   sort_order: number;
   image_url?: string | null;
+  category?: string | null;
+}
+
+// Punto 2 (Nico, 27-sep): "agrupar por carpetas las categorias para que se vea mas
+// ordenado y estetico" — mismo criterio de agrupacion y orden que ya usa POS (ver
+// dashboard/pos/page.tsx): cada categoria con nombre, en el orden en que aparece por
+// primera vez entre los servicios activos, y "Sin categoria" siempre al final.
+const CATEGORY_NONE = "__sin_categoria__";
+
+function groupServicesByCategory(list: Service[]): Array<{ key: string; label: string; items: Service[] }> {
+  const order: string[] = [];
+  for (const s of list) {
+    const key = s.category || CATEGORY_NONE;
+    if (key !== CATEGORY_NONE && !order.includes(key)) order.push(key);
+  }
+  const groups = order.map((key) => ({ key, label: key, items: list.filter((s) => (s.category || CATEGORY_NONE) === key) }));
+  const uncategorized = list.filter((s) => !s.category);
+  if (uncategorized.length) groups.push({ key: CATEGORY_NONE, label: "Sin categoria", items: uncategorized });
+  return groups;
 }
 
 export default function ServiciosPage() {
@@ -41,6 +60,16 @@ export default function ServiciosPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Carpetas colapsadas (por categoria). Vacio = todas expandidas por defecto.
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const toggleCategoryCollapsed = (key: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   const fetchServices = async () => {
     setLoading(true);
     const params = tenant?.id ? `?all=true&tenantId=${tenant.id}` : "?all=true";
@@ -57,12 +86,45 @@ export default function ServiciosPage() {
 
   // Existing categories across current services, for the dropdown suggestions.
   const existingCategories = Array.from(
-    new Set(services.map((s) => (s as any).category).filter(Boolean))
+    new Set(services.map((s) => s.category).filter(Boolean))
   ) as string[];
+
+  // Categorias creadas en el formulario que aun no tienen ningun servicio guardado.
+  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const allCategories = Array.from(new Set([...existingCategories, ...extraCategories]));
+
+  // Si la persona escribio una categoria nueva pero no alcanzo a pulsar "Agregar" y guarda el
+  // servicio directo, se toma ese texto como la categoria (antes se perdia en silencio y el
+  // servicio quedaba "Sin categoria"). Reutiliza una existente si el nombre coincide.
+  const resolveCategoryOnSubmit = (): string => {
+    if (form.category) return form.category;
+    const name = newCategoryName.trim().replace(/\s+/g, " ");
+    if (!creatingCategory || !name) return "";
+    const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return allCategories.find((c) => norm(c) === norm(name)) || name;
+  };
+
+  // Crea la categoria y la deja seleccionada. Si ya existe una igual (sin importar
+  // mayusculas/acentos) se reutiliza, para no duplicar grupos.
+  const confirmNewCategory = () => {
+    const name = newCategoryName.trim().replace(/\s+/g, " ");
+    if (!name) return;
+    const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const existing = allCategories.find((c) => norm(c) === norm(name));
+    const final = existing || name;
+    if (!existing) setExtraCategories((prev) => [...prev, final]);
+    setForm((f) => ({ ...f, category: final }));
+    setCreatingCategory(false);
+    setNewCategoryName("");
+  };
 
   const openNew = () => {
     setEditingService(null);
     setForm({ name: "", description: "", price: "", duration: "", category: "" });
+    setCreatingCategory(false);
+    setNewCategoryName("");
     setShowModal(true);
   };
 
@@ -73,7 +135,7 @@ export default function ServiciosPage() {
       description: s.description || "",
       price: String(s.price),
       duration: String(s.duration),
-      category: (s as any).category || "",
+      category: s.category || "",
     });
     setShowModal(true);
   };
@@ -131,6 +193,7 @@ export default function ServiciosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const categoryToSave = resolveCategoryOnSubmit() || null;
 
     if (editingService) {
       await fetch(`/api/services/${editingService.id}`, {
@@ -141,7 +204,7 @@ export default function ServiciosPage() {
           description: form.description || null,
           price: parseInt(form.price),
           duration: parseInt(form.duration),
-          category: form.category || null,
+          category: categoryToSave,
         }),
       });
       showToast("Servicio actualizado", "success");
@@ -154,7 +217,7 @@ export default function ServiciosPage() {
           description: form.description || null,
           price: parseInt(form.price),
           duration: parseInt(form.duration),
-          category: form.category || null,
+          category: categoryToSave,
           sort_order: activeServices.length,
         }),
       });
@@ -185,6 +248,14 @@ export default function ServiciosPage() {
     fetchServices();
   };
 
+  const activeServices = services.filter((s) => s.active);
+  const inactiveServices = services.filter((s) => !s.active);
+  const serviceGroups = groupServicesByCategory(activeServices);
+  // Solo los servicios de carpetas expandidas, en orden de carpeta — es exactamente lo
+  // que se renderiza y lo unico que se puede arrastrar, asi que el "index" de drag&drop
+  // se calcula sobre esta lista (no sobre activeServices) para que ambos coincidan.
+  const visibleFlat = serviceGroups.flatMap((g) => (collapsedCategories.has(g.key) ? [] : g.items));
+
   // ===== REORDER LOGIC =====
   const saveOrder = async (newList: Service[]) => {
     const order = newList.map((s, i) => ({ id: s.id, sort_order: i }));
@@ -195,18 +266,46 @@ export default function ServiciosPage() {
     });
   };
 
-  const reorder = useCallback((fromIndex: number, toIndex: number) => {
+  // Punto 2 (Nico, 27-sep): al agrupar por carpetas, arrastrar ya no reordena la lista
+  // plana completa — solo tiene sentido reordenar DENTRO de la misma carpeta/categoria.
+  // Se ubica cada servicio por su id (no por posicion en visibleFlat) dentro de su propio
+  // grupo en activeServices, se reordena solo ese subconjunto, y se reinserta cada uno en
+  // su mismo "slot" original — asi el resto de las categorias nunca cambia de posicion.
+  const reorder = useCallback((fromIndex: number, toIndex: number): boolean => {
+    const fromItem = visibleFlat[fromIndex];
+    const toItem = visibleFlat[toIndex];
+    if (!fromItem || !toItem) return false;
+    const fromKey = fromItem.category || CATEGORY_NONE;
+    const toKey = toItem.category || CATEGORY_NONE;
+    if (fromKey !== toKey) {
+      showToast("Solo puedes reordenar servicios dentro de la misma categoria", "error");
+      return false;
+    }
+
     setServices((prev) => {
       const active = prev.filter((s) => s.active);
       const inactive = prev.filter((s) => !s.active);
-      const newActive = [...active];
-      const [moved] = newActive.splice(fromIndex, 1);
-      newActive.splice(toIndex, 0, moved);
-      const reordered = newActive.map((s, i) => ({ ...s, sort_order: i }));
+
+      const groupSlots = active
+        .map((s, i) => ((s.category || CATEGORY_NONE) === fromKey ? i : -1))
+        .filter((i) => i !== -1);
+      const groupItems = groupSlots.map((i) => active[i]);
+      const fromWithin = groupItems.findIndex((s) => s.id === fromItem.id);
+      const toWithin = groupItems.findIndex((s) => s.id === toItem.id);
+      if (fromWithin === -1 || toWithin === -1) return prev;
+
+      const newGroupItems = [...groupItems];
+      const [moved] = newGroupItems.splice(fromWithin, 1);
+      newGroupItems.splice(toWithin, 0, moved);
+
+      const merged = [...active];
+      groupSlots.forEach((slot, idx) => { merged[slot] = newGroupItems[idx]; });
+      const reordered = merged.map((s, i) => ({ ...s, sort_order: i }));
       saveOrder(reordered);
       return [...reordered, ...inactive];
     });
-  }, []);
+    return true;
+  }, [visibleFlat]);
 
   // Desktop drag events
   const handleDragStart = (index: number) => {
@@ -220,8 +319,7 @@ export default function ServiciosPage() {
 
   const handleDragEnd = () => {
     if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
-      reorder(dragIndex, overIndex);
-      showToast("Orden actualizado", "success");
+      if (reorder(dragIndex, overIndex)) showToast("Orden actualizado", "success");
     }
     setDragIndex(null);
     setOverIndex(null);
@@ -254,9 +352,8 @@ export default function ServiciosPage() {
     const touch = e.touches[0];
     setTouchOffsetY(touch.clientY - touchStartY);
 
-    // Find which item we're over
-    const active = services.filter((s) => s.active);
-    for (let i = 0; i < active.length; i++) {
+    // Find which item we're over (solo la lista visible/agrupada — ver visibleFlat).
+    for (let i = 0; i < visibleFlat.length; i++) {
       const el = itemRefs.current[i];
       if (el) {
         const rect = el.getBoundingClientRect();
@@ -272,8 +369,7 @@ export default function ServiciosPage() {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
 
     if (touchDragging && dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
-      reorder(dragIndex, overIndex);
-      showToast("Orden actualizado", "success");
+      if (reorder(dragIndex, overIndex)) showToast("Orden actualizado", "success");
     }
 
     setDragIndex(null);
@@ -281,9 +377,6 @@ export default function ServiciosPage() {
     setTouchDragging(false);
     setTouchOffsetY(0);
   };
-
-  const activeServices = services.filter((s) => s.active);
-  const inactiveServices = services.filter((s) => !s.active);
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
@@ -309,63 +402,93 @@ export default function ServiciosPage() {
           <div className="p-8"><Spinner /></div>
         ) : (
           <div ref={listRef} className="divide-y select-none">
-            {activeServices.map((s, index) => (
-              <div
-                key={s.id}
-                ref={(el) => { itemRefs.current[index] = el; }}
-                draggable
-                onDragStart={() => handleDragStart(index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
-                onTouchStart={(e) => handleTouchStart(e, index)}
-                onTouchMove={(e) => handleTouchMove(e)}
-                onTouchEnd={handleTouchEnd}
-                className={`p-3 md:p-4 flex items-center gap-2 md:gap-3 transition-all ${
-                  dragIndex === index
-                    ? "opacity-50 bg-brand-blue/5 scale-[0.98]"
-                    : overIndex === index && dragIndex !== null
-                    ? "border-t-2 border-t-brand-blue bg-brand-blue/5"
-                    : "hover:bg-gray-50"
-                } ${touchDragging && dragIndex === index ? "shadow-lg z-10 relative" : ""}`}
-                style={touchDragging && dragIndex === index ? { transform: `translateY(${touchOffsetY}px)` } : undefined}
-              >
-                {/* Drag handle */}
-                <div className="cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-500 p-1">
-                  <GripVertical className="w-5 h-5" />
-                </div>
+            {(() => {
+              // Contador de posicion dentro de visibleFlat (unico espacio de indices
+              // compartido por render, drag&drop y touch — ver visibleFlat mas arriba).
+              let flatIndex = -1;
+              return serviceGroups.map((group) => {
+                const isCollapsed = collapsedCategories.has(group.key);
+                return (
+                  <div key={group.key}>
+                    {/* Encabezado de carpeta — siempre visible, incluso colapsada. Solo
+                        se muestra si hay mas de una categoria o alguna con nombre, para
+                        no agregar ruido visual a un negocio que no usa categorias. */}
+                    {(serviceGroups.length > 1) && (
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoryCollapsed(group.key)}
+                        className="w-full flex items-center gap-2 px-3 md:px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                      >
+                        <span className={`text-gray-400 transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▸</span>
+                        <span className="font-semibold text-sm text-brand-dark">{group.label}</span>
+                        <span className="text-xs text-brand-gray">({group.items.length})</span>
+                      </button>
+                    )}
+                    {!isCollapsed && group.items.map((s) => {
+                      flatIndex += 1;
+                      const index = flatIndex;
+                      return (
+                        <div
+                          key={s.id}
+                          ref={(el) => { itemRefs.current[index] = el; }}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragEnd={handleDragEnd}
+                          onTouchStart={(e) => handleTouchStart(e, index)}
+                          onTouchMove={(e) => handleTouchMove(e)}
+                          onTouchEnd={handleTouchEnd}
+                          className={`p-3 md:p-4 flex items-center gap-2 md:gap-3 transition-all border-t ${
+                            dragIndex === index
+                              ? "opacity-50 bg-brand-blue/5 scale-[0.98]"
+                              : overIndex === index && dragIndex !== null
+                              ? "border-t-2 border-t-brand-blue bg-brand-blue/5"
+                              : "hover:bg-gray-50"
+                          } ${touchDragging && dragIndex === index ? "shadow-lg z-10 relative" : ""}`}
+                          style={touchDragging && dragIndex === index ? { transform: `translateY(${touchOffsetY}px)` } : undefined}
+                        >
+                          {/* Drag handle */}
+                          <div className="cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-500 p-1">
+                            <GripVertical className="w-5 h-5" />
+                          </div>
 
-                {/* Service info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-brand-dark text-sm md:text-base truncate">{s.name}</p>
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] md:text-xs font-medium flex-shrink-0">
-                      {s.duration} min
-                    </span>
-                  </div>
-                  {s.description && (
-                    <p className="text-xs text-brand-gray mt-0.5 truncate hidden md:block">{s.description}</p>
-                  )}
-                </div>
+                          {/* Service info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-brand-dark text-sm md:text-base truncate">{s.name}</p>
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] md:text-xs font-medium flex-shrink-0">
+                                {s.duration} min
+                              </span>
+                            </div>
+                            {s.description && (
+                              <p className="text-xs text-brand-gray mt-0.5 truncate hidden md:block">{s.description}</p>
+                            )}
+                          </div>
 
-                {/* Price + Actions */}
-                <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-                  <p className="text-sm md:text-lg font-bold text-brand-dark">{formatCurrency(Number(s.price))}</p>
-                  <div className="hidden md:flex gap-1">
-                    <button onClick={() => openEdit(s)}
-                      className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">Editar</button>
-                    <button onClick={() => toggleActive(s)}
-                      className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">Eliminar</button>
+                          {/* Price + Actions */}
+                          <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+                            <p className="text-sm md:text-lg font-bold text-brand-dark">{formatCurrency(Number(s.price))}</p>
+                            <div className="hidden md:flex gap-1">
+                              <button onClick={() => openEdit(s)}
+                                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">Editar</button>
+                              <button onClick={() => toggleActive(s)}
+                                className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">Eliminar</button>
+                            </div>
+                            {/* Mobile: tap to open edit */}
+                            <button onClick={() => openEdit(s)}
+                              className="md:hidden p-2 text-brand-gray hover:text-brand-dark">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {/* Mobile: tap to open edit */}
-                  <button onClick={() => openEdit(s)}
-                    className="md:hidden p-2 text-brand-gray hover:text-brand-dark">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         )}
       </div>
@@ -417,32 +540,64 @@ export default function ServiciosPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-brand-gray mb-1">Categoria (opcional)</label>
-                {/* Dropdown of existing categories + free text. Choosing an existing one
-                    keeps the POS grouping consistent (avoids "Nicolas" vs "nicolas"
-                    becoming two separate groups); you can still type a new one. */}
-                <input type="text" value={form.category} list="service-categories"
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="Elige una o escribe una nueva"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
-                <datalist id="service-categories">
-                  {existingCategories.map((cat) => (
-                    <option key={cat} value={cat} />
+                {/* Nico, 29-sep: en vez de escribir el nombre de la categoria cada vez (y
+                    terminar con "Barba" y "barba" como grupos distintos), se elige una de las
+                    existentes o se crea una con el boton "Crear nueva categoria". Los servicios
+                    se agrupan por la categoria elegida. */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, category: "" })}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      !form.category ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
+                    }`}
+                  >
+                    Sin categoria
+                  </button>
+                  {allCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setForm({ ...form, category: cat })}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        form.category === cat ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
+                      }`}
+                    >
+                      {cat}
+                    </button>
                   ))}
-                </datalist>
-                {existingCategories.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {existingCategories.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setForm({ ...form, category: cat })}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
-                          form.category === cat ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                  {!creatingCategory && (
+                    <button
+                      type="button"
+                      onClick={() => setCreatingCategory(true)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-brand-blue text-brand-blue hover:bg-brand-blue/5"
+                    >
+                      + Crear nueva categoria
+                    </button>
+                  )}
+                </div>
+                {creatingCategory && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); confirmNewCategory(); }
+                        if (e.key === "Escape") { setCreatingCategory(false); setNewCategoryName(""); }
+                      }}
+                      placeholder="Nombre de la nueva categoria"
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                    />
+                    <button type="button" onClick={confirmNewCategory}
+                      className="px-3 py-2 bg-brand-blue text-white text-xs font-medium rounded-xl hover:opacity-90">
+                      Agregar
+                    </button>
+                    <button type="button" onClick={() => { setCreatingCategory(false); setNewCategoryName(""); }}
+                      className="px-3 py-2 text-xs text-brand-gray hover:bg-gray-100 rounded-xl">
+                      Cancelar
+                    </button>
                   </div>
                 )}
               </div>

@@ -7,7 +7,7 @@ import { todayInChile } from "@/lib/utils";
 // remarketing, seguimiento y reseñas. Visible solo para Administrador y Recepcion.
 //
 // Segunda vuelta: la version original derivaba el origen de la primera CITA del
-// cliente, asi que cualquier cliente sin citas (alta manual sin agendar todavia,
+// cliente, asi que cualquier cliente sin citas (alta manual sin agendar todavía,
 // importacion CSV/Excel masiva, base historica) quedaba afuera de Metricas por
 // completo — por eso aparecia vacia. Ahora el origen vive en clients.acquisition_source,
 // fijado una sola vez al crear el cliente (ver migracion 069), y la consulta recorre

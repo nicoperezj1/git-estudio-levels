@@ -13,6 +13,8 @@ import {
   Calendar, CalendarCheck, CalendarDays, MapPin, Receipt, BarChart3,
   Tablet, CreditCard, Tag, Settings, LogOut, Scissors, Menu, X,
   Heart, Bell, Zap, Image, Star, ChevronLeft, ChevronRight, ChevronDown,
+  MessageCircle, Clock, FileText, UserCircle, PiggyBank, ClipboardList,
+  Building2, ShieldCheck, Ticket, Percent, KeyRound,
 } from "lucide-react";
 
 interface NavItem {
@@ -24,6 +26,10 @@ interface NavItem {
   // Configuracion), para comprimir la barra lateral — el padre sigue siendo un link a su
   // propia pagina, y un chevron aparte expande/colapsa sus hijos.
   children?: NavItem[];
+  // Item 34 (Nico, 26-sep): "matriz de accesos por plan" — un modulo cuyo acceso depende
+  // del plan contratado (no del rol). Cuando el plan del negocio no incluye esta feature,
+  // el item se muestra bloqueado con la misma insignia "PRO" que ya existia para roles.
+  feature?: string;
 }
 
 interface NavSection {
@@ -36,90 +42,86 @@ const sections: NavSection[] = [
     title: "Principal",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, minRole: "admin" },
-      { name: "Caja", href: "/dashboard/caja", icon: Wallet, minRole: "admin" },
-      { name: "Punto de Venta", href: "/dashboard/pos", icon: ShoppingCart, minRole: "receptionist" },
+      { name: "Mi Agenda", href: "/dashboard/mi-agenda", icon: CalendarCheck, minRole: "barber" },
       { name: "Standby", href: "/dashboard/standby", icon: Zap, minRole: "barber" },
     ],
   },
   {
+    // Nico (29-sep): el trabajo del dia a dia junto — agenda, venta y caja.
+    title: "Operación",
+    items: [
+      {
+        name: "Calendario", href: "/dashboard/calendario", icon: CalendarDays, minRole: "receptionist",
+        // Recepcion, Recordatorios y Lista de espera son hijos de Calendario.
+        children: [
+          { name: "Recepción", href: "/dashboard/recepcion", icon: Tablet, minRole: "receptionist" },
+          { name: "Recordatorios", href: "/dashboard/recordatorios", icon: Bell, minRole: "admin" },
+          { name: "Lista de espera", href: "/dashboard/waitlist", icon: Clock, minRole: "admin" },
+        ],
+      },
+      { name: "Agenda", href: "/dashboard/agenda", icon: Calendar, minRole: "receptionist" },
+      { name: "Punto de Venta", href: "/dashboard/pos", icon: ShoppingCart, minRole: "receptionist" },
+      { name: "Caja", href: "/dashboard/caja", icon: Wallet, minRole: "admin", feature: "cash_register" },
+    ],
+  },
+  {
+    // Clientes y todo lo que sirve para relacionarse con ellos (mensajes, cupones).
     title: "Clientes",
     items: [
       {
         name: "Clientes", href: "/dashboard/clientes", icon: Users, minRole: "receptionist",
-        // Punto (Nico, 25-sep): pedido de Pablo — comprimir la barra dejando Metricas,
-        // Fidelidad y Retencion anidadas bajo Clientes en vez de como filas propias.
+        // Metricas, Fidelidad y Retencion anidadas bajo Clientes.
         children: [
           { name: "Métricas", href: "/dashboard/clientes/metricas", icon: BarChart3, minRole: "receptionist" },
-          { name: "Fidelidad", href: "/dashboard/fidelidad", icon: Star, minRole: "admin" },
-          { name: "Retencion", href: "/dashboard/retencion", icon: Heart, minRole: "admin" },
+          { name: "Fidelidad", href: "/dashboard/fidelidad", icon: Star, minRole: "admin", feature: "loyalty" },
+          { name: "Retención", href: "/dashboard/retencion", icon: Heart, minRole: "admin" },
         ],
       },
-      { name: "WhatsApp", href: "/dashboard/whatsapp", icon: Users, minRole: "admin" },
-    ],
-  },
-  {
-    title: "Agenda",
-    items: [
-      { name: "Mi Agenda", href: "/dashboard/mi-agenda", icon: CalendarCheck, minRole: "barber" },
-      { name: "Agenda", href: "/dashboard/agenda", icon: Calendar, minRole: "receptionist" },
-      {
-        name: "Calendario", href: "/dashboard/calendario", icon: CalendarDays, minRole: "receptionist",
-        // Punto (Nico, 25-sep): Recepcion, Recordatorios y Lista Espera pasan a ser hijos
-        // de Calendario (Lista Espera se muda desde la seccion Clientes).
-        children: [
-          { name: "Recepcion", href: "/dashboard/recepcion", icon: Tablet, minRole: "receptionist" },
-          { name: "Recordatorios", href: "/dashboard/recordatorios", icon: Bell, minRole: "admin" },
-          { name: "Lista Espera", href: "/dashboard/waitlist", icon: Users, minRole: "admin" },
-        ],
-      },
+      { name: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircle, minRole: "admin" },
+      { name: "Cupones", href: "/dashboard/cupones", icon: Ticket, minRole: "admin", feature: "coupons" },
     ],
   },
   {
     title: "Finanzas",
     items: [
       { name: "Ingresos/Egresos", href: "/dashboard/finanzas", icon: DollarSign, minRole: "admin" },
-      { name: "Mi Billetera", href: "/dashboard/mi-billetera", icon: Wallet, minRole: "barber" },
-      { name: "Cierre Mensual", href: "/dashboard/reportes", icon: BarChart3, minRole: "admin" },
       { name: "Boletas", href: "/dashboard/boletas", icon: Receipt, minRole: "admin" },
-      { name: "Facturas", href: "/dashboard/facturas", icon: Receipt, minRole: "admin" },
+      { name: "Facturas", href: "/dashboard/facturas", icon: FileText, minRole: "admin", feature: "invoices" },
+      { name: "Cierre Mensual", href: "/dashboard/reportes", icon: ClipboardList, minRole: "admin" },
+      { name: "Mi Billetera", href: "/dashboard/mi-billetera", icon: PiggyBank, minRole: "barber" },
     ],
   },
   {
-    title: "Catalogo",
+    // Equipo, sucursales, configuracion y la cuenta personal.
+    title: "Negocio",
     items: [
-      { name: "Cupones", href: "/dashboard/cupones", icon: CreditCard, minRole: "admin" },
-      { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
-      { name: "Galeria", href: "/dashboard/galeria", icon: Image, minRole: "admin" },
-    ],
-  },
-  {
-    title: "Equipo",
-    items: [
-      { name: "Mi Perfil", href: "/dashboard/mi-perfil", icon: Settings, minRole: "barber" },
       { name: "Profesionales", href: "/dashboard/barberos", icon: Scissors, minRole: "admin" },
       { name: "Sucursales", href: "/dashboard/sucursales", icon: MapPin, minRole: "admin" },
+      { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
+      { name: "Galería", href: "/dashboard/galeria", icon: Image, minRole: "admin" },
       { name: "Pagos", href: "/dashboard/pagos", icon: CreditCard, minRole: "admin" },
       {
-        name: "Configuracion", href: "/dashboard/configuracion", icon: Settings, minRole: "admin",
-        // Punto (Nico, 25-sep): Comisiones/Arriendo/Terminal POS (antes en Finanzas) y
-        // Servicios/Inventario (antes en Catalogo) pasan a ser hijos de Configuracion.
+        name: "Configuración", href: "/dashboard/configuracion", icon: Settings, minRole: "admin",
+        // Comisiones/Arriendo/Terminal POS/Servicios/Inventario son hijos de Configuracion.
         children: [
-          { name: "Comisiones", href: "/dashboard/comisiones", icon: Zap, minRole: "barber" },
-          { name: "Arriendo", href: "/dashboard/arriendo", icon: Zap, minRole: "admin" },
-          { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin" },
+          { name: "Comisiones", href: "/dashboard/comisiones", icon: Percent, minRole: "barber", feature: "commissions" },
+          { name: "Arriendo", href: "/dashboard/arriendo", icon: KeyRound, minRole: "admin", feature: "rental" },
+          { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin", feature: "pos" },
           { name: "Servicios", href: "/dashboard/servicios", icon: Tag, minRole: "admin" },
-          { name: "Inventario", href: "/dashboard/inventario", icon: Package, minRole: "admin" },
+          { name: "Inventario", href: "/dashboard/inventario", icon: Package, minRole: "admin", feature: "inventory" },
+          { name: "Plan y facturación", href: "/dashboard/configuracion/facturacion", icon: CreditCard, minRole: "admin" },
         ],
       },
+      { name: "Mi Perfil", href: "/dashboard/mi-perfil", icon: UserCircle, minRole: "barber" },
     ],
   },
   {
     title: "Super Admin",
     items: [
-      { name: "Empresas", href: "/dashboard/superadmin/tenants", icon: Users, minRole: "super_admin" },
-      { name: "Auditoria", href: "/dashboard/superadmin/audit", icon: Receipt, minRole: "super_admin" },
+      { name: "Empresas", href: "/dashboard/superadmin/tenants", icon: Building2, minRole: "super_admin" },
+      { name: "Auditoría", href: "/dashboard/superadmin/audit", icon: ShieldCheck, minRole: "super_admin" },
       { name: "Sesiones", href: "/dashboard/superadmin/sesiones", icon: Tablet, minRole: "super_admin" },
-      { name: "Horarios", href: "/dashboard/configuracion/horarios", icon: Calendar, minRole: "super_admin" },
+      { name: "Horarios", href: "/dashboard/configuracion/horarios", icon: Clock, minRole: "super_admin" },
     ],
   },
 ];
@@ -174,7 +176,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
   // negocio real de la cuenta del super_admin (ej. Estudio Levels), dando la impresion de
   // datos cruzados. Se usa el tenant del contexto (que si respeta el override) cuando hay
   // uno activo, y se cae al valor del servidor en cualquier otro caso.
-  const { tenant: overrideTenant, isOverriding } = useTenant();
+  const { tenant: overrideTenant, isOverriding, hasPlanFeature } = useTenant();
   const effectiveTenantName = isOverriding && overrideTenant ? overrideTenant.name : tenantName;
   // Punto 15 (Pablo): el espacio de la foto en la esquina inferior izquierda siempre
   // mostraba solo iniciales, nunca la foto real, aunque el profesional ya tuviera una
@@ -214,13 +216,30 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     if (isSoloBusiness && SOLO_BUSINESS_HIDDEN_ROUTES.includes(item.href)) return null;
     if (TEMP_HIDDEN_ROUTES.includes(item.href)) return null;
 
-    const whitelist = ROLE_MENU_ACCESS[effectiveRole];
-    const locked = whitelist ? !whitelist.includes(item.href) : !isAtLeast(item.minRole);
+    // Seguridad/UX (Nico, 26-sep): "Super Admin" es un rol, no algo que se desbloquee
+    // pagando un plan — antes, un admin/recepcion/profesional que no fuera super_admin
+    // veia estos items igual, marcados con la insignia "PRO" (pensada para funciones que
+    // SI se pueden desbloquear con otro plan). Eso confundia: parecia que "actualizando"
+    // el plan del negocio se podia llegar a Empresas/Auditoria/Sesiones/Horarios, cuando
+    // en realidad ningun plan da ese acceso. Ahora se ocultan por completo para cualquiera
+    // que no sea super_admin, en vez de mostrarse bloqueados.
+    if (item.minRole === "super_admin" && effectiveRole !== "super_admin") return null;
 
-    // Para roles con whitelist explicita (receptionist/barber): un item bloqueado se saca
-    // por completo en vez de mostrarse como "PRO" — mismo comportamiento de antes, ahora
-    // recursivo para que tambien aplique a los hijos.
-    if (whitelist && locked) return null;
+    const whitelist = ROLE_MENU_ACCESS[effectiveRole];
+    const roleLocked = whitelist ? !whitelist.includes(item.href) : !isAtLeast(item.minRole);
+
+    // Item 34 (Nico, 26-sep): "matriz de accesos por plan" — ademas del rol, un item puede
+    // requerir una feature que el plan del negocio no incluya (ej. Caja en Basic/Starter).
+    // super_admin sin tenant activo (hasPlanFeature devuelve true sin tenant) ve todo.
+    const planLocked = !!item.feature && !hasPlanFeature(item.feature);
+    const locked = roleLocked || planLocked;
+
+    // Para roles con whitelist explicita (receptionist/barber): un item bloqueado POR ROL
+    // se saca por completo en vez de mostrarse como "PRO" — mismo comportamiento de antes,
+    // ahora recursivo para que tambien aplique a los hijos. Uno bloqueado solo por el plan
+    // SI se muestra (con la insignia), para que reception/barber tambien vean que existe
+    // ese modulo y que hace falta mejorar el plan para usarlo.
+    if (whitelist && roleLocked) return null;
 
     const children = item.children
       ?.map(processItem)
@@ -288,51 +307,44 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
   };
 
   const renderNav = (showLabels: boolean) => (
-    <nav className="flex-1 overflow-y-auto px-3 py-4">
-      {filteredSections.map((section) => {
+    <nav className="flex-1 overflow-y-auto px-3 pb-4 pt-3">
+      {filteredSections.map((section, sIdx) => {
         const isOpen = openSections[section.title] !== false;
-        const hasActive = section.items.some((i) => i.href === pathname);
 
         return (
-          <div key={section.title} className="mb-2">
+          <div key={section.title} className={cn(showLabels ? "mb-5" : "mb-3", !showLabels && sIdx > 0 && "border-t border-black/5 pt-3 dark:border-white/5")}>
             {showLabels && (
               <button
                 onClick={() => toggleSection(section.title)}
-                className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] uppercase tracking-wider text-brand-gray font-semibold"
+                className="group/label mb-1 flex w-full items-center justify-between px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-brand-gray/70 transition-colors hover:text-brand-gray"
               >
                 <span>{section.title}</span>
-                <ChevronDown className={cn("h-3 w-3 transition-transform text-brand-gray", !isOpen && "-rotate-90")} />
+                <ChevronDown className={cn("h-3 w-3 opacity-0 transition-all group-hover/label:opacity-100", !isOpen && "-rotate-90 opacity-100")} />
               </button>
             )}
 
             {(isOpen || !showLabels) && (
-              <ul className="space-y-0.5">
+              <ul className="space-y-px">
                 {section.items.map((item) => {
                   const isActive = pathname === item.href;
                   const isLocked = (item as any).locked;
                   const hasChildren = !!item.children && item.children.length > 0;
                   const childActive = item.children?.some((c) => c.href === pathname) ?? false;
-                  // Punto (Nico, 25-sep): si el usuario nunca lo toco, se auto-abre cuando
-                  // contiene la ruta activa (se recalcula en cada render, no necesita el
-                  // useEffect de montaje para el caso de navegar entre paginas ya adentro).
+                  // Se auto-abre cuando contiene la ruta activa.
                   const itemOpen = openItems[item.href] ?? childActive;
+                  const rowBase = "relative flex flex-1 min-w-0 items-center gap-3 rounded-lg px-3 py-[7px] text-[13px] transition-colors";
                   return (
                     <li key={item.href}>
                       <div className="flex items-center">
                         {isLocked ? (
                           <div
                             title="Disponible en plan superior"
-                            className={cn(
-                              "flex flex-1 min-w-0 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium opacity-40 cursor-not-allowed",
-                              !showLabels && "justify-center px-2",
-                            )}
+                            className={cn(rowBase, "cursor-not-allowed text-brand-gray/60", !showLabels && "justify-center px-2")}
                           >
-                            <item.icon className="h-[18px] w-[18px] flex-shrink-0 text-brand-gray" strokeWidth={1.5} />
+                            <item.icon className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
+                            {showLabels && <span className="flex-1 truncate">{item.name}</span>}
                             {showLabels && (
-                              <span className="truncate flex-1">{item.name}</span>
-                            )}
-                            {showLabels && (
-                              <span className="px-1.5 py-0.5 bg-brand-accent/20 text-brand-accent text-[9px] font-bold rounded">PRO</span>
+                              <span className="rounded border border-brand-gray/30 px-1 py-px text-[9px] font-medium tracking-wide text-brand-gray/70">PRO</span>
                             )}
                           </div>
                         ) : (
@@ -341,14 +353,15 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
                             onClick={() => setMobileOpen(false)}
                             title={!showLabels ? item.name : undefined}
                             className={cn(
-                              "flex flex-1 min-w-0 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                              rowBase,
                               !showLabels && "justify-center px-2",
                               isActive
-                                ? "bg-brand-blue/10 text-brand-blue"
-                                : "text-brand-dark/70 hover:bg-brand-light hover:text-brand-dark"
+                                ? "bg-brand-dark/[0.06] font-semibold text-brand-dark"
+                                : "font-medium text-brand-dark/65 hover:bg-brand-dark/[0.04] hover:text-brand-dark"
                             )}
                           >
-                            <item.icon className={cn("h-[18px] w-[18px] flex-shrink-0", isActive ? "text-brand-blue" : "text-brand-gray")} strokeWidth={1.5} />
+                            {isActive && <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-blue" />}
+                            <item.icon className={cn("h-4 w-4 flex-shrink-0", isActive ? "text-brand-blue" : "text-brand-gray")} strokeWidth={1.6} />
                             {showLabels && <span className="truncate">{item.name}</span>}
                           </Link>
                         )}
@@ -356,7 +369,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
                           <button
                             onClick={() => toggleItem(item.href)}
                             title={itemOpen ? "Colapsar" : "Expandir"}
-                            className="flex-shrink-0 p-1.5 mr-1 text-brand-gray hover:text-brand-dark"
+                            className="mr-1 flex-shrink-0 rounded p-1.5 text-brand-gray/70 transition-colors hover:text-brand-dark"
                           >
                             <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", !itemOpen && "-rotate-90")} />
                           </button>
@@ -364,7 +377,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
                       </div>
 
                       {hasChildren && showLabels && itemOpen && (
-                        <ul className="mt-0.5 ml-4 pl-3 border-l border-gray-100 dark:border-white/10 space-y-0.5">
+                        <ul className="mb-1 ml-[21px] mt-px space-y-px border-l border-black/10 pl-3 dark:border-white/10">
                           {item.children!.map((child) => {
                             const childLocked = (child as any).locked;
                             const childIsActive = pathname === child.href;
@@ -373,24 +386,22 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
                                 {childLocked ? (
                                   <div
                                     title="Disponible en plan superior"
-                                    className="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] font-medium opacity-40 cursor-not-allowed"
+                                    className="flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 text-[12.5px] text-brand-gray/60"
                                   >
-                                    <child.icon className="h-4 w-4 flex-shrink-0 text-brand-gray" strokeWidth={1.5} />
-                                    <span className="truncate flex-1">{child.name}</span>
-                                    <span className="px-1.5 py-0.5 bg-brand-accent/20 text-brand-accent text-[9px] font-bold rounded">PRO</span>
+                                    <span className="flex-1 truncate">{child.name}</span>
+                                    <span className="rounded border border-brand-gray/30 px-1 py-px text-[9px] font-medium tracking-wide text-brand-gray/70">PRO</span>
                                   </div>
                                 ) : (
                                   <Link
                                     href={child.href}
                                     onClick={() => setMobileOpen(false)}
                                     className={cn(
-                                      "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all",
+                                      "flex items-center rounded-md px-3 py-1.5 text-[12.5px] transition-colors",
                                       childIsActive
-                                        ? "bg-brand-blue/10 text-brand-blue"
-                                        : "text-brand-dark/60 hover:bg-brand-light hover:text-brand-dark"
+                                        ? "font-semibold text-brand-blue"
+                                        : "font-medium text-brand-dark/55 hover:text-brand-dark"
                                     )}
                                   >
-                                    <child.icon className={cn("h-4 w-4 flex-shrink-0", childIsActive ? "text-brand-blue" : "text-brand-gray")} strokeWidth={1.5} />
                                     <span className="truncate">{child.name}</span>
                                   </Link>
                                 )}
@@ -477,7 +488,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
         {/* Tenant name */}
         {!collapsed && effectiveTenantName && (
           <div className="px-4 pt-3 pb-1">
-            <p className="text-xs font-semibold text-brand-dark truncate">{effectiveTenantName}</p>
+            <p className="truncate text-[13px] font-semibold tracking-tight text-brand-dark">{effectiveTenantName}</p>
           </div>
         )}
 
@@ -485,13 +496,13 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
         {!collapsed && (
           <button
             onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
-            className="mx-3 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-light hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-brand-gray"
+            className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-black/10 px-3 py-1.5 text-brand-gray transition-colors hover:border-black/20 hover:text-brand-dark dark:border-white/10 dark:hover:border-white/20"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <span className="text-xs flex-1 text-left">Buscar...</span>
-            <kbd className="text-[9px] bg-white dark:bg-brand-light border border-gray-200 dark:border-white/10 px-1.5 py-0.5 rounded font-mono text-brand-gray">⌘K</kbd>
+            <kbd className="text-[9px] border border-black/10 dark:border-white/10 px-1.5 py-0.5 rounded font-mono text-brand-gray">⌘K</kbd>
           </button>
         )}
         {renderNav(!collapsed)}

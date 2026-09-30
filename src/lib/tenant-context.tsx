@@ -17,6 +17,10 @@ interface TenantInfo {
   // Punto (Nico, 25-sep): tema claro/oscuro elegido por el Administrador en
   // Configuracion, aplicado a todo el sistema para ese negocio.
   theme: "light" | "dark";
+  // Item 37 (Nico, 27-sep): wizard de bienvenida para negocios nuevos. Ver
+  // src/app/dashboard/onboarding/page.tsx y supabase/migrations/077_onboarding.sql.
+  onboarding_completed: boolean;
+  onboarding_step: number;
 }
 
 interface TenantContextType {
@@ -96,9 +100,9 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
 
     setLoading(true);
     fetch(`/api/tenant/info?tenantId=${activeTenantId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data.tenant) {
+        if (data?.tenant) {
           setTenant(data.tenant);
           setPlanFeatures(data.features || []);
           setGlobalTenantId(data.tenant.id);
@@ -106,6 +110,8 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
           setTenant(null);
         }
       })
+      // Si la respuesta viene vacia o falla la red, no dejar un error sin manejar.
+      .catch(() => setTenant(null))
       .finally(() => setLoading(false));
   }, [activeTenantId]);
 

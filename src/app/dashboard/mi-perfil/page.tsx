@@ -77,7 +77,7 @@ export default function MiPerfilPage() {
   const origin = typeof window !== "undefined" ? window.location.origin : "https://re-booking.cl";
   const barberId = data.id || user?.id || "";
   const barberSlug = data.booking_slug as string | undefined;
-  const tenantSlug = tenant?.slug;
+  const tenantSlug = (data as any).tenant_slug || tenant?.slug;
   const bookingLink = barberSlug && tenantSlug
     ? `${origin}/${tenantSlug}/${barberSlug}`
     : barberId
@@ -132,7 +132,8 @@ export default function MiPerfilPage() {
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
         </div>
 
-        <div>
+        {/* Oculto (Nico, 29-sep): Especialidades. Los datos siguen intactos. */}
+        <div className="hidden">
           <label className="block text-xs text-brand-gray mb-1">Especialidades</label>
           <input type="text" value={data.specialties?.join(", ") || ""}
             onChange={(e) => setData({ ...data, specialties: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) })}
@@ -160,7 +161,7 @@ export default function MiPerfilPage() {
         <p className="text-xs text-brand-gray">Comparte este link en tu Instagram o redes para que tus clientes agenden contigo directo.</p>
         <div className="flex items-center gap-2">
           <code className="flex-1 text-xs text-brand-blue bg-brand-light px-3 py-2 rounded-xl border border-gray-200 truncate">
-            {bookingLink}
+            {bookingLink.replace(/^https?:\/\//, "")}
           </code>
           <button onClick={() => { navigator.clipboard.writeText(bookingLink); showToast("Link copiado!", "success"); }}
             className="px-3 py-2 bg-brand-blue text-white rounded-xl hover:bg-brand-blue/90">

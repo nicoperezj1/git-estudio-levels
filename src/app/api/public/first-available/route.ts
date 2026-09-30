@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const { data: barbers } = await barberQuery;
 
   if (!barbers || barbers.length === 0) {
-    return NextResponse.json({ error: "No hay barberos activos" }, { status: 404 });
+    return NextResponse.json({ error: "No hay profesionales activos" }, { status: 404 });
   }
 
   // Get appointment counts per barber for this date

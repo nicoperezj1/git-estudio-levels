@@ -174,7 +174,7 @@ export default function SucursalesPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-5 md:p-6 w-full max-w-md shadow-xl animate-scale-in">
+          <div className="bg-white rounded-2xl p-5 md:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl animate-scale-in">
             <h2 className="text-lg font-bold text-brand-dark mb-4">
               {editingBranch ? "Editar Sucursal" : "Nueva Sucursal"}
             </h2>
@@ -183,7 +183,7 @@ export default function SucursalesPage() {
                 <label className="block text-xs font-medium text-brand-gray mb-1">Nombre</label>
                 <input type="text" required value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value, slug: editingBranch ? form.slug : e.target.value.toLowerCase().replace(/\s+/g, "-") })}
-                  placeholder="Ej: Estudio Levels Puente Alto"
+                  placeholder="Ej: Sucursal Centro"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
               </div>
               <div>
@@ -197,7 +197,7 @@ export default function SucursalesPage() {
                 <label className="block text-xs font-medium text-brand-gray mb-1">Direccion</label>
                 <input type="text" value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  placeholder="Av. Concha y Toro 123"
+                  placeholder="Ej: Av. Principal 123, Comuna"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-3">

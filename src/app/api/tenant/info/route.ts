@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   // Get tenant
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, slug, plan, status, max_professionals, max_branches, trial_ends_at, theme")
+    .select("id, name, slug, plan, status, max_professionals, max_branches, trial_ends_at, theme, onboarding_completed, onboarding_step")
     .eq("id", tenantId)
     .single();
 
@@ -35,7 +35,21 @@ export async function GET(req: NextRequest) {
     .eq("plan", tenant.plan)
     .single();
 
-  const features: string[] = planConfig?.features ? JSON.parse(planConfig.features) : [];
+  // plan_limits.features es JSONB: supabase-js lo devuelve ya como array. Antes se hacia
+  // JSON.parse() directo, que revienta (500 sin cuerpo) cuando llega un array; aqui se
+  // aceptan ambas formas (array o string JSON) y nunca se lanza.
+  const rawFeatures: unknown = planConfig?.features;
+  let features: string[] = [];
+  if (Array.isArray(rawFeatures)) {
+    features = rawFeatures as string[];
+  } else if (typeof rawFeatures === "string") {
+    try {
+      const parsed = JSON.parse(rawFeatures);
+      if (Array.isArray(parsed)) features = parsed;
+    } catch {
+      features = [];
+    }
+  }
 
   return NextResponse.json({ tenant, features });
 }

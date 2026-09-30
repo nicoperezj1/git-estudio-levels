@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (!barber) {
-    return NextResponse.json({ error: "Barbero no encontrado" }, { status: 404 });
+    return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
   }
 
   // If rental and has own terminal, use it
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!barber) {
-    return NextResponse.json({ error: "Barbero no encontrado" }, { status: 404 });
+    return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
   }
 
   // A MercadoPago device_id can ONLY be charged with the access_token of the SAME

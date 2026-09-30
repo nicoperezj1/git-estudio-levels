@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!barber) {
-    return NextResponse.json({ error: "Barbero no encontrado" }, { status: 404 });
+    return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
   }
 
   const tenantId = barber.tenant_id;

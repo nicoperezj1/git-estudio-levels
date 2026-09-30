@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const barberId = formData.get("barberId") as string;
 
   if (!file || !barberId) {
-    return NextResponse.json({ error: "Archivo y barbero requeridos" }, { status: 400 });
+    return NextResponse.json({ error: "Archivo y profesional requeridos" }, { status: 400 });
   }
 
   // Generate unique filename

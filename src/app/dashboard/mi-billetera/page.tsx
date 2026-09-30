@@ -89,17 +89,17 @@ export default function MiBilleteraPage() {
       </div>
 
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
-          <p className="text-xl font-bold text-brand-dark">{formatCurrency(data.today.earnings)}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 text-center sm:p-4">
+          <p className="text-base font-bold sm:text-xl text-brand-dark">{formatCurrency(data.today.earnings)}</p>
           <p className="text-[10px] text-brand-gray uppercase mt-1">Hoy</p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
-          <p className="text-xl font-bold text-brand-dark">{data.month.txCount}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 text-center sm:p-4">
+          <p className="text-base font-bold sm:text-xl text-brand-dark">{data.month.txCount}</p>
           <p className="text-[10px] text-brand-gray uppercase mt-1">Atenciones</p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
-          <p className="text-xl font-bold text-brand-accent">{data.month.upcomingAppts}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 text-center sm:p-4">
+          <p className="text-base font-bold sm:text-xl text-brand-accent">{data.month.upcomingAppts}</p>
           <p className="text-[10px] text-brand-gray uppercase mt-1">Pendientes</p>
         </div>
       </div>

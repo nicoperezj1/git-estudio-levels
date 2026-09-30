@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { tryConsumeQuota } from "@/lib/message-quota";
 
 /**
  * MercadoPago Webhook for deposit payments.
@@ -181,23 +182,29 @@ export async function POST(req: NextRequest) {
       metadata: { paymentId, depositAmount, totalPrice, barberId, date },
     });
 
-    // Send confirmation email
+    // Send confirmation email (cuenta contra el cupo de correos del negocio, igual que en
+    // /api/public/book).
     if (clientEmail) {
       try {
-        const { data: barber } = await supabase.from("profiles").select("name").eq("id", barberId).single();
-        const { sendBookingConfirmation } = await import("@/lib/resend");
-        const serviceNames = (await supabase.from("services").select("name").in("id", serviceIds)).data?.map((s) => s.name).join(" + ") || "";
+        const allowed = !tenantId || (await tryConsumeQuota(tenantId, "email", "confirmation"));
+        if (allowed) {
+          const { data: barber } = await supabase.from("profiles").select("name").eq("id", barberId).single();
+          const { sendBookingConfirmation } = await import("@/lib/resend");
+          const serviceNames = (await supabase.from("services").select("name").in("id", serviceIds)).data?.map((s) => s.name).join(" + ") || "";
 
-        await sendBookingConfirmation({
-          to: clientEmail,
-          clientName,
-          barberName: barber?.name || "Tu profesional",
-          serviceName: serviceNames,
-          date: new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }) as any,
-          duration: totalDuration,
-          price: totalPrice,
-          appointmentId: appointment?.id || "",
-        });
+          await sendBookingConfirmation({
+            to: clientEmail,
+            clientName,
+            barberName: barber?.name || "Tu profesional",
+            serviceName: serviceNames,
+            date: new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" }) as any,
+            duration: totalDuration,
+            price: totalPrice,
+            appointmentId: appointment?.id || "",
+          });
+        } else {
+          console.warn(`Cupo de correos agotado para tenant ${tenantId}, no se envia confirmacion (deposito) a ${clientEmail}`);
+        }
       } catch (e) {
         console.error("Error sending confirmation email:", e);
       }

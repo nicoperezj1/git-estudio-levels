@@ -2,6 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
+
+// El slug del profesional es unico POR NEGOCIO (migracion 079), asi el link queda limpio
+// (re-booking.cl/mi-salon/javier) aunque otro salon tenga un "javier".
+async function uniqueBookingSlugForTenant(
+  supabase: ReturnType<typeof createAdminSupabase>,
+  name: string,
+  userId: string,
+  tenantId: string
+): Promise<string> {
+  const base = slugify(name || "profesional");
+  let candidate = base;
+  for (let n = 1; n <= 25; n++) {
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("booking_slug", candidate)
+      .maybeSingle();
+    if (!existing || existing.id === userId) return candidate;
+    candidate = `${base}-${n + 1}`;
+  }
+  return `${base}-${userId.slice(0, 6)}`;
+}
+
 // GET: Get single professional profile
 export async function GET(
   req: NextRequest,
@@ -19,7 +43,21 @@ export async function GET(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  // Link personal corto (re-booking.cl/<negocio>/<profesional>): la UI necesita el slug del
+  // negocio y el del profesional. Se devuelven aqui (y se genera el del profesional si aun
+  // no existe) para que el link nunca caiga al largo "/pro/<uuid>".
+  let bookingSlug: string | null = data.booking_slug ?? null;
+  if (!bookingSlug && data.tenant_id) {
+    bookingSlug = await uniqueBookingSlugForTenant(supabase, data.name || "profesional", params.id, data.tenant_id);
+    await supabase.from("profiles").update({ booking_slug: bookingSlug }).eq("id", params.id);
+  }
+  let tenantSlug: string | null = null;
+  if (data.tenant_id) {
+    const { data: t } = await supabase.from("tenants").select("slug").eq("id", data.tenant_id).single();
+    tenantSlug = t?.slug ?? null;
+  }
+  return NextResponse.json({ ...data, booking_slug: bookingSlug, tenant_slug: tenantSlug });
 }
 
 // PATCH: Update professional profile (mode, rates, etc.)
@@ -43,12 +81,18 @@ export async function PATCH(
     "rental_max_days", "rental_deductions", "rental_notes",
     "personal_pin", "avatar_url", "bio", "specialties",
     "intro_video_url", "years_experience", "slot_duration",
-    "also_attends_clients", "instagram", "rental_cash_to_barber",
+    "also_attends_clients", "instagram", "rental_cash_to_barber", "birth_date",
   ];
 
   const update: Record<string, any> = {};
   for (const key of auth.self ? selfEditableFields : allowedFields) {
     if (body[key] !== undefined) update[key] = body[key];
+  }
+
+  // Fecha de nacimiento: solo se acepta YYYY-MM-DD; vacio la borra.
+  if ("birth_date" in update) {
+    const v = update.birth_date;
+    update.birth_date = typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null;
   }
 
   // Punto 14 (Pablo): red de seguridad para cualquier profesional que haya quedado sin
@@ -58,24 +102,13 @@ export async function PATCH(
   // solo un cambio de nombre.
   const { data: current } = await supabase
     .from("profiles")
-    .select("booking_slug, name")
+    .select("booking_slug, name, tenant_id")
     .eq("id", params.id)
     .single();
-  if (current && !current.booking_slug) {
-    const base = slugify(update.name || current.name || "profesional");
-    let candidate = base;
-    let n = 0;
-    while (n < 25) {
-      const { data: existing } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("booking_slug", candidate)
-        .maybeSingle();
-      if (!existing || existing.id === params.id) break;
-      n += 1;
-      candidate = n === 1 ? `${base}-${params.id.slice(0, 4)}` : `${base}-${params.id.slice(0, 4 + n)}`;
-    }
-    update.booking_slug = candidate;
+  if (current && !current.booking_slug && current.tenant_id) {
+    update.booking_slug = await uniqueBookingSlugForTenant(
+      supabase, update.name || current.name || "profesional", params.id, current.tenant_id
+    );
   }
 
   const { data, error } = await supabase

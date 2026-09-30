@@ -5,6 +5,11 @@ export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
+  // Item (Nico, 28-sep): vista de calendario por profesional a 1/3/7 dias — necesita
+  // traer varios dias en una sola consulta en vez de una por dia. `date` sigue funcionando
+  // igual que siempre (match exacto) cuando no se manda un rango.
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
   const barberId = searchParams.get("barberId");
   // SEGURIDAD: nunca confiar directo en el tenantId de la URL — resolveTenantForRequest lo
   // reemplaza por el negocio real del usuario logueado salvo que sea super_admin.
@@ -25,11 +30,27 @@ export async function GET(req: NextRequest) {
 
   if (tenantId && tenantId !== "ALL") query = query.eq("tenant_id", tenantId);
   if (date) query = query.eq("date", date);
+  if (dateFrom) query = query.gte("date", dateFrom);
+  if (dateTo) query = query.lte("date", dateTo);
   if (barberId) query = query.eq("barber_id", barberId);
 
   const { data, error } = await query;
   if (error) return NextResponse.json([]);
-  return NextResponse.json(data || []);
+  const rows: any[] = data || [];
+
+  // Distintivo "Nuevo" del calendario: cliente sin ninguna visita completada todavía
+  // (mismo criterio que isNewClient en /api/appointments/[id]/details).
+  const clientIds = Array.from(new Set(rows.map((r) => r.client?.id).filter(Boolean)));
+  if (clientIds.length > 0) {
+    const { data: done } = await supabase
+      .from("appointments")
+      .select("client_id")
+      .in("client_id", clientIds)
+      .eq("status", "completed");
+    const withVisits = new Set((done || []).map((d: any) => d.client_id));
+    for (const r of rows) r.is_new_client = !!r.client?.id && !withVisits.has(r.client.id);
+  }
+  return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
