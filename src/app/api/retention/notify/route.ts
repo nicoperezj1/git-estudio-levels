@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { tenantBookingUrl } from "@/lib/retention";
 import { sendRetentionEmail } from "@/lib/resend";
 import { tryConsumeQuota } from "@/lib/message-quota";
 
@@ -19,6 +20,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 
+  // SEGURIDAD: solo se puede notificar a clientes del propio negocio (antes bastaba con
+  // conocer el id de cualquier cliente, incluso de otro negocio, y se gastaba SU cupo).
+  const { tenantId: callerTenantId } = await resolveTenantForRequest(null);
+  if (!callerTenantId || (callerTenantId !== "ALL" && client.tenant_id !== callerTenantId)) {
+    return NextResponse.json({ error: "No autorizado para notificar a este cliente" }, { status: 403 });
+  }
+  const bookingUrl = client.tenant_id ? await tenantBookingUrl(supabase, client.tenant_id) : `${process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl"}/booking`;
+
   // Get coupon details if provided
   let couponDetails = null;
   if (couponCode) {
@@ -26,6 +35,7 @@ export async function POST(req: NextRequest) {
       .from("coupons")
       .select("code, description, discount_type, discount_value")
       .eq("code", couponCode.toUpperCase())
+      .eq("tenant_id", client.tenant_id)
       .single();
     couponDetails = coupon;
   }
@@ -51,6 +61,7 @@ export async function POST(req: NextRequest) {
         couponDescription: couponDetails?.description || null,
         discountType: couponDetails?.discount_type || null,
         discountValue: couponDetails ? Number(couponDetails.discount_value) : null,
+        bookingUrl,
       });
       return NextResponse.json({ success: true, channel: "email" });
     } catch (e: any) {
@@ -81,7 +92,7 @@ export async function POST(req: NextRequest) {
         : `$${Number(couponDetails.discount_value).toLocaleString("es-CL")}`;
       whatsappMessage += `\n\nTenemos un cupon de descuento para ti: ${couponDetails.code} (${discount} off)`;
     }
-    whatsappMessage += `\n\nAgenda aqui: ${process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app"}/booking`;
+    whatsappMessage += `\n\nAgenda aqui: ${bookingUrl}`;
 
     const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(whatsappMessage)}`;
 

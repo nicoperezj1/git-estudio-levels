@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { sendRetentionEmail } from "@/lib/resend";
-import { todayInChile, toChileDateStr } from "@/lib/utils";
+import { getInactiveClients, dedupeBy, tenantBookingUrl } from "@/lib/retention";
+import { formatPhoneCL } from "@/lib/phone";
 import { tryConsumeQuota } from "@/lib/message-quota";
 import { tenantHasFeature } from "@/lib/plan-features";
 
@@ -39,67 +40,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Los mensajes masivos no estan incluidos en tu plan actual. Mejora tu plan para usarlos." }, { status: 403 });
   }
 
-  // Bug (reportado por Nico, 27-sep): mismo problema encontrado en GET /api/retention —
-  // esto comparaba una fecha calendario pura (appointments.date) contra un instante UTC
-  // (new Date()/setDate()), corriendo el corte unas horas por el desfase de Chile con UTC.
-  // Ademas, a diferencia de esa pantalla, este envio masivo NUNCA aplicaba
-  // tenants.retention_start_date (Punto 13, Pablo) — asi que un cliente cuya unica señal
-  // era una visita/alta anterior al inicio real del negocio en re-booking (importacion,
-  // pruebas) SI podia recibir el mensaje masivo, aunque la pantalla de Retencion ya lo
-  // excluye a propósito por ser "dato no confiable". Se alinea con la misma logica.
-  const cutoffDateStr = (() => {
-    const [y, m, d] = todayInChile().split("-").map(Number);
-    const anchor = new Date(Date.UTC(y, m - 1, d, 12));
-    anchor.setUTCDate(anchor.getUTCDate() - (days || 30));
-    return anchor.toISOString().split("T")[0];
-  })();
+  // "Quien esta inactivo" sale de la MISMA funcion que usa la pantalla de Retencion
+  // (lib/retention): mismo corte de dias, misma ventana desde el inicio real del negocio y
+  // sin clientes que ya tienen una cita por venir.
+  const { inactive: inactiveClients } = await getInactiveClients(supabase, tenantId, days || 30);
+  const bookingUrl = await tenantBookingUrl(supabase, tenantId);
 
-  let retentionStartDate: string | null = null;
-  {
-    const { data: tenantRow } = await supabase
-      .from("tenants")
-      .select("retention_start_date, created_at")
-      .eq("id", tenantId)
+  // Detalle del cupon (del propio negocio) para el correo: sin esto el correo decia
+  // "$undefined de descuento" porque solo se enviaba el codigo.
+  let coupon: { code: string; description: string | null; discount_type: string; discount_value: number } | null = null;
+  if (couponCode) {
+    const { data: c } = await supabase
+      .from("coupons")
+      .select("code, description, discount_type, discount_value")
+      .eq("code", String(couponCode).toUpperCase())
+      .eq("tenant_id", tenantId)
       .single();
-    retentionStartDate = tenantRow?.retention_start_date || tenantRow?.created_at || null;
+    coupon = c || null;
   }
-
-  // Clients of THIS business only.
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, name, email, phone, created_at")
-    .eq("tenant_id", tenantId);
-
-  // Last completed visit per client (scoped to this business's clients and, same as la
-  // pantalla de Retencion, nunca antes del inicio real del negocio en re-booking).
-  const clientIds = (clients || []).map((c) => c.id);
-  const lastVisitMap: Record<string, string> = {};
-  if (clientIds.length > 0) {
-    let apptQuery = supabase
-      .from("appointments")
-      .select("client_id, date")
-      .eq("status", "completed")
-      .in("client_id", clientIds)
-      .order("date", { ascending: false });
-    if (retentionStartDate) apptQuery = apptQuery.gte("date", retentionStartDate);
-    const { data: appointments } = await apptQuery;
-    for (const appt of appointments || []) {
-      if (!lastVisitMap[appt.client_id]) lastVisitMap[appt.client_id] = appt.date;
-    }
-  }
-
-  // Filter inactive
-  const inactiveClients = (clients || []).filter((c) => {
-    let sinceRefDateStr = lastVisitMap[c.id] || toChileDateStr(c.created_at);
-    if (!lastVisitMap[c.id] && retentionStartDate) {
-      const retentionStartDateStr = toChileDateStr(retentionStartDate);
-      if (sinceRefDateStr < retentionStartDateStr) sinceRefDateStr = retentionStartDateStr;
-    }
-    return sinceRefDateStr < cutoffDateStr;
-  });
 
   if (type === "email") {
-    const withEmail = inactiveClients.filter((c) => c.email);
+    // Un solo correo por direccion: dos fichas con el mismo email no reciben doble mensaje
+    // (ni gastan cupo dos veces).
+    const withEmail = dedupeBy(inactiveClients.filter((c) => c.email), (c) => c.email!.trim().toLowerCase());
 
     // Preview mode: return who WOULD receive it + a small sample, send nothing.
     if (preview) {
@@ -126,10 +89,11 @@ export async function POST(req: NextRequest) {
           to: client.email!,
           clientName: client.name,
           message: message || "Te extrañamos! Vuelve pronto.",
-          couponCode: couponCode || null,
-          couponDescription: null,
-          discountType: null,
-          discountValue: null,
+          couponCode: coupon?.code || null,
+          couponDescription: coupon?.description || null,
+          discountType: coupon?.discount_type || null,
+          discountValue: coupon ? Number(coupon.discount_value) : null,
+          bookingUrl,
         });
         sent++;
       } catch (e) {
@@ -141,8 +105,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (type === "whatsapp") {
-    const bookingUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
-    const withPhone = inactiveClients.filter((c) => c.phone);
+    const withPhone = dedupeBy(inactiveClients.filter((c) => c.phone), (c) => formatPhoneCL(c.phone!));
 
     if (preview) {
       return NextResponse.json({
@@ -168,7 +131,7 @@ export async function POST(req: NextRequest) {
       const whatsappPhone = phone.startsWith("56") ? phone : `56${phone}`;
       let msg = message || `Hola ${c.name}! Te extrañamos.`;
       if (couponCode) msg += `\n\nUsa tu cupon: ${couponCode}`;
-      msg += `\n\nAgenda: ${bookingUrl}/booking`;
+      msg += `\n\nAgenda: ${bookingUrl}`;
 
       links.push({
         name: c.name,
