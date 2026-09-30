@@ -1,3 +1,4 @@
+import { isTenantSuspended, isBarberTenantSuspended, TENANT_SUSPENDED_MESSAGE } from "@/lib/tenant-suspension";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { sendBookingConfirmation } from "@/lib/resend";
@@ -71,6 +72,9 @@ export async function POST(req: NextRequest) {
   // Get tenant_id from barber
   const { data: barberData } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
   const tenantId = barberData?.tenant_id || null;
+  if (await isTenantSuspended(supabase, tenantId)) {
+    return NextResponse.json({ error: TENANT_SUSPENDED_MESSAGE, code: "tenant_suspended" }, { status: 403 });
+  }
 
   let clientId: string;
   if (clientEmail) {
