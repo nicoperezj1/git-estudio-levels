@@ -43,7 +43,7 @@ export function QuickActions({ userRole }: { userRole?: string }) {
       <button
         onClick={() => setOpen(!open)}
         className={`w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center transition-all active:scale-90 ${
-          open ? "bg-gray-900 rotate-45" : "bg-red-600 shadow-red-600/30"
+          open ? "bg-gray-900 rotate-45" : "bg-gradient-to-br from-brand-blue to-emerald-500 shadow-brand-blue/30"
         }`}
       >
         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

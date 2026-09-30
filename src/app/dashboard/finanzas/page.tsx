@@ -6,6 +6,8 @@ import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { Spinner } from "@/components/ui/spinner";
+import { TrendingUp, TrendingDown, Wallet, Plus, MoreVertical, ArrowUpRight, ArrowDownRight, CalendarDays } from "lucide-react";
+import { PageHeader, StatCard, Panel, Segmented, tableStyles as ts, inputClass, primaryButton, ghostButton } from "@/components/ui/premium";
 
 interface Transaction {
   id: string;
@@ -229,257 +231,255 @@ export default function FinanzasPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Finanzas</h1>
-        <button
-          onClick={() => {
-            setEditingId(null);
-            setFormData(emptyFormData);
-            setShowModal(true);
-          }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-        >
-          Nueva Transaccion
-        </button>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8 animate-fade-in">
+      <PageHeader
+        title="Ingresos y egresos"
+        subtitle="Todos los movimientos del negocio, en el periodo que elijas."
+        actions={
+          <button
+            onClick={() => {
+              setEditingId(null);
+              setFormData(emptyFormData);
+              setShowModal(true);
+            }}
+            className={primaryButton}
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} /> Nueva transacción
+          </button>
+        }
+      />
 
       {/* Stat Cards — el rango entre parentesis aclara a que periodo corresponde el
           numero, ya que ahora es elegible (item 38) en vez de fijo. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-          <p className="text-sm text-gray-500">Total Ingresos {rangeLabel && `(${rangeLabel})`}</p>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
-          <p className="text-sm text-gray-500">Total Egresos {rangeLabel && `(${rangeLabel})`}</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-indigo-500">
-          <p className="text-sm text-gray-500">Balance {rangeLabel && `(${rangeLabel})`}</p>
-          <p className="text-2xl font-bold text-indigo-600">{formatCurrency(balance)}</p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard
+          label={`Ingresos${rangeLabel ? ` · ${rangeLabel}` : ""}`}
+          value={formatCurrency(totalIncome)}
+          Icon={TrendingUp}
+          tone="green"
+        />
+        <StatCard
+          label={`Egresos${rangeLabel ? ` · ${rangeLabel}` : ""}`}
+          value={formatCurrency(totalExpenses)}
+          Icon={TrendingDown}
+          tone="red"
+        />
+        <StatCard
+          hero
+          label={`Balance${rangeLabel ? ` · ${rangeLabel}` : ""}`}
+          value={formatCurrency(balance)}
+          Icon={Wallet}
+          hint={balance >= 0 ? "Ingresos menos egresos" : "Egresos superan a los ingresos"}
+        />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex gap-2">
-          {[
-            { key: "all", label: "Todos" },
-            { key: "income", label: "Ingresos" },
-            { key: "expense", label: "Egresos" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key as "all" | "income" | "expense")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                filter === f.key
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Segmented
+          value={filter}
+          onChange={(v) => setFilter(v)}
+          options={[
+            { value: "all", label: "Todos" },
+            { value: "income", label: "Ingresos" },
+            { value: "expense", label: "Egresos" },
+          ]}
+        />
         {/* Item 38: atajos de rango en vez de tener que escribir fechas a mano cada vez. */}
-        <div className="flex gap-2 flex-wrap">
-          {QUICK_RANGES.map((r) => (
-            <button
-              key={r.key}
-              onClick={() => applyQuickRange(r.key, r.days)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                quickRange === r.key
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2 items-center">
+        <Segmented
+          size="sm"
+          value={quickRange as any}
+          onChange={(k) => {
+            const r = QUICK_RANGES.find((x) => x.key === k);
+            if (r) applyQuickRange(r.key, r.days);
+          }}
+          options={QUICK_RANGES.map((r) => ({ value: r.key, label: r.label }))}
+        />
+        <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray">
+          <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => { setQuickRange("custom"); setDateFrom(e.target.value); }}
-            className="border rounded-lg px-3 py-2 text-sm"
+            className="bg-transparent text-sm text-brand-dark outline-none"
           />
-          <span className="text-gray-500">a</span>
+          <span>→</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => { setQuickRange("custom"); setDateTo(e.target.value); }}
-            className="border rounded-lg px-3 py-2 text-sm"
+            className="bg-transparent text-sm text-brand-dark outline-none"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left p-4 font-medium text-gray-600">Fecha</th>
-              <th className="text-left p-4 font-medium text-gray-600">Tipo</th>
-              <th className="text-left p-4 font-medium text-gray-600">Descripcion</th>
-              <th className="text-left p-4 font-medium text-gray-600">Cliente/Profesional</th>
-              <th className="text-left p-4 font-medium text-gray-600">Corresponde a</th>
-              <th className="text-left p-4 font-medium text-gray-600">Metodo</th>
-              <th className="text-right p-4 font-medium text-gray-600">Monto</th>
-              {isAdmin && <th className="p-4 w-10"></th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={isAdmin ? 8 : 7}><Spinner /></td></tr>
-            ) : transactions.length === 0 ? (
+      <Panel flush title="Movimientos" subtitle={loading ? undefined : `${transactions.length} registro${transactions.length === 1 ? "" : "s"}`}>
+        <div className={ts.wrap}>
+          <table className={ts.table}>
+            <thead className={ts.thead}>
               <tr>
-                <td colSpan={isAdmin ? 8 : 7} className="p-4 text-center text-gray-500">
-                  No hay transacciones
-                </td>
+                <th className={ts.th}>Fecha</th>
+                <th className={ts.th}>Tipo</th>
+                <th className={ts.th}>Descripción</th>
+                <th className={ts.th}>Cliente / Profesional</th>
+                <th className={ts.th}>Corresponde a</th>
+                <th className={ts.th}>Método</th>
+                <th className={ts.thRight}>Monto</th>
+                {isAdmin && <th className="w-10 px-3 py-3"></th>}
               </tr>
-            ) : (
-              transactions.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50">
-                  <td className="p-4">{new Date(t.created_at).toLocaleDateString("es-CL")}</td>
-                  <td className="p-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        t.type === "income"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {t.type === "income" ? "Ingreso" : "Egreso"}
-                    </span>
+            </thead>
+            <tbody className={ts.tbody}>
+              {loading ? (
+                <tr><td colSpan={isAdmin ? 8 : 7}><Spinner /></td></tr>
+              ) : transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={isAdmin ? 8 : 7} className="px-5 py-12 text-center text-sm text-brand-gray">
+                    No hay transacciones en este periodo
                   </td>
-                  <td className="p-4">{t.items?.map((i: any) => i.description).join(", ") || t.notes || "-"}</td>
-                  <td className="p-4">{t.client?.name || t.barber?.name || "-"}</td>
-                  <td className="p-4 text-gray-500">{t.assigned_to ? assignedToLabels[t.assigned_to] : "-"}</td>
-                  <td className="p-4">{paymentMethodLabels[t.payment_method] || t.payment_method}</td>
-                  <td className={`p-4 text-right font-medium ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                    {t.type === "expense" ? "-" : ""}
-                    {formatCurrency(Number(t.total))}
-                  </td>
-                  {isAdmin && (
-                    <td
-                      className="p-4 text-right relative"
-                      ref={openMenuId === t.id ? menuRef : undefined}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                        disabled={deletingId === t.id}
-                        className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 disabled:opacity-50"
-                        aria-label="Mas acciones"
-                      >
-                        ⋮
-                      </button>
-                      {openMenuId === t.id && (
-                        <div
-                          className="absolute right-4 top-10 z-10 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-36 text-left"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(t)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            Modificar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(t.id)}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  )}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                transactions.map((t) => (
+                  <tr key={t.id} className={ts.tr}>
+                    <td className={`${ts.td} whitespace-nowrap tabular-nums text-brand-gray`}>{new Date(t.created_at).toLocaleDateString("es-CL")}</td>
+                    <td className={ts.td}>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          t.type === "income" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                        }`}
+                      >
+                        {t.type === "income" ? <ArrowUpRight className="h-3 w-3" strokeWidth={2.5} /> : <ArrowDownRight className="h-3 w-3" strokeWidth={2.5} />}
+                        {t.type === "income" ? "Ingreso" : "Egreso"}
+                      </span>
+                    </td>
+                    <td className={`${ts.td} max-w-[260px] truncate`}>{t.items?.map((i: any) => i.description).join(", ") || t.notes || "-"}</td>
+                    <td className={ts.td}>{t.client?.name || t.barber?.name || "-"}</td>
+                    <td className={`${ts.td} text-brand-gray`}>{t.assigned_to ? assignedToLabels[t.assigned_to] : "-"}</td>
+                    <td className={ts.td}>
+                      <span className="rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-medium text-brand-gray dark:bg-white/10">
+                        {paymentMethodLabels[t.payment_method] || t.payment_method}
+                      </span>
+                    </td>
+                    <td className={`${ts.tdRight} whitespace-nowrap ${t.type === "income" ? "text-emerald-500" : "text-red-500"}`}>
+                      {t.type === "expense" ? "−" : "+"}
+                      {formatCurrency(Number(t.total))}
+                    </td>
+                    {isAdmin && (
+                      <td
+                        className="relative px-3 py-3 text-right"
+                        ref={openMenuId === t.id ? menuRef : undefined}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                          disabled={deletingId === t.id}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-brand-gray transition-colors hover:bg-brand-blue/10 hover:text-brand-blue disabled:opacity-50"
+                          aria-label="Mas acciones"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                        {openMenuId === t.id && (
+                          <div className="absolute right-4 top-11 z-10 w-36 rounded-xl border border-gray-100 bg-white py-1 text-left shadow-xl">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(t)}
+                              className="w-full px-4 py-2 text-left text-sm text-brand-dark hover:bg-brand-blue/10"
+                            >
+                              Modificar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(t.id)}
+                              className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-500/10"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-modal flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-5 md:p-6 w-full max-w-md shadow-xl animate-scale-in">
-            <h2 className="text-lg font-bold mb-4">{editingId ? "Modificar Transaccion" : "Nueva Transaccion"}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-modal">
+          <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-6 shadow-2xl animate-scale-in">
+            <h2 className="mb-5 text-lg font-bold tracking-tight text-brand-dark">
+              {editingId ? "Modificar transacción" : "Nueva transacción"}
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-gray-100 bg-brand-light p-1">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, type: "income" })}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${
-                    formData.type === "income"
-                      ? "bg-green-600 text-white"
-                      : "bg-gray-100 text-gray-700"
+                  className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+                    formData.type === "income" ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25" : "text-brand-gray hover:text-brand-dark"
                   }`}
                 >
-                  Ingreso
+                  <ArrowUpRight className="h-4 w-4" strokeWidth={2.25} /> Ingreso
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, type: "expense" })}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${
-                    formData.type === "expense"
-                      ? "bg-red-600 text-white"
-                      : "bg-gray-100 text-gray-700"
+                  className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+                    formData.type === "expense" ? "bg-red-500 text-white shadow-lg shadow-red-500/25" : "text-brand-gray hover:text-brand-dark"
                   }`}
                 >
-                  Egreso
+                  <ArrowDownRight className="h-4 w-4" strokeWidth={2.25} /> Egreso
                 </button>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion</label>
+                <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Descripción</label>
                 <input
                   type="text"
                   required
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2"
+                  className={inputClass}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Monto</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className={`${inputClass} tabular-nums`}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Método de pago</label>
+                  <select
+                    value={formData.paymentMethod}
+                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                    className={inputClass}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="debit_card">Débito</option>
+                    <option value="credit_card">Crédito</option>
+                    <option value="transfer">Transferencia</option>
+                  </select>
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Metodo de Pago</label>
-                <select
-                  value={formData.paymentMethod}
-                  onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2"
-                >
-                  <option value="cash">Efectivo</option>
-                  <option value="debit_card">Debito</option>
-                  <option value="credit_card">Credito</option>
-                  <option value="transfer">Transferencia</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Notas</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2"
-                  rows={3}
+                  className={inputClass}
+                  rows={2}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Corresponde a</label>
+                <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Corresponde a</label>
                 <select
                   value={formData.assignedTo}
                   onChange={(e) =>
@@ -489,21 +489,21 @@ export default function FinanzasPage() {
                       barberId: e.target.value === "professional" ? formData.barberId : "",
                     })
                   }
-                  className="w-full border rounded-lg px-3 py-2"
+                  className={inputClass}
                 >
                   <option value="">Sin especificar</option>
                   <option value="professional">Profesional</option>
-                  <option value="reception">Recepcion</option>
+                  <option value="reception">Recepción</option>
                   <option value="business">Negocio general</option>
                 </select>
               </div>
               {formData.assignedTo === "professional" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Profesional</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Profesional</label>
                   <select
                     value={formData.barberId}
                     onChange={(e) => setFormData({ ...formData, barberId: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
+                    className={inputClass}
                   >
                     <option value="">Sin especificar</option>
                     {barbers.map((b) => (
@@ -512,18 +512,14 @@ export default function FinanzasPage() {
                   </select>
                 </div>
               )}
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-                >
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={closeModal} className={ghostButton}>
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={!formData.description || !formData.amount || parseFloat(formData.amount) <= 0}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={primaryButton}
                 >
                   {editingId ? "Guardar cambios" : "Guardar"}
                 </button>

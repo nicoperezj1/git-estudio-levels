@@ -89,9 +89,42 @@ export default function ServiciosPage() {
     new Set(services.map((s) => s.category).filter(Boolean))
   ) as string[];
 
+  // Categorias creadas en el formulario que aun no tienen ningun servicio guardado.
+  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const allCategories = Array.from(new Set([...existingCategories, ...extraCategories]));
+
+  // Si la persona escribio una categoria nueva pero no alcanzo a pulsar "Agregar" y guarda el
+  // servicio directo, se toma ese texto como la categoria (antes se perdia en silencio y el
+  // servicio quedaba "Sin categoria"). Reutiliza una existente si el nombre coincide.
+  const resolveCategoryOnSubmit = (): string => {
+    if (form.category) return form.category;
+    const name = newCategoryName.trim().replace(/\s+/g, " ");
+    if (!creatingCategory || !name) return "";
+    const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return allCategories.find((c) => norm(c) === norm(name)) || name;
+  };
+
+  // Crea la categoria y la deja seleccionada. Si ya existe una igual (sin importar
+  // mayusculas/acentos) se reutiliza, para no duplicar grupos.
+  const confirmNewCategory = () => {
+    const name = newCategoryName.trim().replace(/\s+/g, " ");
+    if (!name) return;
+    const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const existing = allCategories.find((c) => norm(c) === norm(name));
+    const final = existing || name;
+    if (!existing) setExtraCategories((prev) => [...prev, final]);
+    setForm((f) => ({ ...f, category: final }));
+    setCreatingCategory(false);
+    setNewCategoryName("");
+  };
+
   const openNew = () => {
     setEditingService(null);
     setForm({ name: "", description: "", price: "", duration: "", category: "" });
+    setCreatingCategory(false);
+    setNewCategoryName("");
     setShowModal(true);
   };
 
@@ -160,6 +193,7 @@ export default function ServiciosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const categoryToSave = resolveCategoryOnSubmit() || null;
 
     if (editingService) {
       await fetch(`/api/services/${editingService.id}`, {
@@ -170,7 +204,7 @@ export default function ServiciosPage() {
           description: form.description || null,
           price: parseInt(form.price),
           duration: parseInt(form.duration),
-          category: form.category || null,
+          category: categoryToSave,
         }),
       });
       showToast("Servicio actualizado", "success");
@@ -183,7 +217,7 @@ export default function ServiciosPage() {
           description: form.description || null,
           price: parseInt(form.price),
           duration: parseInt(form.duration),
-          category: form.category || null,
+          category: categoryToSave,
           sort_order: activeServices.length,
         }),
       });
@@ -506,32 +540,64 @@ export default function ServiciosPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-brand-gray mb-1">Categoria (opcional)</label>
-                {/* Dropdown of existing categories + free text. Choosing an existing one
-                    keeps the POS grouping consistent (avoids "Nicolas" vs "nicolas"
-                    becoming two separate groups); you can still type a new one. */}
-                <input type="text" value={form.category} list="service-categories"
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="Elige una o escribe una nueva"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
-                <datalist id="service-categories">
-                  {existingCategories.map((cat) => (
-                    <option key={cat} value={cat} />
+                {/* Nico, 29-sep: en vez de escribir el nombre de la categoria cada vez (y
+                    terminar con "Barba" y "barba" como grupos distintos), se elige una de las
+                    existentes o se crea una con el boton "Crear nueva categoria". Los servicios
+                    se agrupan por la categoria elegida. */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, category: "" })}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      !form.category ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
+                    }`}
+                  >
+                    Sin categoria
+                  </button>
+                  {allCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setForm({ ...form, category: cat })}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        form.category === cat ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
+                      }`}
+                    >
+                      {cat}
+                    </button>
                   ))}
-                </datalist>
-                {existingCategories.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {existingCategories.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setForm({ ...form, category: cat })}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
-                          form.category === cat ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                  {!creatingCategory && (
+                    <button
+                      type="button"
+                      onClick={() => setCreatingCategory(true)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-brand-blue text-brand-blue hover:bg-brand-blue/5"
+                    >
+                      + Crear nueva categoria
+                    </button>
+                  )}
+                </div>
+                {creatingCategory && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); confirmNewCategory(); }
+                        if (e.key === "Escape") { setCreatingCategory(false); setNewCategoryName(""); }
+                      }}
+                      placeholder="Nombre de la nueva categoria"
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm"
+                    />
+                    <button type="button" onClick={confirmNewCategory}
+                      className="px-3 py-2 bg-brand-blue text-white text-xs font-medium rounded-xl hover:opacity-90">
+                      Agregar
+                    </button>
+                    <button type="button" onClick={() => { setCreatingCategory(false); setNewCategoryName(""); }}
+                      className="px-3 py-2 text-xs text-brand-gray hover:bg-gray-100 rounded-xl">
+                      Cancelar
+                    </button>
                   </div>
                 )}
               </div>

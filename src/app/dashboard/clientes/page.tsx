@@ -390,14 +390,14 @@ export default function ClientesPage() {
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" value={formData.email}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input type="email" required value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
-                <input type="text" value={formData.phone}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono *</label>
+                <input type="text" required value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>

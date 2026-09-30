@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
-import { EmptyState, EmptyIcons, SuccessMark } from "@/components/ui/empty-state";
+import {
+  Sparkles, Package, Search, Plus, Minus, Trash2, ShoppingBag, Tag, Lock, Check, Star,
+  Banknote, CreditCard, ArrowLeftRight, ArrowRight, ArrowUp, ArrowDown,
+} from "lucide-react";
+import { SaleCelebration } from "@/components/pos/sale-celebration";
 
 interface Service {
   id: string;
@@ -20,6 +24,23 @@ interface Product {
   price: number;
   stock: number;
   barcode?: string;
+}
+
+// Monograma con las iniciales del item: le da caracter a cada tarjeta en vez de un icono generico.
+function Monogram({ name, tone, size = 40 }: { name: string; tone: "teal" | "amber"; size?: number }) {
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className={`flex flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold tracking-tight ${
+        tone === "teal"
+          ? "bg-gradient-to-br from-brand-blue/25 to-brand-accent/10 text-brand-blue ring-1 ring-brand-blue/20"
+          : "bg-gradient-to-br from-orange-400/25 to-amber-300/10 text-orange-500 ring-1 ring-orange-400/25"
+      }`}
+    >
+      {initials || "•"}
+    </div>
+  );
 }
 
 interface Client {
@@ -54,6 +75,11 @@ export default function POSPage() {
   const [selectedBarber, setSelectedBarber] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  // Alta rapida de cliente desde el POS (Nico, 29-sep): si el nombre escrito no existe.
+  const [addingClient, setAddingClient] = useState(false);
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [savingClient, setSavingClient] = useState(false);
   const [clientPoints, setClientPoints] = useState(0);
   const [redeemedPoints, setRedeemedPoints] = useState(0);
   const [couponCode, setCouponCode] = useState("");
@@ -547,91 +573,92 @@ export default function POSPage() {
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)]">
       {/* Left: Items */}
       <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
-        {/* Tabs with count */}
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={() => setActiveTab("services")}
-            className={`px-4 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all ${
-              activeTab === "services" ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20" : "bg-white border border-gray-200 text-brand-dark hover:border-brand-blue"
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-            </svg>
-            Servicios ({services.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("products")}
-            className={`px-4 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all ${
-              activeTab === "products" ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20" : "bg-white border border-gray-200 text-brand-dark hover:border-brand-blue"
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-            </svg>
-            Productos ({products.length})
-          </button>
-        </div>
+        {/* Barra superior: pestañas segmentadas + buscador + orden */}
+        <div className="mb-5 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-2xl border border-gray-100 bg-brand-light p-1">
+              {([
+                { key: "services", label: "Servicios", count: services.length, Icon: Sparkles },
+                { key: "products", label: "Productos", count: products.length, Icon: Package },
+              ] as const).map(({ key, label, count, Icon }) => {
+                const active = activeTab === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                      active ? "bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "text-brand-gray hover:text-brand-dark"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" strokeWidth={1.75} />
+                    {label}
+                    <span className={`rounded-full px-1.5 py-0.5 text-[11px] leading-none ${active ? "bg-white/20" : "bg-black/5 dark:bg-white/10"}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* Search */}
-        {/* Category filter for services */}
-        {activeTab === "services" && serviceCategories.length > 0 && (
-          <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
-            <button onClick={() => setCategoryFilter("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                categoryFilter === "all" ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
-              }`}>
-              Todos
-            </button>
-            {serviceCategories.map((cat) => (
-              <button key={cat} onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                  categoryFilter === cat ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
-                }`}>
-                {cat}
-              </button>
-            ))}
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-gray" strokeWidth={1.75} />
+              <input
+                type="text"
+                placeholder="Buscar o escanear código de barras..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && search.trim()) {
+                    // Barcode scanner sends Enter after scan
+                    const found = products.find((p) => p.barcode === search.trim());
+                    if (found) {
+                      addToCart(found, "product");
+                      setSearch("");
+                      setActiveTab("products");
+                    }
+                  }
+                }}
+                className="w-full rounded-2xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {([
+                { key: "price_asc", Icon: ArrowUp, label: "Precio menor a mayor" },
+                { key: "price_desc", Icon: ArrowDown, label: "Precio mayor a menor" },
+              ] as const).map(({ key, Icon, label }) => (
+                <button
+                  key={key}
+                  title={label}
+                  onClick={() => setSortBy(sortBy === key ? "default" : key)}
+                  className={`flex items-center gap-1 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                    sortBy === key
+                      ? "border-brand-blue bg-brand-blue/10 text-brand-blue"
+                      : "border-gray-200 bg-white text-brand-gray hover:border-brand-blue/40 hover:text-brand-dark"
+                  }`}
+                >
+                  Precio <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* Sort by price */}
-        <div className="flex gap-1.5 mb-3">
-          <button onClick={() => setSortBy(sortBy === "price_asc" ? "default" : "price_asc")}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
-              sortBy === "price_asc" ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
-            }`}>
-            Precio ↑
-          </button>
-          <button onClick={() => setSortBy(sortBy === "price_desc" ? "default" : "price_desc")}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
-              sortBy === "price_desc" ? "bg-brand-blue text-white" : "bg-gray-100 text-brand-gray hover:bg-gray-200"
-            }`}>
-            Precio ↓
-          </button>
-        </div>
-
-        <div className="relative mb-4">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-gray" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Buscar o escanear codigo de barras..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && search.trim()) {
-                // Barcode scanner sends Enter after scan
-                const found = products.find((p) => p.barcode === search.trim());
-                if (found) {
-                  addToCart(found, "product");
-                  setSearch("");
-                  setActiveTab("products");
-                }
-              }
-            }}
-            className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
-          />
+          {/* Filtro por categoria (solo servicios) */}
+          {activeTab === "services" && serviceCategories.length > 0 && (
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {["all", ...serviceCategories].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    categoryFilter === cat
+                      ? "border-transparent bg-brand-blue text-white shadow-md shadow-brand-blue/25"
+                      : "border-gray-200 bg-white text-brand-gray hover:border-brand-blue/50 hover:text-brand-dark"
+                  }`}
+                >
+                  {cat === "all" ? "Todos" : cat}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Product/Service grid. For services with categories and no active filter,
@@ -641,40 +668,46 @@ export default function POSPage() {
             search) fall back to a single flat grid. */}
         {(() => {
           const renderCard = (item: Service | Product) => {
-            const inCart = cart.find((c) => c.id === item.id && c.type === (activeTab === "services" ? "service" : "product"));
+            const type = activeTab === "services" ? "service" : "product";
+            const isService = type === "service";
+            const inCart = cart.find((c) => c.id === item.id && c.type === type);
+            const stock = isService ? null : Number((item as Product).stock);
+            const lowStock = stock !== null && stock <= 3;
             return (
               <button
                 key={item.id}
-                onClick={() => addToCart(item, activeTab === "services" ? "service" : "product")}
-                className={`relative bg-white p-4 rounded-2xl border transition-all text-left group active:scale-95 ${
-                  inCart ? "border-brand-blue shadow-md shadow-brand-blue/10" : "border-gray-100 hover:border-brand-blue/50 hover:shadow-md"
+                onClick={() => addToCart(item, type)}
+                className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97] ${
+                  inCart
+                    ? "border-brand-blue bg-brand-blue/[0.06] shadow-lg shadow-brand-blue/10 ring-1 ring-brand-blue/40"
+                    : "border-gray-100 bg-white hover:border-brand-blue/40 hover:shadow-lg hover:shadow-black/5"
                 }`}
               >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${
-                  activeTab === "services" ? "bg-blue-50 text-brand-blue" : "bg-orange-50 text-orange-500"
-                }`}>
-                  {activeTab === "services" ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                    </svg>
+                {/* brillo sutil al pasar el cursor */}
+                <span className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-brand-blue/15 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
+                <div className="relative flex items-start justify-between">
+                  <Monogram name={item.name} tone={isService ? "teal" : "amber"} />
+                  {inCart ? (
+                    <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-brand-blue px-1.5 text-xs font-bold text-white shadow-md">
+                      ×{inCart.quantity}
+                    </span>
                   ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                    </svg>
+                    <span className="flex h-7 w-7 scale-75 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100">
+                      <Plus className="h-4 w-4" strokeWidth={2.25} />
+                    </span>
                   )}
                 </div>
-                <p className="font-semibold text-sm text-brand-dark truncate">{item.name}</p>
-                <p className="text-brand-blue font-bold text-base mt-1">{formatCurrency(Number(item.price))}</p>
-                <p className="text-[11px] text-brand-gray mt-0.5">
-                  {activeTab === "services"
-                    ? `${(item as Service).duration} min`
-                    : `Stock: ${(item as Product).stock}`}
-                </p>
-                {inCart && (
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-brand-blue text-white rounded-full flex items-center justify-center text-xs font-bold shadow-md">
-                    {inCart.quantity}
-                  </div>
-                )}
+                <p className="relative mt-3 line-clamp-2 min-h-[2.5em] text-[15px] font-semibold leading-tight text-brand-dark">{item.name}</p>
+                <div className="relative mt-2 flex items-end justify-between gap-2">
+                  <p className="text-xl font-extrabold tracking-tight text-brand-blue tabular-nums">{formatCurrency(Number(item.price))}</p>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      lowStock ? "bg-red-500/15 text-red-500" : "bg-black/5 text-brand-gray dark:bg-white/10"
+                    }`}
+                  >
+                    {isService ? `${(item as Service).duration} min` : `Stock ${stock}`}
+                  </span>
+                </div>
               </button>
             );
           };
@@ -704,13 +737,14 @@ export default function POSPage() {
           if (uncategorized.length) groups.push({ label: "Sin categoria", items: uncategorized });
 
           return (
-            <div className="space-y-5">
+            <div className="space-y-7">
               {groups.map((g) => (
                 <div key={g.label}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xs font-bold text-brand-dark uppercase tracking-wide">{g.label}</h3>
-                    <span className="text-[10px] text-brand-gray bg-gray-100 rounded-full px-2 py-0.5">{g.items.length}</span>
-                    <div className="flex-1 h-px bg-gray-100" />
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" />
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-dark">{g.label}</h3>
+                    <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-semibold text-brand-blue">{g.items.length}</span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-brand-blue/25 to-transparent" />
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {g.items.map(renderCard)}
@@ -723,27 +757,30 @@ export default function POSPage() {
       </div>
 
       {/* Right: Cart */}
-      <div className="w-full lg:w-[420px] bg-white border-t lg:border-t-0 lg:border-l flex flex-col lg:max-h-screen">
-        {/* Compact header: barber + client */}
-        <div className="p-3 border-b space-y-2">
+      <div className="flex w-full flex-col border-t border-gray-100 bg-gradient-to-b from-brand-white to-brand-light lg:max-h-screen lg:w-[440px] lg:border-l lg:border-t-0">
+        {/* Encabezado: titulo + total en vivo, profesional y cliente */}
+        <div className="space-y-3 border-b border-gray-100 px-4 pb-3 pt-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-base text-brand-dark">Venta</h2>
-              {cart.length > 0 && (
-                <span className="w-5 h-5 bg-brand-blue text-white rounded-full flex items-center justify-center text-[10px] font-bold">
-                  {cart.reduce((s, c) => s + c.quantity, 0)}
-                </span>
-              )}
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue">
+                <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold leading-none text-brand-dark">Nueva venta</h2>
+                <p className="mt-1 text-[11px] text-brand-gray">
+                  {cart.length === 0 ? "Sin items" : `${cart.reduce((s, c) => s + c.quantity, 0)} item${cart.reduce((s, c) => s + c.quantity, 0) > 1 ? "s" : ""}`}
+                </p>
+              </div>
             </div>
             {cart.length > 0 && (
-              <span className="text-sm font-bold text-brand-blue">{formatCurrency(total)}</span>
+              <span className="text-xl font-extrabold tracking-tight text-brand-blue tabular-nums">{formatCurrency(total)}</span>
             )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <select
               value={selectedBarber}
               onChange={(e) => setSelectedBarber(e.target.value)}
-              className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
             >
               <option value="">Profesional *</option>
               {barbers.map((b) => (
@@ -753,7 +790,7 @@ export default function POSPage() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Cliente..."
+                placeholder="Cliente (nombre, telefono)..."
                 value={clientSearch}
                 onChange={async (e) => {
                   const val = e.target.value;
@@ -771,15 +808,52 @@ export default function POSPage() {
                     setClients(data.clients || []);
                   }
                 }}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
               />
-              {clientSearch.length >= 2 && !selectedClient && clients.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-32 overflow-y-auto">
-                  {clients
-                    .slice(0, 8)
-                    .map((c) => (
+              {clientSearch.trim().length >= 2 && !selectedClient && (() => {
+                const typed = clientSearch.trim();
+                const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                const exactMatch = clients.some((c) => norm(c.name) === norm(typed));
+                // Celular y correo son obligatorios: sin ellos no hay registro ni datos del cliente.
+                const phoneOk = newClientPhone.replace(/\D/g, "").length >= 8;
+                const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newClientEmail.trim());
+                const formOk = phoneOk && emailOk;
+                const addClient = async () => {
+                  if (savingClient || !typed) return;
+                  if (!formOk) {
+                    showToast(!phoneOk ? "Ingresa un celular valido" : "Ingresa un correo valido", "error");
+                    return;
+                  }
+                  setSavingClient(true);
+                  try {
+                    const t = getActiveTenantId();
+                    const res = await fetch("/api/clients", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: typed, phone: newClientPhone.trim(), email: newClientEmail.trim(), source: "walk_in", ...(t ? { tenantId: t } : {}) }),
+                    });
+                    const created = await res.json();
+                    if (!res.ok || !created?.id) {
+                      showToast(created?.error || "No se pudo crear el cliente", "error");
+                    } else {
+                      setClients((prev) => [created, ...prev]);
+                      setSelectedClient(created.id);
+                      setClientSearch(created.name);
+                      setClientPoints(0);
+                      setAddingClient(false);
+                      setNewClientPhone("");
+                      setNewClientEmail("");
+                      showToast(`Cliente "${created.name}" agregado`, "success");
+                    }
+                  } finally {
+                    setSavingClient(false);
+                  }
+                };
+                return (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {clients.slice(0, 8).map((c) => (
                       <button key={c.id} onClick={async () => {
-                        setSelectedClient(c.id); setClientSearch(c.name);
+                        setSelectedClient(c.id); setClientSearch(c.name); setAddingClient(false);
                         const res = await fetch(`/api/clients/${c.id}`);
                         const data = await res.json();
                         setClientPoints(data?.client?.loyalty_points || data?.loyalty_points || 0);
@@ -788,15 +862,57 @@ export default function POSPage() {
                         {c.name} {c.phone ? `· ${c.phone}` : ""}
                       </button>
                     ))}
-                </div>
-              )}
+                    {!exactMatch && (
+                      addingClient ? (
+                        <div className="p-2 border-t border-gray-100 space-y-2">
+                          <p className="text-[11px] text-gray-500">Nuevo cliente: <span className="font-semibold text-gray-800">{typed}</span></p>
+                          <input
+                            type="tel"
+                            autoFocus
+                            required
+                            value={newClientPhone}
+                            onChange={(e) => setNewClientPhone(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addClient(); } }}
+                            placeholder="Celular *"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+                          />
+                          <input
+                            type="email"
+                            required
+                            value={newClientEmail}
+                            onChange={(e) => setNewClientEmail(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addClient(); } }}
+                            placeholder="Correo *"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={addClient} disabled={savingClient || !formOk}
+                              className="flex-1 px-3 py-1.5 bg-brand-blue text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+                              {savingClient ? "Añadiendo..." : "Añadir"}
+                            </button>
+                            <button onClick={() => { setAddingClient(false); setNewClientPhone(""); setNewClientEmail(""); }}
+                              className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg">
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setAddingClient(true)}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-brand-blue hover:bg-gray-100 border-t border-gray-100">
+                          + Añadir "{typed}" como cliente nuevo
+                        </button>
+                      )
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
           {/* Loyalty points - compact */}
           {selectedClient && clientPoints > 0 && (
-            <div className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2">
-              <span className="text-xs text-brand-blue font-medium">{clientPoints - redeemedPoints} pts</span>
+            <div className="flex items-center justify-between rounded-xl border border-amber-400/25 bg-gradient-to-r from-amber-400/15 to-transparent px-3 py-2">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600"><Star className="h-3.5 w-3.5" fill="currentColor" />{clientPoints - redeemedPoints} pts</span>
               {redeemedPoints === 0 ? (
                 <button onClick={() => { const max = Math.min(clientPoints * 100, subtotal); setRedeemedPoints(Math.floor(max / 100)); setDiscount(Math.floor(max / 100) * 100); }}
                   disabled={subtotal === 0} className="text-[10px] px-2 py-1 bg-brand-blue text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
@@ -812,59 +928,52 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Cart items - scrollable, spacious */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+        {/* Items de la venta */}
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
           {cart.length === 0 ? (
-            <EmptyState
-              icon={EmptyIcons.cart}
-              title="Carrito vacio"
-              description="Toca un servicio o producto para agregar"
-              size="sm"
-            />
+            <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
+              <div className="relative mb-4">
+                <div className="absolute inset-0 rounded-full bg-brand-blue/15 blur-xl" />
+                <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-brand-blue/40 bg-brand-blue/5">
+                  <ShoppingBag className="h-7 w-7 text-brand-blue" strokeWidth={1.5} />
+                </div>
+              </div>
+              <p className="font-semibold text-brand-dark">Carrito vacío</p>
+              <p className="mt-1 max-w-[210px] text-xs text-brand-gray">Toca un servicio o producto para agregarlo a la venta</p>
+            </div>
           ) : (
             <>
-              <div className="flex items-center justify-between px-1 mb-1">
-                <span className="text-[11px] text-brand-gray font-medium uppercase tracking-wider">Items ({cart.reduce((s, c) => s + c.quantity, 0)})</span>
-                <button onClick={() => setCart([])} className="text-[11px] text-red-400 hover:text-red-600 font-medium">Vaciar todo</button>
+              <div className="mb-1 flex items-center justify-between px-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-gray">Detalle</span>
+                <button onClick={() => setCart([])} className="text-[11px] font-medium text-red-400 transition-colors hover:text-red-500">Vaciar todo</button>
               </div>
               {cart.map((item) => (
-                <div key={`${item.type}-${item.id}`} className="bg-white border border-gray-100 rounded-xl p-3 hover:border-brand-blue/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    {/* Type icon */}
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      item.type === "service" ? "bg-blue-50 text-brand-blue" : "bg-orange-50 text-orange-500"
-                    }`}>
-                      {item.type === "service" ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                        </svg>
-                      )}
+                <div
+                  key={`${item.type}-${item.id}`}
+                  className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-2.5 pr-3 transition-colors hover:border-brand-blue/30"
+                >
+                  <Monogram name={item.name} tone={item.type === "service" ? "teal" : "amber"} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-brand-dark">{item.name}</p>
+                    <p className="text-[11px] text-brand-gray tabular-nums">{formatCurrency(Number(item.price))} c/u</p>
+                    <div className="mt-1.5 inline-flex items-center rounded-full border border-gray-200 bg-brand-light">
+                      <button onClick={() => updateQuantity(item.id, item.type, -1)} aria-label="Restar"
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-brand-gray transition-colors hover:bg-brand-blue/15 hover:text-brand-blue">
+                        <Minus className="h-3 w-3" strokeWidth={2.5} />
+                      </button>
+                      <span className="w-7 text-center text-xs font-bold text-brand-dark tabular-nums">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.id, item.type, 1)} aria-label="Sumar"
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-brand-gray transition-colors hover:bg-brand-blue/15 hover:text-brand-blue">
+                        <Plus className="h-3 w-3" strokeWidth={2.5} />
+                      </button>
                     </div>
-                    {/* Name + price per unit */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-brand-dark truncate">{item.name}</p>
-                      <p className="text-[11px] text-brand-gray">{formatCurrency(Number(item.price))} c/u</p>
-                    </div>
-                    {/* Line total */}
-                    <p className="font-bold text-sm text-brand-dark flex-shrink-0">{formatCurrency(Number(item.price) * item.quantity)}</p>
                   </div>
-                  {/* Quantity controls */}
-                  <div className="flex items-center justify-between mt-2 pl-[52px]">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => updateQuantity(item.id, item.type, -1)}
-                        className="w-7 h-7 rounded-lg bg-brand-light border border-gray-200 text-brand-dark flex items-center justify-center text-base hover:border-brand-blue hover:text-brand-blue transition-colors">−</button>
-                      <span className="text-sm font-bold text-brand-dark w-8 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, item.type, 1)}
-                        className="w-7 h-7 rounded-lg bg-brand-light border border-gray-200 text-brand-dark flex items-center justify-center text-base hover:border-brand-blue hover:text-brand-blue transition-colors">+</button>
-                    </div>
-                    <button onClick={() => removeFromCart(item.id, item.type)}
-                      className="text-[11px] text-red-400 hover:text-red-600 font-medium">
-                      Quitar
+                  <div className="flex flex-col items-end justify-between gap-3 self-stretch">
+                    <button onClick={() => removeFromCart(item.id, item.type)} title="Quitar" aria-label="Quitar"
+                      className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-500/10 hover:text-red-500">
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                     </button>
+                    <p className="text-sm font-bold text-brand-dark tabular-nums">{formatCurrency(Number(item.price) * item.quantity)}</p>
                   </div>
                 </div>
               ))}
@@ -872,53 +981,59 @@ export default function POSPage() {
           )}
         </div>
 
-        <div className="border-t p-4 space-y-3">
-          {/* Coupon & Manual Discount */}
-          <div className="space-y-2">
-            <div className="flex gap-2">
+        <div className="space-y-3 border-t border-gray-100 bg-brand-white p-4">
+          {/* Cupon + descuento manual */}
+          <div className="space-y-1.5">
+            <div className="relative">
+              <Tag className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-gray" strokeWidth={1.75} />
               <input
                 type="text"
-                placeholder="Codigo cupon"
+                placeholder="Código de cupón"
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value)}
-                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-24 text-sm outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
               />
               <button
                 onClick={applyCoupon}
-                className="px-3 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-900"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-brand-blue/10 px-3 py-1.5 text-xs font-semibold text-brand-blue transition-colors hover:bg-brand-blue hover:text-white"
               >
                 Aplicar
               </button>
             </div>
-            <button
-              onClick={() => setShowPinModal(true)}
-              className="w-full py-2 border-2 border-dashed border-orange-300 text-orange-600 rounded-lg text-sm font-medium hover:bg-orange-50"
-            >
-              🔐 Descuento manual (PIN admin)
-            </button>
-            {discount > 0 && (
-              <button onClick={() => setDiscount(0)} className="text-xs text-red-500 hover:underline">
-                Quitar descuento
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowPinModal(true)}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-brand-gray transition-colors hover:bg-orange-500/10 hover:text-orange-500"
+              >
+                <Lock className="h-3.5 w-3.5" strokeWidth={1.75} /> Descuento manual (PIN admin)
               </button>
-            )}
-          </div>
-          {couponError && <p className="text-red-500 text-xs">{couponError}</p>}
-
-          {/* Totals */}
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal</span>
-              <span>{formatCurrency(subtotal)}</span>
+              {discount > 0 && (
+                <button onClick={() => setDiscount(0)} className="text-xs font-medium text-red-500 hover:underline">
+                  Quitar descuento
+                </button>
+              )}
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Descuento</span>
-                <span>-{formatCurrency(discount)}</span>
+          </div>
+          {couponError && <p className="text-xs text-red-500">{couponError}</p>}
+
+          {/* Resumen tipo recibo */}
+          <div className="rounded-2xl border border-gray-100 bg-brand-light/60 px-4 py-3">
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-brand-gray">Subtotal</span>
+                <span className="font-medium text-brand-dark tabular-nums">{formatCurrency(subtotal)}</span>
               </div>
-            )}
-            <div className="flex justify-between font-bold text-lg pt-1 border-t">
-              <span>Total</span>
-              <span>{formatCurrency(total)}</span>
+              {discount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Descuento</span>
+                  <span className="font-medium tabular-nums">-{formatCurrency(discount)}</span>
+                </div>
+              )}
+            </div>
+            <div className="my-3 border-t border-dashed border-gray-300" />
+            <div className="flex items-end justify-between">
+              <span className="text-sm font-semibold uppercase tracking-wider text-brand-gray">Total</span>
+              <span className="text-3xl font-black leading-none tracking-tight text-brand-dark tabular-nums">{formatCurrency(total)}</span>
             </div>
             {/* Tip is asked on the terminal itself, after the card payment. See the
                 "Cliente agrego propina?" step in the success flow below. */}
@@ -927,9 +1042,9 @@ export default function POSPage() {
           {/* Payment Methods */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 font-medium">Metodo de pago</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-gray">Método de pago</span>
               <button onClick={() => setSplitMode(!splitMode)}
-                className={`text-[10px] px-2 py-0.5 rounded-full ${splitMode ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors ${splitMode ? "bg-brand-blue/15 text-brand-blue" : "bg-black/5 text-brand-gray hover:text-brand-dark dark:bg-white/10"}`}>
                 {splitMode ? "Pago dividido ✓" : "Dividir pago"}
               </button>
             </div>
@@ -937,23 +1052,28 @@ export default function POSPage() {
             {!splitMode ? (
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { key: "cash", label: "Efectivo" },
-                  { key: "debit_card", label: "Debito" },
-                  { key: "credit_card", label: "Credito" },
-                  { key: "transfer", label: "Transfer" },
-                ].map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => setPaymentMethod(m.key)}
-                    className={`py-2 rounded-lg text-sm font-medium ${
-                      paymentMethod === m.key
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+                  { key: "cash", label: "Efectivo", Icon: Banknote },
+                  { key: "debit_card", label: "Débito", Icon: CreditCard },
+                  { key: "credit_card", label: "Crédito", Icon: CreditCard },
+                  { key: "transfer", label: "Transfer", Icon: ArrowLeftRight },
+                ].map((m) => {
+                  const selected = paymentMethod === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      onClick={() => setPaymentMethod(m.key)}
+                      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all ${
+                        selected
+                          ? "border-brand-blue bg-brand-blue/10 text-brand-blue ring-1 ring-brand-blue/40"
+                          : "border-gray-200 bg-white text-brand-dark hover:border-brand-blue/40"
+                      }`}
+                    >
+                      <m.Icon className="h-4 w-4" strokeWidth={1.75} />
+                      {m.label}
+                      {selected && <Check className="ml-auto h-4 w-4" strokeWidth={2.5} />}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="space-y-2">
@@ -1037,9 +1157,16 @@ export default function POSPage() {
                 ? splitPayments.reduce((s, p) => s + (parseInt(p.amount) || 0), 0) !== total
                 : !paymentMethod)
             }
-            className="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-brand-blue to-emerald-500 py-3.5 text-base font-bold text-white shadow-lg shadow-brand-blue/25 transition-all hover:brightness-110 hover:shadow-xl active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:brightness-100"
           >
-            {processing ? "Procesando..." : mpPaymentStatus === "waiting" ? "Esperando pago en maquina..." : "Cobrar"}
+            <span className="flex items-center justify-center gap-2">
+              {processing ? "Procesando..." : mpPaymentStatus === "waiting" ? "Esperando pago en máquina..." : (
+                <>
+                  Cobrar{total > 0 && <span className="tabular-nums">{formatCurrency(total)}</span>}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2.25} />
+                </>
+              )}
+            </span>
           </button>
         </div>
       </div>
@@ -1152,42 +1279,8 @@ export default function POSPage() {
         </div>
       )}
 
-      {/* Success Celebration Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSuccessModal(false)}>
-          <div className="text-center animate-scale-in">
-            {/* Confetti particles */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              {[...Array(20)].map((_, i) => (
-                <div key={i} className="absolute animate-bounce" style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 60}%`,
-                  animationDelay: `${Math.random() * 0.5}s`,
-                  animationDuration: `${1 + Math.random()}s`,
-                }}>
-                  <div className={`w-3 h-3 rounded-full ${["bg-[#2EC4B6]", "bg-[#0F8B8D]", "bg-yellow-400", "bg-green-400", "bg-white"][i % 5]}`} />
-                </div>
-              ))}
-            </div>
-
-            {/* Main content */}
-            <div className="relative">
-              <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm mx-auto">
-                <SuccessMark size={72} className="mb-4" />
-                <h2 className="text-2xl font-bold text-brand-dark">Venta exitosa!</h2>
-                <p className="text-4xl font-black text-brand-blue mt-3">{formatCurrency(successAmount)}</p>
-                <p className="text-sm text-brand-gray mt-3">Registrada correctamente</p>
-                <div className="mt-4 flex items-center justify-center gap-2 text-xs text-green-600">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Stock actualizado · Boleta enviada · Puntos acreditados
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Success Celebration Modal (Nico, 29-sep: mas estilo — confeti en abanico, check animado, monto que sube) */}
+      {showSuccessModal && <SaleCelebration amount={successAmount} onClose={() => setShowSuccessModal(false)} />}
 
       {/* MercadoPago Payment Modal */}
       {mpPaymentStatus !== "idle" && (

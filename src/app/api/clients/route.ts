@@ -53,6 +53,18 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { name, email, phone, notes, tenantId, source, sourceDetail } = body;
 
+  // Nico (29-sep): celular y correo son obligatorios — sin ellos no hay registro ni datos
+  // del cliente. Se valida tambien aqui (no solo en los formularios).
+  if (!name || !String(name).trim()) {
+    return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
+  }
+  if (!phone || String(phone).replace(/\D/g, "").length < 8) {
+    return NextResponse.json({ error: "El celular es obligatorio" }, { status: 400 });
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    return NextResponse.json({ error: "El correo es obligatorio y debe ser valido" }, { status: 400 });
+  }
+
   // Always resolve tenant_id: prefer param, fallback to session
   let resolvedTenantId = tenantId;
   if (!resolvedTenantId) {

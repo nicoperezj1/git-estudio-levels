@@ -8,6 +8,8 @@ import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun } from "lucide-react";
+import { Segmented, primaryButton } from "@/components/ui/premium";
 
 interface Barber { id: string; name: string; role?: string; also_attends_clients?: boolean; }
 interface Service { id: string; name: string; price: number; duration: number; }
@@ -21,6 +23,7 @@ interface Appointment {
   status: string;
   barber_id: string;
   client: { name: string } | null;
+  is_new_client?: boolean;
   barber: { name: string } | null;
   services: Array<{ service: { name: string } }>;
 }
@@ -95,7 +98,7 @@ export default function CalendarioPage() {
   // profesional en un solo dia" se reemplaza por "una columna por dia" para ESE
   // profesional, y aparecen los botones 1/3/7 dias. Version simple (primera entrega,
   // a pedido de Nico): solo lectura — click para ver el detalle, sin arrastrar para crear
-  // ni mover/redimensionar citas en esta vista todavia (eso sigue solo en la vista normal).
+  // ni mover/redimensionar citas en esta vista todavía (eso sigue solo en la vista normal).
   const [professionalFilter, setProfessionalFilter] = useState("");
   const [rangeDays, setRangeDays] = useState<1 | 3 | 7>(1);
   const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -205,11 +208,18 @@ export default function CalendarioPage() {
   const [editDate, setEditDate] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
   const [editEndTime, setEditEndTime] = useState("");
+  // Editar servicio(s) de una cita (Nico, 29-sep)
+  const swipeRef = useRef<{ x: number; y: number } | null>(null);
+  const [editingApptServices, setEditingApptServices] = useState(false);
+  const [editServiceIds, setEditServiceIds] = useState<string[]>([]);
+  const [adjustEnd, setAdjustEnd] = useState(true);
+  const [savingServices, setSavingServices] = useState(false);
 
   const openApptDetails = async (apptId: string) => {
     setSelectedApptId(apptId);
     setApptTab("detalles");
     setEditingApptTime(false);
+    setEditingApptServices(false);
     setLoadingDetails(true);
     const res = await fetch(`/api/appointments/${apptId}/details`);
     const data = await res.json();
@@ -285,6 +295,10 @@ export default function CalendarioPage() {
   const [clientSearch, setClientSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [creatingClient, setCreatingClient] = useState(false);
+  // Celular y correo obligatorios al crear un cliente desde la cita (sin ellos no hay registro).
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
   const [popupPosition, setPopupPosition] = useState<"left" | "right">("right");
 
   const gridRef = useRef<HTMLDivElement>(null);
@@ -773,15 +787,20 @@ export default function CalendarioPage() {
   const createClientInline = async () => {
     const name = clientSearch.trim();
     if (!name) return;
+    if (newClientPhone.replace(/\D/g, "").length < 8) { showToast("Ingresa un celular valido", "error"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newClientEmail.trim())) { showToast("Ingresa un correo valido", "error"); return; }
     setCreatingClient(true);
     try {
       const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, tenantId: getActiveTenantId() || undefined }),
+        body: JSON.stringify({ name, phone: newClientPhone.trim(), email: newClientEmail.trim(), source: "walk_in", tenantId: getActiveTenantId() || undefined }),
       });
       const data = await res.json();
       if (res.ok && data.id) {
+        setShowNewClientForm(false);
+        setNewClientPhone("");
+        setNewClientEmail("");
         setSelectedClient(data.id);
         setClientSearch(data.name);
         setFilteredClients([]);
@@ -831,104 +850,268 @@ export default function CalendarioPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Calendario</h1>
-          {/* Toggle Calendario / Lista (punto 20: Agenda fusionada aca) */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-0.5 text-sm">
-            <button
-              onClick={() => setView("calendario")}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${view === "calendario" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
-            >
-              Calendario
-            </button>
-            <button
-              onClick={() => setView("lista")}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${view === "lista" ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
-            >
-              Lista
-            </button>
-          </div>
+      {/* Cabecera premium (mismo look del Dashboard) */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-brand-dark md:text-3xl">Calendario</h1>
+          <p className="mt-0.5 text-sm text-brand-gray first-letter:uppercase">
+            {professionalFilter && rangeDays > 1 ? (
+              <>
+                {new Date(rangeDates[0] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
+                {" – "}
+                {new Date(rangeDates[rangeDates.length - 1] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
+                {" · "}
+                {displayBarbers.find((b) => b.id === professionalFilter)?.name}
+              </>
+            ) : (
+              new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })
+            )}
+          </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => changeDate(-1)} className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">←</button>
-          <button onClick={() => setDate(todayInChile())} className={`px-3 py-2 rounded-lg text-sm font-medium ${isToday ? "bg-blue-600 text-white" : "bg-gray-100"}`}>Hoy</button>
-          <button onClick={() => changeDate(1)} className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">→</button>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border rounded-lg px-3 py-2 text-sm ml-2" />
-          {view === "calendario" && (
-            <button
-              onClick={() => setFullDay((v) => !v)}
-              title={fullDay ? "Ver horario reducido (08:00 - 21:00)" : "Ver todo el dia (00:00 - 24:00)"}
-              className={`px-3 py-2 rounded-lg text-sm font-medium ${fullDay ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-            >
-              {fullDay ? "Horario reducido" : "Ver todo el dia"}
-            </button>
-          )}
-          {/* Vista por profesional a 1/3/7 dias (Nico, 28-sep). "Todos" = la grilla de
-              siempre (una columna por profesional, un solo dia). Al elegir uno puntual
-              aparecen los botones de rango. */}
-          {view === "calendario" && (
-            <select
-              value={professionalFilter}
-              onChange={(e) => { setProfessionalFilter(e.target.value); setRangeDays(1); }}
-              className="border rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">Todos los profesionales</option>
-              {displayBarbers.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          )}
-          {view === "calendario" && professionalFilter && (
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
-              {([1, 3, 7] as const).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setRangeDays(n)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${rangeDays === n ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
-                >
-                  {n === 1 ? "1 dia" : `${n} dias`}
-                </button>
-              ))}
-            </div>
-          )}
-          {view === "lista" && (
-            <select value={listBarberFilter} onChange={(e) => setListBarberFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm">
-              <option value="">Todos los profesionales</option>
-              {displayBarbers.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          )}
-          <button onClick={handleAgendarClick}
-            className="px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 text-sm font-medium flex items-center gap-1">
-            <span className="text-base leading-none">+</span> Agendar
-          </button>
-        </div>
+        <button onClick={handleAgendarClick} className={`${primaryButton} w-full md:w-auto`}>
+          <Plus className="h-4 w-4" strokeWidth={2.5} /> Agendar
+        </button>
       </div>
 
-      <p className="text-center text-sm text-gray-600 font-medium">
-        {professionalFilter && rangeDays > 1 ? (
-          <>
-            {new Date(rangeDates[0] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
-            {" – "}
-            {new Date(rangeDates[rangeDates.length - 1] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
-            <span className="text-gray-400 ml-2">· {displayBarbers.find((b) => b.id === professionalFilter)?.name} · solo lectura, toca una cita para ver el detalle</span>
-          </>
-        ) : (
-          <>
-            {new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
-            <span className="text-gray-400 ml-2">· Toca "Agendar" o arrastra sobre el horario</span>
-          </>
+      {/* Barra de controles: navegacion de fecha, vista, profesional y rango */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2">
+        <div className="flex items-center gap-1 rounded-xl bg-brand-light p-1">
+          <button aria-label="Anterior" onClick={() => changeDate(-1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-gray transition-colors hover:bg-white hover:text-brand-dark">
+            <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />
+          </button>
+          <button
+            onClick={() => setDate(todayInChile())}
+            className={`h-9 rounded-lg px-3.5 text-sm font-semibold transition-all ${isToday ? "bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "text-brand-dark hover:bg-white"}`}
+          >
+            Hoy
+          </button>
+          <button aria-label="Siguiente" onClick={() => changeDate(1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-gray transition-colors hover:bg-white hover:text-brand-dark">
+            <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
+          </button>
+        </div>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+        />
+
+        <div className="hidden h-6 w-px bg-gray-100 md:block" />
+
+        <Segmented
+          size="sm"
+          value={view}
+          onChange={(v) => setView(v as "calendario" | "lista")}
+          options={[{ value: "calendario", label: "Calendario" }, { value: "lista", label: "Lista" }]}
+        />
+
+        {view === "calendario" && (
+          <select
+            value={professionalFilter}
+            onChange={(e) => { setProfessionalFilter(e.target.value); setRangeDays(1); }}
+            className="hidden h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-brand-dark outline-none focus:border-brand-blue md:block"
+          >
+            <option value="">Todos los profesionales</option>
+            {displayBarbers.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
         )}
-      </p>
+        {view === "calendario" && professionalFilter && (
+          <div className="hidden md:block">
+            <Segmented
+              size="sm"
+              value={String(rangeDays)}
+              onChange={(v) => setRangeDays(Number(v) as 1 | 3 | 7)}
+              options={[{ value: "1", label: "1 día" }, { value: "3", label: "3 días" }, { value: "7", label: "7 días" }]}
+            />
+          </div>
+        )}
+        {view === "calendario" && (
+          <button
+            onClick={() => setFullDay((v) => !v)}
+            title={fullDay ? "Ver horario reducido (08:00 - 21:00)" : "Ver todo el dia (00:00 - 24:00)"}
+            className={`hidden h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors md:inline-flex ${
+              fullDay ? "border-brand-blue bg-brand-blue/10 text-brand-blue" : "border-gray-200 bg-white text-brand-dark hover:border-brand-blue/40"
+            }`}
+          >
+            <Sun className="h-4 w-4" strokeWidth={2} />
+            {fullDay ? "Horario reducido" : "Todo el día"}
+          </button>
+        )}
+        {view === "lista" && (
+          <select
+            value={listBarberFilter}
+            onChange={(e) => setListBarberFilter(e.target.value)}
+            className="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-brand-dark outline-none focus:border-brand-blue"
+          >
+            <option value="">Todos los profesionales</option>
+            {displayBarbers.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Celular: tira de dias + chips de profesional + agenda por tarjetas (la grilla de
+          columnas queda para pantallas medianas en adelante). */}
+      {view === "calendario" && (
+        <div
+          className="space-y-3 md:hidden"
+          onTouchStart={(e) => { swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
+          onTouchEnd={(e) => {
+            const st = swipeRef.current;
+            swipeRef.current = null;
+            if (!st) return;
+            const dx = e.changedTouches[0].clientX - st.x;
+            const dy = e.changedTouches[0].clientY - st.y;
+            // Deslizar horizontal (no scroll vertical, no chips deslizables): cambia de dia.
+            if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2 && !(e.target as HTMLElement).closest("[data-noswipe]")) {
+              changeDate(dx < 0 ? 1 : -1);
+            }
+          }}
+        >
+          <div className="grid grid-cols-7 gap-1.5">
+            {Array.from({ length: 7 }, (_, i) => dateStrOffset(date, i - 3)).map((d) => {
+              const dt = new Date(d + "T12:00:00");
+              const sel = d === date;
+              const tod = d === todayInChile();
+              return (
+                <button
+                  key={d}
+                  onClick={() => setDate(d)}
+                  className={`flex flex-col items-center rounded-2xl border py-2 transition-all ${
+                    sel
+                      ? "border-transparent bg-gradient-to-br from-brand-blue to-emerald-500 text-white shadow-lg shadow-brand-blue/25"
+                      : tod
+                      ? "border-brand-blue/40 bg-brand-blue/5 text-brand-dark"
+                      : "border-gray-100 bg-white text-brand-dark"
+                  }`}
+                >
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide ${sel ? "text-white/80" : "text-brand-gray"}`}>
+                    {dt.toLocaleDateString("es-CL", { weekday: "short" }).replace(".", "").slice(0, 3)}
+                  </span>
+                  <span className="text-base font-bold tabular-nums">{dt.getDate()}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div data-noswipe className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[{ id: "", name: "Todos" }, ...displayBarbers].map((b) => {
+              const active = professionalFilter === b.id;
+              return (
+                <button
+                  key={b.id || "all"}
+                  onClick={() => { setProfessionalFilter(b.id); setRangeDays(1); }}
+                  className={`flex-shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+                    active ? "border-transparent bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "border-gray-100 bg-white text-brand-gray"
+                  }`}
+                >
+                  {b.name}
+                </button>
+              );
+            })}
+          </div>
+
+          {loading ? <Spinner /> : (() => {
+            const dayList = rangeDates.map((d) => ({
+              d,
+              items: appointments
+                .filter((a: any) => (rangeDates.length === 1 || a.date === d) && (!professionalFilter || a.barber_id === professionalFilter))
+                .sort((x: any, y: any) => String(x.start_time).localeCompare(String(y.start_time))),
+            }));
+            const totalItems = dayList.reduce((n, x) => n + x.items.length, 0);
+            if (totalItems === 0) {
+              return (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue">
+                    <CalendarX className="h-6 w-6" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-sm font-semibold text-brand-dark">Sin citas este día</p>
+                  <p className="mt-1 text-xs text-brand-gray">Agenda una nueva con el botón +</p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-4">
+                {dayList.map(({ d, items }) => (
+                  <div key={d} className="space-y-2">
+                    {rangeDates.length > 1 && (
+                      <p className="px-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand-gray">
+                        {new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "short" })}
+                      </p>
+                    )}
+                    {items.map((a: any) => {
+                      const st = statusBadge[a.status] || statusBadge.scheduled;
+                      const t1 = a.start_time?.match(/(\d{2}:\d{2})/)?.[1] || "";
+                      const t2 = a.end_time?.match(/(\d{2}:\d{2})/)?.[1] || "";
+                      const bi = Math.max(0, displayBarbers.findIndex((b) => b.id === a.barber_id));
+                      const col = barberColors[bi % barberColors.length];
+                      return (
+                        <div
+                          key={a.id}
+                          role="button"
+                          onClick={() => openApptDetails(a.id)}
+                          className="w-full rounded-2xl border border-gray-100 bg-white p-3 text-left transition-all active:scale-[0.99]"
+                        >
+                          <div className="flex items-stretch gap-3">
+                          <div className="flex w-14 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-brand-light py-2">
+                            <span className="text-base font-bold tabular-nums text-brand-dark">{t1}</span>
+                            <span className="text-[10px] tabular-nums text-brand-gray">{t2}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="flex min-w-0 items-center gap-1.5 text-[15px] font-semibold text-brand-dark">
+                                <span className="truncate">{a.client?.name || "Cliente"}</span>
+                                {a.is_new_client && <span className="shrink-0 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+                              </p>
+                              <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
+                            </div>
+                            <p className="mt-0.5 truncate text-xs text-brand-gray">
+                              {a.services?.map((sv: any) => sv.service?.name).join(", ") || "Sin servicio"}
+                            </p>
+                            {!professionalFilter && (
+                              <div className="mt-1.5 flex items-center gap-1.5">
+                                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ${col.bg} ${col.text}`}>
+                                  {(a.barber?.name || "?").split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                                </span>
+                                <span className="truncate text-[11px] text-brand-gray">{a.barber?.name}</span>
+                              </div>
+                            )}
+                          </div>
+                                                  </div>
+                          {(a.status === "scheduled" || a.status === "confirmed" || a.status === "in_progress") && (
+                            <div className="mt-2.5 flex gap-2 border-t border-gray-100 pt-2.5" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => updateListStatus(a.id, a.status === "scheduled" ? "confirmed" : a.status === "confirmed" ? "in_progress" : "completed")}
+                                className="flex-1 rounded-xl bg-brand-blue py-2.5 text-xs font-bold text-white shadow-md shadow-brand-blue/20 active:scale-95"
+                              >
+                                {a.status === "scheduled" ? "Confirmar" : a.status === "confirmed" ? "Iniciar" : "Completar"}
+                              </button>
+                              <button
+                                onClick={() => openApptDetails(a.id)}
+                                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-xs font-semibold text-brand-dark active:scale-95"
+                              >
+                                Ver detalle
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Vista por profesional a 1/3/7 dias — una columna por dia, solo lectura (version
           simple, punto pendiente pulir drag-to-create/mover en esta vista mas adelante). */}
       {view === "calendario" && professionalFilter && (loading ? <Spinner /> : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+        <div className="hidden overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm md:block">
           <div className="min-w-[800px]">
             <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
               <div className="w-14 flex-shrink-0 border-r border-gray-100" />
@@ -972,10 +1155,13 @@ export default function CalendarioPage() {
                         <div
                           key={appt.id}
                           onClick={() => openApptDetails(appt.id)}
-                          className="absolute left-1 right-1 rounded-md border-l-[3px] bg-blue-100 border-l-blue-500 text-blue-800 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10"
+                          className="absolute left-1 right-1 rounded-lg border-l-[3px] shadow-sm bg-blue-100 border-l-blue-500 text-blue-800 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10"
                           style={getBlockStyle(appt)}
                         >
-                          <p className="text-[11px] font-bold truncate">{appt.client?.name || "Cliente"}</p>
+                          <p className="flex items-center gap-1 text-[11px] font-bold">
+                            <span className="truncate">{appt.client?.name || "Cliente"}</span>
+                            {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded bg-emerald-500 px-1 py-px text-[8px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+                          </p>
                           <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
                           <div className="flex items-center justify-between gap-1">
                             <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
@@ -998,7 +1184,7 @@ export default function CalendarioPage() {
       ))}
 
       {view === "calendario" && !professionalFilter && (loading ? <Spinner /> : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+        <div className="hidden overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm md:block">
           <div className="min-w-[800px]">
             {/* Barber headers */}
             <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
@@ -1007,10 +1193,10 @@ export default function CalendarioPage() {
                 const color = barberColors[i % barberColors.length];
                 return (
                   <div key={barber.id} className="flex-1 p-2 text-center border-r border-gray-100 min-w-[120px]">
-                    <div className={`inline-flex w-7 h-7 rounded-full ${color.bg} ${color.text} items-center justify-center text-[10px] font-bold`}>
+                    <div className={`inline-flex h-8 w-8 rounded-full ${color.bg} ${color.text} items-center justify-center text-[11px] font-bold ring-2 ring-white`}>
                       {barber.name.split(" ").map((n) => n[0]).join("")}
                     </div>
-                    <p className="text-[11px] font-medium text-gray-700 truncate mt-0.5">{barber.name}</p>
+                    <p className="mt-1 truncate text-xs font-semibold text-brand-dark">{barber.name}</p>
                   </div>
                 );
               })}
@@ -1220,10 +1406,13 @@ export default function CalendarioPage() {
                           e.stopPropagation();
                           openApptDetails(appt.id);
                         }}
-                        className={`absolute left-1 right-1 rounded-md border-l-[3px] ${color.bg} ${color.border} ${color.text} px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10 group ${movingApptId === appt.id ? "opacity-40 ring-2 ring-blue-500" : ""}`}
+                        className={`absolute left-1 right-1 rounded-lg border-l-[3px] shadow-sm ${color.bg} ${color.border} ${color.text} px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10 group ${movingApptId === appt.id ? "opacity-40 ring-2 ring-blue-500" : ""}`}
                         style={getBlockStyle(appt)}
                       >
-                        <p className="text-[11px] font-bold truncate">{appt.client?.name || "Cliente"}</p>
+                        <p className="flex items-center gap-1 text-[11px] font-bold">
+                            <span className="truncate">{appt.client?.name || "Cliente"}</span>
+                            {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded bg-emerald-500 px-1 py-px text-[8px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+                          </p>
                         <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-[9px] opacity-50 truncate" data-timelabel>{timeLabel}</p>
@@ -1339,10 +1528,10 @@ export default function CalendarioPage() {
           ) : (
             <div className="space-y-3">
               {listAppointments.map((a: any) => (
-                <div key={a.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between flex-wrap gap-3">
+                <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-4 transition-colors hover:border-brand-blue/30">
                   <div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-lg font-bold text-indigo-600">{a.start_time?.match(/(\d{2}:\d{2})/)?.[1] || ""}</span>
+                      <span className="rounded-lg bg-brand-blue/10 px-2 py-0.5 text-base font-bold tabular-nums text-brand-blue">{a.start_time?.match(/(\d{2}:\d{2})/)?.[1] || ""}</span>
                       <span className="font-medium text-gray-900">{a.client?.name || "-"}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${listStatusColors[a.status] || "bg-gray-100 text-gray-700"}`}>
                         {listStatusLabels[a.status] || a.status}
@@ -1379,38 +1568,6 @@ export default function CalendarioPage() {
         })()
       )}
 
-      {/* Mobile FAB: Quick add appointment */}
-      {!showPopup && (
-        <button
-          onClick={() => {
-            const now = new Date();
-            const h = now.getHours();
-            const m = Math.ceil(now.getMinutes() / 15) * 15;
-            const startTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-            const endM = h * 60 + m + 45;
-            const endTime = `${Math.floor(endM / 60).toString().padStart(2, "0")}:${(endM % 60).toString().padStart(2, "0")}`;
-            setPopupData({
-              barberId: barbers[0]?.id || "",
-              startTime,
-              endTime,
-              barberName: barbers[0]?.name || "",
-            });
-            setPopupPosition("right");
-            setShowPopup(true);
-            setPopupTab("service");
-            const shortest = services.length > 0 ? services.reduce((min, s) => s.duration < min.duration ? s : min, services[0]) : null;
-            setSelectedService(shortest?.id || "");
-            setSelectedClient("");
-            setClientSearch("");
-            setEventName("");
-            setEventNotes("");
-          }}
-          className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 flex items-center justify-center text-2xl z-40 active:scale-95"
-        >
-          +
-        </button>
-      )}
-
       {/* Google Calendar style popup - positioned beside the selection */}
       {showPopup && (
         <div className="fixed inset-0 z-50" onClick={() => setShowPopup(false)}>
@@ -1429,11 +1586,11 @@ export default function CalendarioPage() {
             {/* Tabs */}
             <div className="flex gap-4 px-4 pt-3 border-b">
               <button onClick={() => setPopupTab("service")}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${popupTab === "service" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500"}`}>
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${popupTab === "service" ? "border-brand-blue text-brand-blue" : "border-transparent text-gray-500"}`}>
                 Servicio
               </button>
               <button onClick={() => setPopupTab("event")}
-                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${popupTab === "event" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500"}`}>
+                className={`pb-2 text-sm font-medium border-b-2 transition-colors ${popupTab === "event" ? "border-brand-blue text-brand-blue" : "border-transparent text-gray-500"}`}>
                 Evento / Bloqueo
               </button>
             </div>
@@ -1508,11 +1665,30 @@ export default function CalendarioPage() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50">{c.name}</button>
                         ))}
                         {/* Create the client right here instead of leaving the calendar. */}
-                        <button onClick={createClientInline} disabled={creatingClient}
-                          className="w-full text-left px-3 py-2 text-sm text-brand-blue font-medium hover:bg-brand-blue/5 border-t border-gray-100 flex items-center gap-1.5 disabled:opacity-50">
-                          <span className="text-base leading-none">+</span>
-                          {creatingClient ? "Creando..." : `Crear cliente nuevo: "${clientSearch}"`}
-                        </button>
+                        {showNewClientForm ? (
+                          <div className="p-2 border-t border-gray-100 space-y-2">
+                            <p className="text-xs text-gray-500">Nuevo cliente: <span className="font-semibold text-gray-800">{clientSearch}</span></p>
+                            <input type="tel" required autoFocus value={newClientPhone} onChange={(e) => setNewClientPhone(e.target.value)}
+                              placeholder="Celular *" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                            <input type="email" required value={newClientEmail} onChange={(e) => setNewClientEmail(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createClientInline(); } }}
+                              placeholder="Correo *" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                            <div className="flex gap-2">
+                              <button onClick={createClientInline} disabled={creatingClient}
+                                className="flex-1 px-3 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+                                {creatingClient ? "Añadiendo..." : "Añadir"}
+                              </button>
+                              <button onClick={() => { setShowNewClientForm(false); setNewClientPhone(""); setNewClientEmail(""); }}
+                                className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setShowNewClientForm(true)}
+                            className="w-full text-left px-3 py-2 text-sm text-brand-blue font-medium hover:bg-brand-blue/5 border-t border-gray-100 flex items-center gap-1.5">
+                            <span className="text-base leading-none">+</span>
+                            {`Añadir "${clientSearch}" como cliente nuevo`}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1540,7 +1716,7 @@ export default function CalendarioPage() {
             {/* Footer */}
             <div className="flex justify-end p-4 border-t">
               <button onClick={handleCreate} disabled={creating || (popupTab === "service" && !selectedService)}
-                className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                className={`${primaryButton} px-6`}>
                 {creating ? "Creando..." : "Crear"}
               </button>
             </div>
@@ -1625,10 +1801,10 @@ export default function CalendarioPage() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-brand-dark">{apptDetails.client.name}</p>
                             {apptDetails.isNewClient && (
-                              <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[9px] font-bold rounded">NUEVO</span>
+                              <span className="rounded bg-emerald-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase leading-none tracking-wide text-white">Cliente nuevo</span>
                             )}
                             {!apptDetails.isNewClient && apptDetails.totalVisits > 0 && (
-                              <span className="text-[10px] text-brand-gray">{apptDetails.totalVisits} visitas</span>
+                              <span className="text-[10px] text-brand-gray">{apptDetails.totalVisits} {apptDetails.totalVisits === 1 ? "visita" : "visitas"}</span>
                             )}
                           </div>
                           {apptDetails.client.email && <p className="text-xs text-brand-gray">{apptDetails.client.email}</p>}
@@ -1703,17 +1879,92 @@ export default function CalendarioPage() {
                           Ver ficha de cliente
                         </button>
                       )}
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditingApptTime(true)}
-                          className="flex-1 py-2 border border-gray-200 rounded-xl text-xs text-brand-gray hover:bg-gray-50 font-medium">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => {
+                            setEditServiceIds((apptDetails.services || []).map((sv: any) => sv.service?.id).filter(Boolean));
+                            setAdjustEnd(true);
+                            setEditingApptTime(false);
+                            setEditingApptServices(true);
+                          }}
+                          className="py-2 border border-gray-200 rounded-xl text-xs text-brand-gray hover:bg-gray-50 font-medium">
+                          Editar servicio
+                        </button>
+                        <button onClick={() => { setEditingApptServices(false); setEditingApptTime(true); }}
+                          className="py-2 border border-gray-200 rounded-xl text-xs text-brand-gray hover:bg-gray-50 font-medium">
                           Editar hora
                         </button>
                         <button onClick={() => updateApptStatus("cancelled")}
-                          className="flex-1 py-2 border border-red-200 rounded-xl text-xs text-red-500 hover:bg-red-50 font-medium">
+                          className="col-span-2 py-2 border border-red-200 rounded-xl text-xs text-red-500 hover:bg-red-50 font-medium">
                           Cancelar cita
                         </button>
                       </div>
                     </div>
+
+                    {/* Editar servicio(s) de la cita */}
+                    {editingApptServices && (() => {
+                      const chosen = services.filter((sv) => editServiceIds.includes(sv.id));
+                      const totalPrice = chosen.reduce((n, sv) => n + Number(sv.price || 0), 0);
+                      const totalMin = chosen.reduce((n, sv) => n + (sv.duration || 0), 0);
+                      return (
+                        <div className="mt-3 space-y-3 rounded-xl bg-brand-light p-3">
+                          <p className="text-xs font-medium text-brand-dark">Modificar servicios</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {services.map((sv) => {
+                              const on = editServiceIds.includes(sv.id);
+                              return (
+                                <button
+                                  key={sv.id}
+                                  type="button"
+                                  onClick={() => setEditServiceIds((prev) => (on ? prev.filter((x) => x !== sv.id) : [...prev, sv.id]))}
+                                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                                    on ? "border-transparent bg-brand-blue text-white shadow-md shadow-brand-blue/25" : "border-gray-200 bg-white text-brand-gray"
+                                  }`}
+                                >
+                                  {sv.name} · {formatCurrency(sv.price)} · {sv.duration}m
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-xs text-brand-gray">
+                            Total: <span className="font-semibold text-brand-dark">{formatCurrency(totalPrice)}</span> · {totalMin} min
+                          </p>
+                          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-brand-gray">
+                            <input type="checkbox" checked={adjustEnd} onChange={(e) => setAdjustEnd(e.target.checked)} />
+                            Ajustar la hora de término a la nueva duración
+                          </label>
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditingApptServices(false)}
+                              className="flex-1 rounded-lg border border-gray-200 py-1.5 text-[11px] text-brand-gray hover:bg-white">
+                              Cancelar
+                            </button>
+                            <button
+                              disabled={editServiceIds.length === 0 || savingServices}
+                              onClick={async () => {
+                                setSavingServices(true);
+                                try {
+                                  const res = await fetch(`/api/appointments/${selectedApptId}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ service_ids: editServiceIds, adjust_end: adjustEnd }),
+                                  });
+                                  if (!res.ok) throw new Error();
+                                  showToast("Servicios actualizados", "success");
+                                  setEditingApptServices(false);
+                                  if (selectedApptId) await openApptDetails(selectedApptId);
+                                  await fetchAppointments();
+                                } catch {
+                                  showToast("No se pudieron actualizar los servicios", "error");
+                                } finally {
+                                  setSavingServices(false);
+                                }
+                              }}
+                              className="flex-1 rounded-lg bg-brand-blue py-1.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40">
+                              {savingServices ? "Guardando..." : "Guardar"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Edit time/date form */}
                     {editingApptTime && (
@@ -1796,7 +2047,7 @@ export default function CalendarioPage() {
           en un solo lugar (punto de Pablo, 25-sep). */}
       {editingBlock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditingBlock(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-sm max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-bold text-lg text-brand-dark">Bloqueo</h3>
               <button onClick={() => setEditingBlock(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
@@ -1902,12 +2153,13 @@ export default function CalendarioPage() {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Agendada</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Confirmada</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> En Atencion</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Completada</span>
+      {/* Leyenda */}
+      <div className="flex flex-wrap gap-2 text-[11px] font-medium text-brand-gray">
+        {[["bg-yellow-500", "Agendada"], ["bg-blue-500", "Confirmada"], ["bg-purple-500", "En atención"], ["bg-green-500", "Completada"]].map(([c, l]) => (
+          <span key={l} className="flex items-center gap-1.5 rounded-full border border-gray-100 bg-white px-2.5 py-1">
+            <span className={`h-2 w-2 rounded-full ${c}`} /> {l}
+          </span>
+        ))}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { CreditCard } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { createClient } from "@/lib/supabase/client";
+import MpSetupGuide, { MP_DEVICE_PREFIX } from "@/components/terminal-pos/mp-setup-guide";
 
 // Terminal POS — single place to configure whichever card terminal the POS charges
 // to. Before this page existed, the same job was split across two disconnected
@@ -188,8 +189,8 @@ export default function TerminalPosPage() {
       showToast("Espera un momento a que cargue la pagina y vuelve a intentar.", "error");
       return;
     }
-    if (!newMpTerminal.name || !newMpTerminal.device_id) {
-      showToast("Completa nombre y Device ID", "error");
+    if (!newMpTerminal.name || !newMpTerminal.device_id || newMpTerminal.device_id.trim() === MP_DEVICE_PREFIX) {
+      showToast("Completa nombre y Device ID (prefijo + número de serie)", "error");
       return;
     }
     const res = await fetch("/api/settings/mercadopago/terminals", {
@@ -356,6 +357,14 @@ export default function TerminalPosPage() {
         </div>
       </div>
 
+      <MpSetupGuide
+        onUseDeviceId={(id) => {
+          setNewMpTerminal((prev) => ({ ...prev, device_id: id }));
+          setShowAddMpTerminal(true);
+          showToast("Device ID cargado en «Nuevo terminal»", "success");
+        }}
+      />
+
       {/* MercadoPago Config */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 space-y-4">
         <div className="flex items-center gap-2">
@@ -399,7 +408,7 @@ export default function TerminalPosPage() {
                 <p className="text-[10px] text-brand-gray">Agrega multiples maquinas y asigna cuales cobran servicios y cuales productos</p>
               </div>
               <button
-                onClick={() => setShowAddMpTerminal(true)}
+                onClick={() => { setNewMpTerminal((prev) => ({ ...prev, device_id: prev.device_id || MP_DEVICE_PREFIX })); setShowAddMpTerminal(true); }}
                 className="px-3 py-1.5 bg-brand-blue text-white text-xs rounded-lg hover:bg-brand-blue/90 font-medium"
               >
                 + Anadir terminal
@@ -469,6 +478,7 @@ export default function TerminalPosPage() {
                   placeholder="NEWLAND_N950__SERIAL"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono"
                 />
+                <p className="text-[10px] text-brand-gray mt-1">Prefijo + número de serie (S/N de la etiqueta trasera), sin espacios.</p>
               </div>
               <div>
                 <label className="block text-[10px] text-brand-gray mb-1">Tipo de cobro</label>
@@ -499,7 +509,7 @@ export default function TerminalPosPage() {
                 </button>
                 <button
                   onClick={addMpTerminal}
-                  disabled={!newMpTerminal.name || !newMpTerminal.device_id || !tenantId}
+                  disabled={!newMpTerminal.name || newMpTerminal.device_id.trim() === MP_DEVICE_PREFIX || !newMpTerminal.device_id.trim() || !tenantId}
                   className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium hover:bg-brand-blue/90 disabled:opacity-50"
                 >
                   Agregar

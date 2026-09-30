@@ -462,6 +462,18 @@ export default function ConfiguracionPage() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in max-w-3xl">
       <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Configuracion</h1>
 
+      {/* Preferencias de reservas: banner, logo, Google Maps y tipo de vista */}
+      {isAdmin && (
+        <a href="/dashboard/configuracion/reservas" className="flex items-center gap-3 rounded-2xl border border-gray-100 dark:border-white/10 bg-white dark:bg-brand-white p-4 shadow-sm transition-colors hover:border-brand-blue/40">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue"><ImageIcon className="h-5 w-5" /></div>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-brand-dark">Preferencias de reservas</p>
+            <p className="text-xs text-brand-gray">Logo, imagen del negocio, Google Maps y cómo ven tus clientes la reserva</p>
+          </div>
+          <span className="text-xs font-semibold text-brand-blue">Abrir →</span>
+        </a>
+      )}
+
       {/* Booking Link */}
       <div className="bg-gradient-to-r from-brand-blue/5 to-brand-accent/5 rounded-2xl border border-brand-blue/20 p-4 md:p-6 space-y-3">
         <div className="flex items-center gap-2">
@@ -545,14 +557,14 @@ export default function ConfiguracionPage() {
             <label className="block text-xs font-medium text-brand-gray mb-1">Direccion</label>
             <input type="text" value={businessData.address}
               onChange={(e) => setBusinessData({ ...businessData, address: e.target.value })}
-              placeholder="Av. Concha y Toro 123, Puente Alto"
+              placeholder="Ej: Av. Principal 123, Comuna"
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-brand-light/40 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm" />
           </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-brand-gray mb-1">Sitio Web</label>
             <input type="text" value={businessData.website}
               onChange={(e) => setBusinessData({ ...businessData, website: e.target.value })}
-              placeholder="https://www.estudiolevels.cl"
+              placeholder="https://www.minegocio.cl"
               className="w-full border border-gray-200 dark:border-white/10 dark:bg-brand-light/40 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm" />
           </div>
         </div>
@@ -638,7 +650,8 @@ export default function ConfiguracionPage() {
       {/* Deposit / Abono Config
           (Configuracion de terminales de cobro con tarjeta: ver /dashboard/terminal-pos.
           Antes vivia aqui duplicado con otra pagina vieja separada, se unifico todo alla.) */}
-      <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-4">
+      {/* Oculto por ahora (Nico, 29-sep): se quita "Abono para Reservas" de la pantalla; la logica queda intacta por si se reactiva. */}
+      <div className="hidden bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -844,18 +857,7 @@ export default function ConfiguracionPage() {
           <p className="text-xs text-brand-gray">
             Este cambio aplica a todo el sistema para {businessData.name || "tu negocio"}: colores, tarjetas y el logo de re-booking se adaptan automaticamente.
           </p>
-          {/* Bug (reportado por Nico, 26-sep): "aparece boton verde, pero no realiza
-              cambios" — el toggle SI guarda y aplica el tema (activa .dark en <html>), pero
-              hoy solo un grupo reducido de pantallas tiene estilos dark: definidos, asi que
-              elegir "Oscuro" se veia como si el boton "no hiciera nada" en el resto del
-              sistema. Se avisa esto en vez de ocultar el selector (evitaria que un negocio
-              que ya eligio "Oscuro" pueda volver a "Claro") o prometer una cobertura que
-              todavia no existe. La ampliacion a todas las pantallas queda pendiente
-              (tarea de mayor costo, evaluada aparte con Nico).
-          */}
-          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-            Por ahora el tema oscuro se ve reflejado en una parte del sistema — seguimos ampliándolo al resto de las pantallas.
-          </p>
+          {/* Aviso "tema oscuro parcial" retirado (Nico, 29-sep): la cobertura ya es completa. */}
         </div>
       )}
 

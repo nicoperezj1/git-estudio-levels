@@ -23,7 +23,7 @@ export default function BarberosPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ name: "", email: "", phone: "", password: "", role: "barber" });
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "", birthDate: "", password: "", role: "barber" });
   const { showToast } = useToast();
   const { tenant, loading: tenantLoading } = useTenant();
   const { effectiveRole } = useAuth();
@@ -82,7 +82,7 @@ export default function BarberosPage() {
     }
     showToast("Miembro creado. Se envio email con credenciales.", "success");
     setShowModal(false);
-    setFormData({ name: "", email: "", phone: "", password: "", role: "barber" });
+    setFormData({ name: "", email: "", phone: "", birthDate: "", password: "", role: "barber" });
     fetchBarbers();
   };
 
@@ -289,6 +289,13 @@ export default function BarberosPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
                 <input type="text" value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
+                <input type="date" value={formData.birthDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>

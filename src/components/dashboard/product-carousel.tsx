@@ -61,8 +61,8 @@ export function ProductCarousel({ title, icon, items, emptyMessage, loading }: P
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-brand-blue">{icon}</span>
-          <h3 className="font-bold text-brand-dark text-sm">{title}</h3>
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">{icon}</span>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">{title}</h3>
         </div>
         {pageCount > 1 && (
           <div className="flex items-center gap-1.5">
@@ -93,11 +93,11 @@ export function ProductCarousel({ title, icon, items, emptyMessage, loading }: P
             style={{ transform: `translateX(-${page * 100}%)` }}
           >
             {pages.map((pageItems, pageIdx) => (
-              <div key={pageIdx} className="w-full flex-shrink-0 grid grid-cols-3 gap-3">
+              <div key={pageIdx} className="w-full flex-shrink-0 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {pageItems.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-xl border border-gray-100 dark:border-white/10 bg-brand-light/40 p-3 flex flex-col gap-1.5 min-h-[92px]"
+                    className="rounded-2xl border border-gray-100 dark:border-white/10 bg-brand-light/40 p-3.5 flex flex-col gap-1.5 min-h-[96px] transition-all hover:-translate-y-0.5 hover:border-brand-blue/30"
                   >
                     <p className="text-xs font-semibold text-brand-dark leading-tight line-clamp-2">{item.primary}</p>
                     <span

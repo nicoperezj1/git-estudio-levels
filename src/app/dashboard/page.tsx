@@ -9,7 +9,11 @@ import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
 import { SalesChart, type ChartRange, type ChartPoint } from "@/components/dashboard/sales-chart";
 import { ProductCarousel, type CarouselItem } from "@/components/dashboard/product-carousel";
-import { PackageX, ShoppingBag } from "lucide-react";
+import { PackageX, ShoppingBag, CalendarCheck, Wallet, UserPlus, RefreshCw, CalendarX, CalendarDays } from "lucide-react";
+import { PageHeader, StatCard, Panel, Segmented } from "@/components/ui/premium";
+import { BusinessQuoteNote } from "@/components/dashboard/business-quote-note";
+import { SuperAdminDashboard } from "@/components/dashboard/superadmin-dashboard";
+import { BirthdaysCard } from "@/components/dashboard/birthdays-card";
 import Link from "next/link";
 
 interface DashboardData {
@@ -55,8 +59,10 @@ export default function DashboardPage() {
   // para ir viendo el crecimiento del negocio de forma comoda.
   const [chartRange, setChartRange] = useState<ChartRange>("7d");
   const [chartLoading, setChartLoading] = useState(false);
-  const { user, effectiveRole } = useAuth();
-  const { tenant, loading: tenantLoading } = useTenant();
+  const { user, effectiveRole, isAtLeast } = useAuth();
+  const { tenant, loading: tenantLoading, isOverriding } = useTenant();
+  // Super Admin (sin "Entrar" a una empresa): ve el panel de plataforma, no el de un negocio.
+  const isSuperView = effectiveRole === "super_admin" && !isOverriding;
   const isToday = selectedDate === todayInChile();
   const router = useRouter();
 
@@ -74,6 +80,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (tenantLoading) return;
+    if (isSuperView) { setLoading(false); return; }
 
     const fetchDashboard = (opts?: { silent?: boolean }) => {
       const params = new URLSearchParams({ date: selectedDate, range: chartRange });
@@ -95,7 +102,9 @@ export default function DashboardPage() {
     if (!isToday) return;
     const interval = setInterval(() => fetchDashboard({ silent: true }), 30000);
     return () => clearInterval(interval);
-  }, [tenant?.id, tenantLoading, selectedDate, isToday, chartRange]);
+  }, [tenant?.id, tenantLoading, selectedDate, isToday, chartRange, isSuperView]);
+
+  if (isSuperView) return <SuperAdminDashboard />;
 
   if (loading) return <Spinner />;
 
@@ -120,32 +129,19 @@ export default function DashboardPage() {
     );
   }
 
-  // `invert`: para metricas donde subir es MALO (ej. Cancelaciones) — un + rojo, un -
-  // verde. Antes todo positivo se pintaba verde, incluso mas cancelaciones, que es peor
-  // para el negocio, no mejor.
-  const StatChange = ({ value, invert = false }: { value: number; invert?: boolean }) => {
-    const isGood = invert ? value <= 0 : value >= 0;
-    return (
-      <span
-        className={`inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-full mt-2 ${
-          isGood ? "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10" : "text-red-500 bg-red-50 dark:text-red-400 dark:bg-red-500/10"
-        }`}
-      >
-        {value >= 0 ? "+" : ""}
-        {value}%
-        <span className="font-normal opacity-70">vs dia anterior</span>
-      </span>
-    );
-  };
-
-  // Carrusel de stock bajo: "critico" cuando ya llego a 0, "bajo" cuando esta en o por
-  // debajo del minimo pero todavia queda algo.
-  const lowStockItems: CarouselItem[] = (data.lowStock || []).map((p) => ({
-    id: p.id,
-    primary: p.name,
-    secondary: `${p.stock}/${p.minStock} uds · ${p.stock <= 0 ? "Critico" : "Bajo"}`,
-    tone: p.stock <= 0 ? "danger" : "warning",
-  }));
+  // Carrusel de stock bajo. Estados: "Descuadrado" (stock negativo: se vendio mas de lo que
+  // estaba cargado en el inventario, falta registrar el ingreso), "Sin stock" (0) y "Bajo"
+  // (en o bajo el minimo pero queda). Se muestra "N uds · mín. M" en vez de "N/M" para que
+  // no parezca una fraccion.
+  const lowStockItems: CarouselItem[] = (data.lowStock || []).map((p) => {
+    const state = p.stock < 0 ? "Descuadrado" : p.stock === 0 ? "Sin stock" : "Bajo";
+    return {
+      id: p.id,
+      primary: p.name,
+      secondary: `${p.stock} uds · mín. ${p.minStock} · ${state}`,
+      tone: p.stock <= 0 ? "danger" : "warning",
+    } as CarouselItem;
+  });
 
   const topProductItems: CarouselItem[] = (data.topProducts || []).map((p, i) => ({
     id: p.name,
@@ -154,83 +150,89 @@ export default function DashboardPage() {
     tone: i === 0 ? "success" : "neutral",
   }));
 
+  const yesterday = dateStrOffset(todayInChile(), -1);
+  const dayValue: "today" | "yesterday" | "" = isToday ? "today" : selectedDate === yesterday ? "yesterday" : "";
+  const maxServiceCount = Math.max(...data.topServices.map((sv) => sv.count), 1);
+  const statusBadge: Record<string, { label: string; cls: string }> = {
+    completed: { label: "Completada", cls: "bg-emerald-500/10 text-emerald-500" },
+    cancelled: { label: "Cancelada", cls: "bg-red-500/10 text-red-500" },
+    no_show: { label: "No asistió", cls: "bg-amber-500/10 text-amber-500" },
+  };
+
   return (
-    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-brand-dark tracking-tight">
-              Hola, {firstName}
-            </h1>
-            <p className="text-brand-gray text-sm mt-0.5">
-              {isToday
-                ? "Aqui tienes el resumen de tu negocio hoy."
-                : `Resumen de tu negocio del ${selectedDateLabel}.`}
-            </p>
-          </div>
-        </div>
-        {/* Punto 8: selector de fecha, para consultar el Dashboard de un dia anterior */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedDate(todayInChile())}
-            className={`px-3 py-2 rounded-lg text-sm font-medium ${isToday ? "bg-brand-blue text-white" : "bg-white dark:bg-brand-white border border-gray-100 dark:border-white/10 text-brand-gray hover:bg-gray-50 dark:hover:bg-white/5"}`}
-          >
-            Hoy
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedDate(dateStrOffset(todayInChile(), -1))}
-            className={`px-3 py-2 rounded-lg text-sm font-medium ${selectedDate === dateStrOffset(todayInChile(), -1) ? "bg-brand-blue text-white" : "bg-white dark:bg-brand-white border border-gray-100 dark:border-white/10 text-brand-gray hover:bg-gray-50 dark:hover:bg-white/5"}`}
-          >
-            Ayer
-          </button>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-brand-white rounded-xl border border-gray-100 dark:border-white/10 text-sm text-brand-gray">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-            </svg>
-            <input
-              type="date"
-              value={selectedDate}
-              max={todayInChile()}
-              onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-              className="text-sm text-brand-gray bg-transparent outline-none"
+      <PageHeader
+        title={`Hola, ${firstName}`}
+        subtitle={isToday ? "Aquí tienes el resumen de tu negocio hoy." : `Resumen de tu negocio del ${selectedDateLabel}.`}
+        actions={
+          <>
+            {/* Punto 8: selector de fecha, para consultar el Dashboard de un dia anterior */}
+            <Segmented
+              value={dayValue}
+              onChange={(v) => setSelectedDate(v === "today" ? todayInChile() : yesterday)}
+              options={[
+                { value: "today", label: "Hoy" },
+                { value: "yesterday", label: "Ayer" },
+              ]}
             />
-          </div>
-        </div>
+            <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray transition focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10">
+              <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
+              <input
+                type="date"
+                value={selectedDate}
+                max={todayInChile()}
+                onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                className="bg-transparent text-sm text-brand-dark outline-none"
+              />
+            </div>
+          </>
+        }
+      />
+
+      {/* Stat Cards: Ventas destacada + 4 metricas */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard
+          hero
+          className="col-span-2"
+          label={isToday ? "Ventas hoy" : "Ventas"}
+          value={formatCurrency(data.stats.ventasHoy)}
+          Icon={Wallet}
+          delta={{ value: data.stats.ventasChange, suffix: "vs dia anterior" }}
+        />
+        <StatCard
+          label={isToday ? "Reservas hoy" : "Reservas"}
+          value={data.stats.reservasHoy}
+          Icon={CalendarCheck}
+          tone="teal"
+          delta={{ value: data.stats.reservasChange }}
+        />
+        <StatCard
+          label="Clientes nuevos"
+          value={data.stats.clientesNuevos}
+          Icon={UserPlus}
+          tone="green"
+          delta={{ value: data.stats.clientesChange }}
+        />
+        <StatCard
+          label="Reagendamientos"
+          value={data.stats.reagendamientos}
+          Icon={RefreshCw}
+          tone="violet"
+          delta={{ value: data.stats.reagendamientosChange }}
+        />
+        <StatCard
+          label="Cancelaciones"
+          value={data.stats.cancelaciones}
+          Icon={CalendarX}
+          tone="red"
+          delta={{ value: data.stats.cancelacionesChange, invert: true }}
+        />
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 transition-all duration-300 hover:shadow-md hover:border-brand-blue/20 hover:-translate-y-0.5">
-          <p className="text-xs text-brand-gray font-medium">{isToday ? "Reservas hoy" : "Reservas"}</p>
-          <p className="text-3xl font-bold text-brand-dark mt-1">{data.stats.reservasHoy}</p>
-          <StatChange value={data.stats.reservasChange} />
-        </div>
-        <div className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 transition-all duration-300 hover:shadow-md hover:border-brand-blue/20 hover:-translate-y-0.5">
-          <p className="text-xs text-brand-gray font-medium">{isToday ? "Ventas hoy" : "Ventas"}</p>
-          <p className="text-3xl font-bold text-brand-dark mt-1">{formatCurrency(data.stats.ventasHoy)}</p>
-          <StatChange value={data.stats.ventasChange} />
-        </div>
-        <div className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 transition-all duration-300 hover:shadow-md hover:border-brand-blue/20 hover:-translate-y-0.5">
-          <p className="text-xs text-brand-gray font-medium">Clientes nuevos</p>
-          <p className="text-3xl font-bold text-brand-dark mt-1">{data.stats.clientesNuevos}</p>
-          <StatChange value={data.stats.clientesChange} />
-        </div>
-        <div className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 transition-all duration-300 hover:shadow-md hover:border-brand-blue/20 hover:-translate-y-0.5">
-          <p className="text-xs text-brand-gray font-medium">Reagendamientos</p>
-          <p className="text-3xl font-bold text-brand-dark mt-1">{data.stats.reagendamientos}</p>
-          <StatChange value={data.stats.reagendamientosChange} />
-        </div>
-        <div className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 transition-all duration-300 hover:shadow-md hover:border-brand-blue/20 hover:-translate-y-0.5">
-          <p className="text-xs text-brand-gray font-medium">Cancelaciones</p>
-          <p className="text-3xl font-bold text-brand-dark mt-1">{data.stats.cancelaciones}</p>
-          <StatChange value={data.stats.cancelacionesChange} invert />
-        </div>
-      </div>
+      {/* Cumpleanos del mes (solo admin; no se muestra si no hay) */}
+      {isAtLeast("admin") && <BirthdaysCard tenantId={tenant?.id} />}
 
-      {/* Sales Chart — Punto 9: 7 dias / 1 mes / 3 meses / 12 meses */}
       <SalesChart
         data={data.chartData || []}
         range={chartRange}
@@ -241,32 +243,34 @@ export default function DashboardPage() {
       />
 
       {/* Aviso de stock bajo + Productos mas vendidos — carruseles de 3 por vista */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <ProductCarousel
           title="Stock bajo"
-          icon={<PackageX className="w-4 h-4" />}
+          icon={<PackageX className="h-4 w-4" />}
           emptyMessage="Todo el inventario esta dentro de su stock minimo."
           items={lowStockItems}
         />
         <ProductCarousel
           title="Mas vendidos (ultimos 30 dias)"
-          icon={<ShoppingBag className="w-4 h-4" />}
+          icon={<ShoppingBag className="h-4 w-4" />}
           emptyMessage="Sin ventas de productos en este periodo."
           items={topProductItems}
         />
       </div>
 
       {/* Main content: Agenda + Top Services */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Agenda del dia elegido (por defecto, hoy) */}
-        <div className="lg:col-span-3 bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-brand-dark">{isToday ? "Agenda de hoy" : "Agenda de ese dia"}</h3>
-            <Link href="/dashboard/calendario" className="text-xs text-brand-blue font-medium hover:underline">
+        <Panel
+          className="lg:col-span-3"
+          title={isToday ? "Agenda de hoy" : "Agenda de ese dia"}
+          subtitle={data.todayAppointments.length > 0 ? `${data.todayAppointments.length} cita${data.todayAppointments.length > 1 ? "s" : ""}` : undefined}
+          action={
+            <Link href="/dashboard/calendario" className="text-xs font-semibold text-brand-blue hover:underline">
               Ver agenda completa →
             </Link>
-          </div>
-
+          }
+        >
           {data.todayAppointments.length === 0 ? (
             <EmptyState
               icon={EmptyIcons.agendaEmpty}
@@ -274,53 +278,79 @@ export default function DashboardPage() {
               description="Cuando se agende una cita aparecera aqui."
             />
           ) : (
-            <div className="space-y-1">
+            <div className="relative space-y-2">
               {data.todayAppointments.map((appt) => {
                 const time = appt.start_time?.match(/(\d{2}:\d{2})/)?.[1] || "";
-                const serviceName = appt.services?.map((s: any) => s.service?.name).join(" + ") || "Servicio";
+                const serviceName = appt.services?.map((sv: any) => sv.service?.name).join(" + ") || "Servicio";
+                const badge = statusBadge[appt.status];
                 return (
-                  <div key={appt.id} className="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
-                    <span className="text-sm text-brand-gray font-medium w-12">{time}</span>
-                    <div className="flex-1 flex items-center gap-3">
-                      <div className="w-1 h-10 rounded-full bg-brand-blue/60" />
-                      <div>
-                        <p className="text-sm font-semibold text-brand-dark">{serviceName}</p>
-                        <p className="text-xs text-brand-gray">{appt.client?.name || "Cliente"} · {appt.barber?.name}</p>
-                      </div>
+                  <div
+                    key={appt.id}
+                    className="group flex items-center gap-4 rounded-2xl border border-transparent p-3 transition-colors hover:border-brand-blue/20 hover:bg-brand-blue/[0.04]"
+                  >
+                    <span className="w-[58px] flex-shrink-0 rounded-xl bg-brand-blue/10 py-1.5 text-center text-sm font-bold text-brand-blue tabular-nums">
+                      {time}
+                    </span>
+                    <div className="h-9 w-1 flex-shrink-0 rounded-full bg-gradient-to-b from-brand-blue to-emerald-500" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-brand-dark">{serviceName}</p>
+                      <p className="truncate text-xs text-brand-gray">
+                        {appt.client?.name || "Cliente"} · {appt.barber?.name}
+                      </p>
                     </div>
+                    {badge && (
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${badge.cls}`}>{badge.label}</span>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </Panel>
 
         {/* Top Servicios */}
-        <div className="lg:col-span-2 bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-brand-dark">Top Servicios</h3>
-            <Link href="/dashboard/reportes" className="text-xs text-brand-blue font-medium hover:underline">
-              Ver reporte completo →
+        <Panel
+          className="lg:col-span-2"
+          title="Top servicios"
+          action={
+            <Link href="/dashboard/reportes" className="text-xs font-semibold text-brand-blue hover:underline">
+              Ver cierre →
             </Link>
-          </div>
-
+          }
+        >
           {data.topServices.length === 0 ? (
-            <p className="text-center py-8 text-brand-gray text-sm">Sin datos aun</p>
+            <p className="py-8 text-center text-sm text-brand-gray">Sin datos aun</p>
           ) : (
             <div className="space-y-4">
               {data.topServices.map((svc, i) => (
-                <div key={svc.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-brand-gray font-medium w-4">{i + 1}</span>
-                    <span className="text-sm text-brand-dark font-medium">{svc.name}</span>
+                <div key={svc.name}>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                          i === 0 ? "bg-brand-blue text-white shadow-md shadow-brand-blue/30" : "bg-brand-blue/10 text-brand-blue"
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="truncate text-sm font-medium text-brand-dark">{svc.name}</span>
+                    </div>
+                    <span className="text-sm font-bold text-brand-dark tabular-nums">{svc.count}</span>
                   </div>
-                  <span className="text-sm font-bold text-brand-dark">{svc.count}</span>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-brand-blue to-emerald-500 transition-all duration-700"
+                      style={{ width: `${Math.max((svc.count / maxServiceCount) * 100, 6)}%` }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </Panel>
       </div>
+      {/* Frase de negocios (solo admin): franja discreta al final */}
+      {isAtLeast("admin") && <BusinessQuoteNote />}
     </div>
   );
 }

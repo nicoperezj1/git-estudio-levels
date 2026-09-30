@@ -16,6 +16,17 @@ function normalizeName(name: string): string {
     .toLowerCase();
 }
 
+// Una lista larga de ids en .in() supera el largo maximo de la URL y devolvia vacio en
+// silencio con cientos de ventas al mes: se consulta por lotes.
+async function inChunks(ids: string[], fetcher: (chunk: string[]) => PromiseLike<{ data: any[] | null }>, size = 100): Promise<any[]> {
+  const out: any[] = [];
+  for (let i = 0; i < ids.length; i += size) {
+    const { data } = await fetcher(ids.slice(i, i + size));
+    if (data) out.push(...data);
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   // Business-wide financials: owners/managers only. A professional must never pull the
   // whole salon's income from here (they were seeing it via the UI before the fix).
@@ -163,11 +174,11 @@ export async function GET(req: NextRequest) {
   const prodMap: Record<string, { total: number; count: number }> = {};
 
   if (txIdList.length > 0) {
-    const { data: serviceItems } = await supabase
+    const serviceItems = await inChunks(txIdList, (c) => supabase
       .from("transaction_items")
       .select("description, total, quantity, service_id, transaction_id")
       .not("service_id", "is", null)
-      .in("transaction_id", txIdList);
+      .in("transaction_id", c));
 
     for (const item of serviceItems || []) {
       if (!svcMap[item.description]) svcMap[item.description] = { total: 0, count: 0 };
@@ -175,11 +186,11 @@ export async function GET(req: NextRequest) {
       svcMap[item.description].count += item.quantity;
     }
 
-    const { data: productItems } = await supabase
+    const productItems = await inChunks(txIdList, (c) => supabase
       .from("transaction_items")
       .select("description, total, quantity, product_id, transaction_id")
       .not("product_id", "is", null)
-      .in("transaction_id", txIdList);
+      .in("transaction_id", c));
 
     for (const item of productItems || []) {
       if (!prodMap[item.description]) prodMap[item.description] = { total: 0, count: 0 };
@@ -196,10 +207,10 @@ export async function GET(req: NextRequest) {
   const expenseMap: Record<string, { total: number; count: number }> = {};
   const expenseTxIds = new Set((expenseTx || []).map((t: any) => t.id));
   if (expenseTxIds.size > 0) {
-    const { data: expenseItems } = await supabase
+    const expenseItems = await inChunks(Array.from(expenseTxIds) as string[], (c) => supabase
       .from("transaction_items")
       .select("description, total, transaction_id")
-      .in("transaction_id", Array.from(expenseTxIds));
+      .in("transaction_id", c));
 
     for (const item of expenseItems || []) {
       const label = item.description || "Otro egreso";

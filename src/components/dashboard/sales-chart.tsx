@@ -63,7 +63,7 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
           <div>
-            <h3 className="font-bold text-brand-dark text-sm">Ventas</h3>
+            <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">Ventas</h3>
             <div className="relative h-5 flex items-center">
               <span
                 className={cn(
@@ -94,16 +94,16 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
 
       {/* Range toggle */}
       <div className="flex items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-1 bg-brand-light rounded-xl p-1 w-fit">
+        <div className="flex items-center gap-1 bg-brand-light rounded-2xl border border-gray-100 p-1 w-fit">
           {RANGE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onRangeChange(opt.value)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
+                "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200",
                 range === opt.value
-                  ? "bg-white dark:bg-brand-white text-brand-dark shadow-sm"
+                  ? "bg-brand-blue text-white shadow-md shadow-brand-blue/25"
                   : "text-brand-gray hover:text-brand-dark"
               )}
             >
@@ -154,7 +154,7 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
                   className={cn(
                     "w-full max-w-[22px] rounded-full cursor-pointer transition-all duration-300 ease-out origin-bottom",
                     isHovered
-                      ? "bg-brand-blue"
+                      ? "bg-gradient-to-t from-brand-blue to-emerald-400"
                       : isNeighbor
                       ? "bg-brand-blue/40"
                       : isAnyHovered

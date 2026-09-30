@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import { formatCurrency, todayInChile } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  ChevronLeft, ChevronRight, FileDown, Coins, Percent, KeyRound, TrendingDown, PiggyBank, Receipt, CalendarCheck, UserPlus,
+} from "lucide-react";
+import { PageHeader, StatCard, Panel, tableStyles as ts, primaryButton } from "@/components/ui/premium";
 
 interface ReportData {
   summary: {
@@ -77,240 +81,269 @@ export default function ReportesPage() {
 
   if (loading || !data) {
     return (
-      <div className="p-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">Reportes</h1>
+      <div className="mx-auto max-w-7xl p-4 md:p-8">
+        <PageHeader title="Cierre mensual" />
         <Spinner />
       </div>
     );
   }
 
-  return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Reportes</h1>
-        <a
-          href={`/api/reportes/pdf?month=${month}&year=${year}`}
-          target="_blank"
-          className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Descargar PDF
-        </a>
-      </div>
+  const chartMax = Math.max(...comparison.map((c) => Math.max(c.income, c.expenses)), 1);
 
-      {/* Month Navigation */}
-      <div className="flex items-center gap-4">
-        <button onClick={() => changeMonth(-1)}
-          className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">&larr;</button>
-        <span className="text-lg font-medium">{monthNames[month - 1]} {year}</span>
-        <button onClick={() => changeMonth(1)}
-          className="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">&rarr;</button>
-      </div>
+  return (
+    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8 animate-fade-in">
+      <PageHeader
+        title="Cierre mensual"
+        subtitle="Resultado del mes: ingresos, egresos y utilidad del salón."
+        actions={
+          <>
+            {/* Navegacion de mes */}
+            <div className="flex items-center gap-1 rounded-2xl border border-gray-100 bg-brand-light p-1">
+              <button
+                onClick={() => changeMonth(-1)}
+                aria-label="Mes anterior"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-brand-gray transition-colors hover:bg-white hover:text-brand-blue dark:hover:bg-white/10"
+              >
+                <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+              </button>
+              <span className="min-w-[150px] text-center text-sm font-bold text-brand-dark">
+                {monthNames[month - 1]} {year}
+              </span>
+              <button
+                onClick={() => changeMonth(1)}
+                aria-label="Mes siguiente"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-brand-gray transition-colors hover:bg-white hover:text-brand-blue dark:hover:bg-white/10"
+              >
+                <ChevronRight className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </div>
+            <a href={`/api/reportes/pdf?month=${month}&year=${year}`} className={primaryButton}>
+              <FileDown className="h-4 w-4" strokeWidth={2} /> Descargar PDF
+            </a>
+          </>
+        }
+      />
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-green-500 to-green-700 rounded-2xl shadow-lg shadow-green-500/20 p-4 text-white">
-          <p className="text-xs opacity-80">Movimiento Total (bruto)</p>
-          <p className="text-xl font-bold">{formatCurrency(data.summary.totalIncome)}</p>
-          <p className="text-[10px] opacity-60">Incluye ventas de arrendatarios</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500">Ingresos Comisión</p>
-          <p className="text-lg font-bold text-purple-600">{formatCurrency(data.summary.incomeCommission)}</p>
-          <p className="text-[10px] text-gray-400">Ingresa al salón</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500">Ingresos Arriendo</p>
-          <p className="text-lg font-bold text-orange-600">{formatCurrency(data.summary.incomeRental)}</p>
-          <p className="text-[10px] text-gray-400">No ingresa al salón</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500">Egresos</p>
-          <p className="text-lg font-bold text-red-600">{formatCurrency(data.summary.totalExpenses)}</p>
-        </div>
-      </div>
-
-      {/* Second row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl shadow-lg shadow-indigo-500/20 p-4 text-white">
-          <p className="text-xs opacity-80">Utilidad Salón</p>
-          <p className="text-xl font-bold">{formatCurrency(data.summary.salonNetIncome)}</p>
-          <p className="text-[10px] opacity-60">Comisión - Egresos</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500">Transacciones</p>
-          <p className="text-lg font-bold text-gray-900">{data.summary.totalTransactions}</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500">Citas Completadas</p>
-          <p className="text-lg font-bold text-gray-900">{data.summary.appointmentsCompleted}</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-xs text-gray-500">Clientes Nuevos</p>
-          <p className="text-lg font-bold text-gray-900">{data.summary.newClients}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <StatCard
+          hero
+          className="col-span-2 lg:col-span-2"
+          label="Movimiento total (bruto)"
+          value={formatCurrency(data.summary.totalIncome)}
+          Icon={Coins}
+          hint="Incluye ventas de arrendatarios"
+        />
+        <StatCard
+          label="Ingresos comisión"
+          value={formatCurrency(data.summary.incomeCommission)}
+          Icon={Percent}
+          tone="violet"
+          hint="Ingresa al salón"
+        />
+        <StatCard
+          label="Ingresos arriendo"
+          value={formatCurrency(data.summary.incomeRental)}
+          Icon={KeyRound}
+          tone="amber"
+          hint="No ingresa al salón"
+        />
+        <StatCard
+          label="Egresos"
+          value={formatCurrency(data.summary.totalExpenses)}
+          Icon={TrendingDown}
+          tone="red"
+        />
+        <StatCard
+          label="Utilidad salón"
+          value={formatCurrency(data.summary.salonNetIncome)}
+          Icon={PiggyBank}
+          tone="green"
+          hint="Comisión − egresos"
+        />
+        <StatCard label="Transacciones" value={data.summary.totalTransactions} Icon={Receipt} tone="slate" />
+        <StatCard label="Citas completadas" value={data.summary.appointmentsCompleted} Icon={CalendarCheck} tone="teal" />
+        <StatCard label="Clientes nuevos" value={data.summary.newClients} Icon={UserPlus} tone="green" />
       </div>
 
       {/* Monthly Comparison Chart */}
       {comparison.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-          <h3 className="font-bold text-gray-800 mb-4">Comparativa Mensual (ultimos 6 meses)</h3>
-          <div className="flex items-end justify-between gap-2 h-48">
+        <Panel
+          title="Comparativa mensual"
+          subtitle="Últimos 6 meses"
+          action={
+            <div className="flex items-center gap-4 text-xs text-brand-gray">
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-gradient-to-t from-brand-blue to-emerald-400" /> Ingresos</span>
+              <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-400/70" /> Egresos</span>
+            </div>
+          }
+        >
+          <div className="flex h-52 items-end justify-between gap-3">
             {comparison.map((m) => {
-              const maxVal = Math.max(...comparison.map((c) => Math.max(c.income, c.expenses)), 1);
-              const incomeHeight = (m.income / maxVal) * 100;
-              const expenseHeight = (m.expenses / maxVal) * 100;
+              const incomeHeight = (m.income / chartMax) * 100;
+              const expenseHeight = (m.expenses / chartMax) * 100;
               return (
-                <div key={m.label} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="flex gap-0.5 items-end h-36 w-full justify-center">
-                    <div className="w-3 md:w-5 bg-green-400 rounded-t" style={{ height: `${Math.max(incomeHeight, 2)}%` }} title={`Ingresos: ${formatCurrency(m.income)}`} />
-                    <div className="w-3 md:w-5 bg-red-300 rounded-t" style={{ height: `${Math.max(expenseHeight, 2)}%` }} title={`Egresos: ${formatCurrency(m.expenses)}`} />
+                <div key={m.label} className="group flex flex-1 flex-col items-center gap-2">
+                  <div className="flex h-40 w-full items-end justify-center gap-1">
+                    <div
+                      className="w-4 rounded-full bg-gradient-to-t from-brand-blue to-emerald-400 opacity-80 transition-all duration-300 group-hover:opacity-100 md:w-6"
+                      style={{ height: `${Math.max(incomeHeight, 2)}%` }}
+                      title={`Ingresos: ${formatCurrency(m.income)}`}
+                    />
+                    <div
+                      className="w-4 rounded-full bg-red-400/60 transition-all duration-300 group-hover:bg-red-400 md:w-6"
+                      style={{ height: `${Math.max(expenseHeight, 2)}%` }}
+                      title={`Egresos: ${formatCurrency(m.expenses)}`}
+                    />
                   </div>
-                  <span className="text-[10px] text-gray-500">{m.label}</span>
+                  <span className="text-[11px] font-medium text-brand-gray">{m.label}</span>
                 </div>
               );
             })}
           </div>
-          <div className="flex gap-4 justify-center mt-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-400 rounded" /> Ingresos</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-300 rounded" /> Egresos</span>
-          </div>
-        </div>
+        </Panel>
       )}
 
       {/* Tables Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Income by Barber */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 p-4 border-b">Ingresos por Profesional</h3>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left p-3 font-medium text-gray-600">Profesional</th>
-                <th className="text-center p-3 font-medium text-gray-600">Modo</th>
-                <th className="text-right p-3 font-medium text-gray-600">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.incomeByBarber?.map((row, i) => (
-                <tr key={i}>
-                  <td className="p-3">{row.name}</td>
-                  <td className="p-3 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      row.workMode === "rental" ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"
-                    }`}>
-                      {row.workMode === "rental" ? "Arriendo" : "Comisión"}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right font-medium">{formatCurrency(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* By Payment Method */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 p-4 border-b">Por Metodo de Pago</h3>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left p-3 font-medium text-gray-600">Metodo</th>
-                <th className="text-right p-3 font-medium text-gray-600">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.incomeByMethod?.map((row, i) => (
-                <tr key={i}>
-                  <td className="p-3">{paymentMethodLabels[row.method] || row.method}</td>
-                  <td className="p-3 text-right font-medium">{formatCurrency(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Top Services */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 p-4 border-b">Top Servicios</h3>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left p-3 font-medium text-gray-600">Servicio</th>
-                <th className="text-center p-3 font-medium text-gray-600">Cantidad</th>
-                <th className="text-right p-3 font-medium text-gray-600">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.topServices?.map((row, i) => (
-                <tr key={i}>
-                  <td className="p-3">{row.name}</td>
-                  <td className="p-3 text-center">{row.count}</td>
-                  <td className="p-3 text-right font-medium">{formatCurrency(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Top Products */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 p-4 border-b">Top Productos</h3>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left p-3 font-medium text-gray-600">Producto</th>
-                <th className="text-center p-3 font-medium text-gray-600">Cantidad</th>
-                <th className="text-right p-3 font-medium text-gray-600">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.topProducts?.map((row, i) => (
-                <tr key={i}>
-                  <td className="p-3">{row.name}</td>
-                  <td className="p-3 text-center">{row.count}</td>
-                  <td className="p-3 text-right font-medium">{formatCurrency(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Detalle de Egresos (Punto 18) */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 md:col-span-2">
-          <h3 className="font-bold text-gray-800 p-4 border-b">Detalle de Egresos</h3>
-          {(!data.expensesDetail || data.expensesDetail.length === 0) ? (
-            <p className="text-center py-6 text-gray-400 text-sm">Sin egresos manuales en este periodo</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+        <Panel flush title="Ingresos por profesional">
+          <div className={ts.wrap}>
+            <table className={ts.table}>
+              <thead className={ts.thead}>
                 <tr>
-                  <th className="text-left p-3 font-medium text-gray-600">Concepto</th>
-                  <th className="text-center p-3 font-medium text-gray-600">Cantidad</th>
-                  <th className="text-right p-3 font-medium text-gray-600">Total</th>
+                  <th className={ts.th}>Profesional</th>
+                  <th className={ts.thCenter}>Modo</th>
+                  <th className={ts.thRight}>Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
-                {data.expensesDetail.map((row, i) => (
-                  <tr key={i}>
-                    <td className="p-3">{row.name}</td>
-                    <td className="p-3 text-center">{row.count}</td>
-                    <td className="p-3 text-right font-medium text-red-600">{formatCurrency(row.total)}</td>
+              <tbody className={ts.tbody}>
+                {data.incomeByBarber?.map((row, i) => (
+                  <tr key={i} className={ts.tr}>
+                    <td className={ts.td}>{row.name}</td>
+                    <td className={ts.tdCenter}>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                          row.workMode === "rental" ? "bg-amber-500/10 text-amber-500" : "bg-violet-500/10 text-violet-500"
+                        }`}
+                      >
+                        {row.workMode === "rental" ? "Arriendo" : "Comisión"}
+                      </span>
+                    </td>
+                    <td className={ts.tdRight}>{formatCurrency(row.total)}</td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr className="border-t bg-gray-50">
-                  <td className="p-3 font-bold text-gray-800">Total Egresos</td>
-                  <td className="p-3 text-center font-bold text-gray-800">{data.expensesDetail.reduce((s, r) => s + r.count, 0)}</td>
-                  <td className="p-3 text-right font-bold text-red-600">{formatCurrency(data.summary.totalExpenses)}</td>
-                </tr>
-              </tfoot>
             </table>
+          </div>
+        </Panel>
+
+        {/* By Payment Method */}
+        <Panel flush title="Por método de pago">
+          <div className={ts.wrap}>
+            <table className={ts.table}>
+              <thead className={ts.thead}>
+                <tr>
+                  <th className={ts.th}>Método</th>
+                  <th className={ts.thRight}>Total</th>
+                </tr>
+              </thead>
+              <tbody className={ts.tbody}>
+                {data.incomeByMethod?.map((row, i) => (
+                  <tr key={i} className={ts.tr}>
+                    <td className={ts.td}>{paymentMethodLabels[row.method] || row.method}</td>
+                    <td className={ts.tdRight}>{formatCurrency(row.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        {/* Top Services */}
+        <Panel flush title="Top servicios">
+          <div className={ts.wrap}>
+            <table className={ts.table}>
+              <thead className={ts.thead}>
+                <tr>
+                  <th className={ts.th}>Servicio</th>
+                  <th className={ts.thCenter}>Cantidad</th>
+                  <th className={ts.thRight}>Total</th>
+                </tr>
+              </thead>
+              <tbody className={ts.tbody}>
+                {data.topServices?.map((row, i) => (
+                  <tr key={i} className={ts.tr}>
+                    <td className={ts.td}>{row.name}</td>
+                    <td className={ts.tdCenter}>{row.count}</td>
+                    <td className={ts.tdRight}>{formatCurrency(row.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        {/* Top Products */}
+        <Panel flush title="Top productos">
+          <div className={ts.wrap}>
+            <table className={ts.table}>
+              <thead className={ts.thead}>
+                <tr>
+                  <th className={ts.th}>Producto</th>
+                  <th className={ts.thCenter}>Cantidad</th>
+                  <th className={ts.thRight}>Total</th>
+                </tr>
+              </thead>
+              <tbody className={ts.tbody}>
+                {data.topProducts?.map((row, i) => (
+                  <tr key={i} className={ts.tr}>
+                    <td className={ts.td}>{row.name}</td>
+                    <td className={ts.tdCenter}>{row.count}</td>
+                    <td className={ts.tdRight}>{formatCurrency(row.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        {/* Detalle de Egresos (Punto 18) */}
+        <Panel flush title="Detalle de egresos" className="md:col-span-2">
+          {(!data.expensesDetail || data.expensesDetail.length === 0) ? (
+            <p className="py-10 text-center text-sm text-brand-gray">Sin egresos manuales en este periodo</p>
+          ) : (
+            <div className={ts.wrap}>
+              <table className={ts.table}>
+                <thead className={ts.thead}>
+                  <tr>
+                    <th className={ts.th}>Concepto</th>
+                    <th className={ts.thCenter}>Cantidad</th>
+                    <th className={ts.thRight}>Total</th>
+                  </tr>
+                </thead>
+                <tbody className={ts.tbody}>
+                  {data.expensesDetail.map((row, i) => (
+                    <tr key={i} className={ts.tr}>
+                      <td className={ts.td}>{row.name}</td>
+                      <td className={ts.tdCenter}>{row.count}</td>
+                      <td className={`${ts.tdRight} text-red-500`}>{formatCurrency(row.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-gray-100 bg-brand-blue/[0.04]">
+                    <td className="px-5 py-3.5 text-sm font-bold text-brand-dark">Total egresos</td>
+                    <td className="px-5 py-3.5 text-center font-bold tabular-nums text-brand-dark">
+                      {data.expensesDetail.reduce((sum, r) => sum + r.count, 0)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-bold tabular-nums text-red-500">{formatCurrency(data.summary.totalExpenses)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );

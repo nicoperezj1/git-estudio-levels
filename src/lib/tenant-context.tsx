@@ -100,9 +100,9 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
 
     setLoading(true);
     fetch(`/api/tenant/info?tenantId=${activeTenantId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data.tenant) {
+        if (data?.tenant) {
           setTenant(data.tenant);
           setPlanFeatures(data.features || []);
           setGlobalTenantId(data.tenant.id);
@@ -110,6 +110,8 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
           setTenant(null);
         }
       })
+      // Si la respuesta viene vacia o falla la red, no dejar un error sin manejar.
+      .catch(() => setTenant(null))
       .finally(() => setLoading(false));
   }, [activeTenantId]);
 
