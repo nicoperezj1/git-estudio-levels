@@ -47,7 +47,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 const EDITABLE_FIELDS = [
-  "name", "rut_empresa", "admin_email", "admin_name", "phone", "address",
+  "name", "rut_empresa", "admin_email", "admin_name", "phone", "address", "city",
   "plan", "status", "logo_url", "website", "social_media", "max_professionals",
   "max_branches", "active",
   // Cupos de mensajeria (Nico, 27-sep): override por negocio, mismo patron que
@@ -130,7 +130,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   if (cascadeError) {
     // Un error aca significa que la funcion (o alguna tabla que referencia al tenant sin
-    // cascade) todavia no existe en produccion, o que algo quedo fuera de la migracion
+    // cascade) todavía no existe en produccion, o que algo quedo fuera de la migracion
     // 071 — gracias a que todo corre dentro de una sola funcion, Postgres hizo rollback
     // completo: no se borro nada a medias.
     return NextResponse.json({

@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { name, slug, rut_empresa, admin_email, admin_name, phone, address, plan, logo_url, website, social_media, trial_days, max_professionals, business_category } = body;
+  const { name, slug, rut_empresa, admin_email, admin_name, phone, address, city, plan, logo_url, website, social_media, trial_days, max_professionals, business_category } = body;
 
   // Validations
   if (!name || !slug || !admin_email) {
@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
       status: "trial",
       phone: phone || null,
       address: address || null,
+      city: (city || "").trim() || null,
       logo_url: logo_url || null,
       website: website || null,
       social_media: social_media || null,

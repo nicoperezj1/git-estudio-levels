@@ -53,7 +53,7 @@ export default function SuperAdminTenantsPage() {
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string; slug: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "basic",
+    name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", city: "", rut_empresa: "", plan: "basic",
     logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "",
   });
   const { showToast } = useToast();
@@ -233,7 +233,7 @@ export default function SuperAdminTenantsPage() {
     if (res.ok) {
       setCreatedInfo({ email: form.admin_email, password: data.temp_password, slug: form.slug });
       setShowCreate(false);
-      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "" });
+      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", city: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "" });
       fetchTenants();
       showToast("Empresa creada exitosamente", "success");
     } else {
@@ -484,6 +484,13 @@ export default function SuperAdminTenantsPage() {
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" />
                 </div>
                 <div>
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Ciudad</label>
+                  <input type="text" value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    placeholder="Ej: Santiago, Valparaíso, Concepción"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" />
+                </div>
+                <div>
                   <label className="text-xs font-medium text-brand-gray block mb-1">Logo (URL)</label>
                   <input type="url" value={form.logo_url}
                     onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
@@ -600,6 +607,10 @@ export default function SuperAdminTenantsPage() {
                 <div>
                   <p className="text-[10px] text-brand-gray uppercase font-medium">Direccion</p>
                   <p className="text-brand-dark">{viewingContact.address || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-brand-gray uppercase font-medium">Ciudad</p>
+                  <p className="text-brand-dark">{(viewingContact as any).city || "—"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-brand-gray uppercase font-medium">RUT empresa</p>
