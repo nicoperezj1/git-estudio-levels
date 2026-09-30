@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function SuscripcionResultadoPage() {
+function SuscripcionResultadoContent() {
   const params = useSearchParams();
   // "result" lo pone re-booking en las back_urls del pago anual (Checkout Pro). El
   // regreso de una suscripcion mensual (Preapproval) no trae resultado: lo que manda es
@@ -50,8 +50,6 @@ export default function SuscripcionResultadoPage() {
   }, [result, reqId, preapprovalId]);
 
   const failed = result === "failure" && !paid;
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-brand-light p-4">
@@ -107,5 +105,22 @@ export default function SuscripcionResultadoPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SuscripcionResultadoPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-brand-light p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-xl p-6 md:p-8 text-center">
+            <div className="text-4xl mb-3">⏳</div>
+            <h2 className="text-lg font-bold text-brand-dark">Cargando...</h2>
+          </div>
+        </div>
+      }
+    >
+      <SuscripcionResultadoContent />
+    </Suspense>
   );
 }
