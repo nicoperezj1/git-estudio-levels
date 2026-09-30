@@ -24,10 +24,11 @@
 ALTER TABLE plan_limits ADD COLUMN IF NOT EXISTS whatsapp_quota INT;
 ALTER TABLE plan_limits ADD COLUMN IF NOT EXISTS email_quota INT;
 
-UPDATE plan_limits SET whatsapp_quota = 100, email_quota = 100 WHERE plan = 'basic';
-UPDATE plan_limits SET whatsapp_quota = 150, email_quota = 250 WHERE plan = 'starter';
-UPDATE plan_limits SET whatsapp_quota = 500, email_quota = 600 WHERE plan = 'pro';
-UPDATE plan_limits SET whatsapp_quota = NULL, email_quota = NULL WHERE plan = 'enterprise';
+UPDATE plan_limits SET whatsapp_quota = 100, email_quota = 100 WHERE plan = 'basic' AND whatsapp_quota IS NULL AND email_quota IS NULL;
+UPDATE plan_limits SET whatsapp_quota = 150, email_quota = 250 WHERE plan = 'starter' AND whatsapp_quota IS NULL AND email_quota IS NULL;
+UPDATE plan_limits SET whatsapp_quota = 500, email_quota = 600 WHERE plan = 'pro' AND whatsapp_quota IS NULL AND email_quota IS NULL;
+-- Enterprise queda en NULL (ilimitado): es el valor por defecto de las columnas nuevas.
+-- (Las actualizaciones de arriba solo rellenan cupos vacios: re-ejecutar no pisa cambios manuales.)
 
 -- Override por negocio, mismo patron que tenants.max_professionals: NULL = usa el
 -- default del plan. Le permite a Superadmin desacoplar la cuota del plan elegido (ej. un
