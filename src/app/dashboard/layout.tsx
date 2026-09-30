@@ -3,6 +3,7 @@ import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server
 import { Sidebar } from "@/components/layout/sidebar";
 import { ToastWrapper } from "@/components/providers/toast-wrapper";
 import { AuthWrapper } from "@/components/providers/auth-wrapper";
+import { SuspendedGate } from "@/components/layout/suspended-gate";
 import { TrialBanner } from "@/components/layout/trial-banner";
 import { TenantOverrideBanner } from "@/components/layout/tenant-override-banner";
 import { PushNotificationPrompt } from "@/components/push-notifications";
@@ -25,11 +26,14 @@ export default async function DashboardLayout({
   // Single query: profile + tenant name via join (was two sequential round-trips).
   const { data: profile } = await createAdminSupabase()
     .from("profiles")
-    .select("name, role, tenant_id, tenant:tenants(name)")
+    .select("name, role, tenant_id, tenant:tenants(name, status)")
     .eq("id", user.id)
     .single();
 
   const tenantName = (profile?.tenant as any)?.name || "";
+  // Negocio suspendido por falta de pago: se bloquea el panel (salvo Plan y facturacion).
+  // El super admin nunca se bloquea (soporte / impersonacion).
+  const isSuspended = (profile?.tenant as any)?.status === "suspended" && profile?.role !== "super_admin";
 
   // A business with only 1 active team member is a solo/independent professional
   // (e.g. Saray Ovalle running her own account). Items like Recepcion, Lista de Espera
@@ -60,11 +64,13 @@ export default async function DashboardLayout({
             <TenantOverrideBanner />
             <TrialBanner />
             <ErrorBoundary>
-              {children}
+              <SuspendedGate suspended={isSuspended} isAdmin={profile?.role === "admin"}>
+                {children}
+              </SuspendedGate>
             </ErrorBoundary>
-            <PushNotificationPrompt />
-            <QuickActions userRole={profile?.role || "barber"} />
-            <CommandPalette />
+            {!isSuspended && <PushNotificationPrompt />}
+            {!isSuspended && <QuickActions userRole={profile?.role || "barber"} />}
+            {!isSuspended && <CommandPalette />}
           </main>
         </div>
       </AuthWrapper>

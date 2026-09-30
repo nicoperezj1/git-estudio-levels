@@ -258,7 +258,7 @@ export default function AgendaPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Barbero</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Profesional</label>
                 <select required value={formData.barber_id}
                   onChange={(e) => setFormData({ ...formData, barber_id: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2">

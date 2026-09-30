@@ -47,7 +47,7 @@ export default function SesionesPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-brand-light border-b border-gray-100">
               <tr>
                 <th className="text-left p-3 text-xs font-medium text-brand-gray">Usuario</th>
@@ -78,7 +78,7 @@ export default function SesionesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
     </div>

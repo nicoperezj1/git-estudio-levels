@@ -200,13 +200,15 @@ export async function POST(req: NextRequest) {
           .single();
 
         let businessLogoUrl: string | null = null;
+        let businessName: string | null = null;
         if (barber?.tenant_id) {
           const { data: tenantRow } = await supabase
             .from("tenants")
-            .select("logo_url")
+            .select("logo_url, name")
             .eq("id", barber.tenant_id)
             .single();
           businessLogoUrl = tenantRow?.logo_url || null;
+          businessName = tenantRow?.name || null;
         }
 
         await sendReceipt({
@@ -226,6 +228,7 @@ export async function POST(req: NextRequest) {
           date: new Date(),
           barberName: barber?.name || "Tu profesional",
           businessLogoUrl,
+          businessName,
         });
 
         await supabase

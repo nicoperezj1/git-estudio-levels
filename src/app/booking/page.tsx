@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import BusinessProfile, { type BusinessInfo } from "@/components/booking/business-profile";
+import TimeFirstFlow, { type TimePick } from "@/components/booking/time-first-flow";
 import { formatCurrency } from "@/lib/utils";
 import { SuccessMark } from "@/components/ui/empty-state";
 
@@ -53,7 +55,12 @@ export default function BookingPage() {
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
   const [businessName, setBusinessName] = useState("");
+  const [businessSuspended, setBusinessSuspended] = useState(false);
   const [businessLogoUrl, setBusinessLogoUrl] = useState<string | null>(null);
+  const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
+  // Vista de reserva: "time" (día y hora primero) o "professional" (profesional primero).
+  const [viewMode, setViewMode] = useState<"time" | "professional">("professional");
+  const preselectSlot = useRef<string>(""); // hora elegida en la vista por horario
   const [depositRequired, setDepositRequired] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(30);
   const [depositMessage, setDepositMessage] = useState("");
@@ -69,17 +76,25 @@ export default function BookingPage() {
   useEffect(() => {
     // Get tenant slug from URL params
     const urlParams = new URLSearchParams(window.location.search);
-    const tenantSlug = urlParams.get("tenant") || urlParams.get("branch");
+    // Link corto /<negocio>/<profesional>: negocio y profesional vienen de la ruta.
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const pathTenant = pathParts.length === 2 && pathParts[0] !== "booking" ? decodeURIComponent(pathParts[0]) : null;
+    const pathProf = pathTenant ? decodeURIComponent(pathParts[1]) : null;
+    const tenantSlug = urlParams.get("tenant") || urlParams.get("branch") || pathTenant;
     if (tenantSlug) setTenantSlugState(tenantSlug);
     const barberSlug = urlParams.get("profesional") || urlParams.get("barber");
-    const profSlugParam = urlParams.get("prof"); // preferred: unique readable booking_slug
+    const profSlugParam = urlParams.get("prof") || pathProf; // preferred: unique readable booking_slug
     const barberIdParam = urlParams.get("barberId"); // also unambiguous (uuid)
     const barberUrl = tenantSlug ? `/api/public/barbers?branch=${tenantSlug}` : "/api/public/barbers";
 
     // Fetch business info if on subdomain
     if (tenantSlug) {
       fetch(`/api/public/business-info?slug=${tenantSlug}`).then((r) => r.json()).then((data) => {
-        if (data.name) setBusinessName(data.name);
+        if (data.name) {
+          setBusinessName(data.name); setBusinessInfo(data);
+          if (data.suspended) setBusinessSuspended(true);
+          if (data.booking_view_mode === "time") setViewMode("time");
+        }
         if (data.logo_url) setBusinessLogoUrl(data.logo_url);
         // Fetch deposit settings for this tenant
         if (data.id) {
@@ -183,13 +198,13 @@ export default function BookingPage() {
   useEffect(() => {
     if (selectedBarber && selectedDate && selectedServices.length > 0) {
       setLoadingSlots(true);
-      setSelectedSlot("");
+      setSelectedSlot(preselectSlot.current);
       fetch(
         `/api/public/availability?barberId=${selectedBarber.id}&date=${selectedDate}&duration=${totalDuration}`
       )
         .then((r) => r.json())
         .then((data) => setSlots(data.slots || []))
-        .finally(() => setLoadingSlots(false));
+        .finally(() => { setLoadingSlots(false); preselectSlot.current = ""; });
     }
   }, [selectedBarber, selectedDate, selectedServices]);
 
@@ -270,20 +285,57 @@ export default function BookingPage() {
     dateOptions.push(toLocalDateStr(d));
   }
 
+  // Vista por horario disponible solo si el negocio la eligió y hay link de negocio.
+  const viewPref = businessInfo?.booking_view_mode || "professional";
+  const timeViewAllowed = !!tenantSlugState && (viewPref === "time" || viewPref === "both");
+  const professionalViewAllowed = viewPref !== "time";
+  const activeView: "time" | "professional" =
+    timeViewAllowed && !professionalViewAllowed ? "time" : !timeViewAllowed ? "professional" : viewMode;
+  const closedWeekdays = (businessInfo?.hours || []).filter((h) => h.is_closed).map((h) => h.day_of_week);
+
+  const handleTimePick = (p: TimePick) => {
+    preselectSlot.current = p.slot;
+    setSelectedBarber({ id: p.barber.id, name: p.barber.name, avatar_url: p.barber.avatar_url, bio: null, specialties: null, intro_video_url: null, years_experience: null });
+    setSelectedServices(p.services.map((sv) => ({ id: sv.id, name: sv.name, description: sv.description, price: sv.price, duration: sv.duration })));
+    setSelectedDate(p.date);
+    setSelectedSlot(p.slot);
+    setStep("details");
+  };
+
+  // El perfil completo del negocio se muestra en el primer paso.
+  const showProfile = step === "barber" && !!businessInfo?.name;
+
+  if (businessSuspended) {
+    return (
+      <div className="min-h-screen bg-brand-light flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-brand-dark">Reservas no disponibles</h1>
+          <p className="text-sm text-brand-gray mt-2">{businessName ? `${businessName} no está` : "Este negocio no está"} recibiendo reservas por el momento.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-brand-light text-brand-dark">
       {/* Header */}
       <div className="border-b border-gray-100 py-4 px-6 flex items-center justify-between bg-white">
         <div className="flex-1" />
         <div className="text-center">
-          {businessLogoUrl ? (
-            <img src={businessLogoUrl} alt={businessName || "Logo"} className="h-12 mx-auto object-contain" />
+          {showProfile ? (
+            <p className="text-xs text-brand-blue uppercase tracking-widest font-medium">Agendar hora</p>
           ) : (
-            <img src="/logo-horizontal.png" alt="re-booking" className="h-10 mx-auto" />
+            <>
+              {businessLogoUrl ? (
+                <img src={businessLogoUrl} alt={businessName || "Logo"} className="h-12 mx-auto object-contain" />
+              ) : (
+                <img src="/logo-horizontal.png" alt="re-booking" className="h-10 mx-auto" />
+              )}
+              <p className="text-xs text-brand-blue uppercase tracking-widest mt-2 font-medium">
+                {businessName || "Agendar Hora"}
+              </p>
+            </>
           )}
-          <p className="text-xs text-brand-blue uppercase tracking-widest mt-2 font-medium">
-            {businessName || "Agendar Hora"}
-          </p>
         </div>
         <div className="flex-1 flex justify-end">
           <button onClick={async () => {
@@ -298,6 +350,19 @@ export default function BookingPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
+
+        {/* Perfil del negocio (banner, logo, estrellas, dirección, cómo llegar…) */}
+        {showProfile && businessInfo && <BusinessProfile info={businessInfo} />}
+
+        {/* Botón pequeño para cambiar de vista (solo si el negocio eligió "ambas") */}
+        {step === "barber" && timeViewAllowed && professionalViewAllowed && (
+          <div className="mb-6 flex justify-center">
+            <div className="inline-flex rounded-full border border-gray-200 bg-white p-1 text-xs font-semibold shadow-sm">
+              <button onClick={() => setViewMode("time")} className={`rounded-full px-4 py-1.5 transition ${activeView === "time" ? "bg-brand-blue text-white" : "text-brand-gray"}`}>Por horario</button>
+              <button onClick={() => setViewMode("professional")} className={`rounded-full px-4 py-1.5 transition ${activeView === "professional" ? "bg-brand-blue text-white" : "text-brand-gray"}`}>Por profesional</button>
+            </div>
+          </div>
+        )}
 
         {/* Progress indicator */}
         {step !== "confirmed" && (
@@ -392,8 +457,13 @@ export default function BookingPage() {
           </div>
         )}
 
+        {/* Vista por horario: servicio → día y hora → profesional disponible */}
+        {step === "barber" && activeView === "time" && (
+          <TimeFirstFlow tenantSlug={tenantSlugState} closedWeekdays={closedWeekdays} onPick={handleTimePick} />
+        )}
+
         {/* Step 1: Barber (PRIMERO) */}
-        {step === "barber" && (
+        {step === "barber" && activeView === "professional" && (
           <div>
             <h2 className="text-2xl font-bold mb-2">Elige tu profesional</h2>
             <p className="text-brand-gray mb-6">Selecciona un miembro del equipo</p>

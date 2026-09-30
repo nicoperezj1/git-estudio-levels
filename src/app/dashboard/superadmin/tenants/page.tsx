@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { BUSINESS_CATEGORIES, businessCategoryLabel } from "@/lib/business-categories";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { formatCurrency } from "@/lib/utils";
@@ -16,6 +17,10 @@ interface Tenant {
   admin_name: string | null;
   phone: string | null;
   max_professionals: number;
+  whatsapp_quota_override: number | null;
+  email_quota_override: number | null;
+  business_category: string | null;
+  client_files_enabled: boolean;
   trial_ends_at: string | null;
   active: boolean;
   created_at: string;
@@ -38,12 +43,18 @@ const planColors: Record<string, string> = {
 export default function SuperAdminTenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  // Cambio rapido de plan (Nico, 26-sep, item 33: "poder ver facil el plan actual y
+  // cambiarlo desde ahi") — antes solo se podia cambiar el plan abriendo el modal
+  // completo de Editar. Este id marca que negocio esta guardando su cambio de plan.
+  const [changingPlanId, setChangingPlanId] = useState<string | null>(null);
+  // Filtro por rubro (Nico, 28-sep): "" = todos, "none" = sin clasificar.
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createdInfo, setCreatedInfo] = useState<{ email: string; password: string; slug: string } | null>(null);
   const [form, setForm] = useState({
-    name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "basic",
-    logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "",
+    name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", city: "", rut_empresa: "", plan: "basic",
+    logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "",
   });
   const { showToast } = useToast();
   const { switchTenant } = useTenant();
@@ -86,6 +97,10 @@ export default function SuperAdminTenantsPage() {
       plan: t.plan,
       status: t.status,
       max_professionals: t.max_professionals,
+      whatsapp_quota_override: t.whatsapp_quota_override,
+      email_quota_override: t.email_quota_override,
+      business_category: t.business_category || "",
+      client_files_enabled: !!t.client_files_enabled,
     });
   };
 
@@ -108,6 +123,33 @@ export default function SuperAdminTenantsPage() {
       fetchTenants();
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const changePlanQuick = async (t: Tenant, newPlan: string) => {
+    if (newPlan === t.plan) return;
+    const previous = t.plan;
+    setChangingPlanId(t.id);
+    // Optimista: refleja el cambio al toque, revierte si falla.
+    setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, plan: newPlan } : x)));
+    try {
+      const res = await fetch(`/api/superadmin/tenants/${t.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, plan: previous } : x)));
+        showToast(data.error || "No se pudo cambiar el plan", "error");
+        return;
+      }
+      showToast(`Plan de ${t.name} cambiado a ${newPlan}`, "success");
+    } catch {
+      setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, plan: previous } : x)));
+      showToast("No se pudo cambiar el plan", "error");
+    } finally {
+      setChangingPlanId(null);
     }
   };
 
@@ -191,7 +233,7 @@ export default function SuperAdminTenantsPage() {
     if (res.ok) {
       setCreatedInfo({ email: form.admin_email, password: data.temp_password, slug: form.slug });
       setShowCreate(false);
-      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "" });
+      setForm({ name: "", slug: "", admin_email: "", admin_name: "", phone: "", address: "", city: "", rut_empresa: "", plan: "starter", logo_url: "", website: "", social_media: "", trial_days: "15", max_professionals: "", business_category: "" });
       fetchTenants();
       showToast("Empresa creada exitosamente", "success");
     } else {
@@ -239,6 +281,32 @@ export default function SuperAdminTenantsPage() {
         </div>
       </div>
 
+      {/* Negocios por rubro (Nico, 28-sep): cuantos hay de barberia, estetica, etc. Clic en
+          un rubro filtra la lista de abajo. */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <p className="text-xs font-medium text-brand-gray mb-2">Negocios por rubro</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setCategoryFilter("")}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium ${categoryFilter === "" ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          >
+            Todos ({tenants.length})
+          </button>
+          {[...BUSINESS_CATEGORIES.map((c) => ({ value: c.value as string, label: c.label as string })), { value: "none", label: "Sin clasificar" }]
+            .map((c) => ({ ...c, count: tenants.filter((t) => (c.value === "none" ? !t.business_category : t.business_category === c.value)).length }))
+            .filter((c) => c.count > 0 || categoryFilter === c.value)
+            .map((c) => (
+              <button
+                key={c.value}
+                onClick={() => setCategoryFilter(c.value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium ${categoryFilter === c.value ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >
+                {c.label} ({c.count})
+              </button>
+            ))}
+        </div>
+      </div>
+
       {/* Created info banner */}
       {createdInfo && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
@@ -274,7 +342,7 @@ export default function SuperAdminTenantsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {tenants.map((t) => (
+          {tenants.filter((t) => !categoryFilter || (categoryFilter === "none" ? !t.business_category : t.business_category === categoryFilter)).map((t) => (
             <div key={t.id} className="bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -284,15 +352,26 @@ export default function SuperAdminTenantsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-brand-dark">{t.name}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${planColors[t.plan] || ""}`}>
-                        {t.plan}
-                      </span>
+                      {/* Cambio rapido de plan (item 33): antes solo era una etiqueta de
+                          solo lectura, habia que abrir Editar para cambiarlo. */}
+                      <select
+                        value={t.plan}
+                        disabled={changingPlanId === t.id}
+                        onChange={(e) => changePlanQuick(t, e.target.value)}
+                        title="Cambiar plan"
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium border-0 cursor-pointer disabled:opacity-50 ${planColors[t.plan] || ""}`}
+                      >
+                        <option value="basic">basic</option>
+                        <option value="starter">starter</option>
+                        <option value="pro">pro</option>
+                        <option value="enterprise">enterprise</option>
+                      </select>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[t.status] || ""}`}>
                         {t.status === "trial" ? `Trial (${daysLeft(t.trial_ends_at)}d)` : t.status}
                       </span>
                     </div>
                     <p className="text-xs text-brand-gray mt-0.5">
-                      {t.admin_email} · /{t.slug} · {t.max_professionals} profesionales max
+                      {t.admin_email} · /{t.slug} · {t.max_professionals} profesionales max · {businessCategoryLabel(t.business_category)}
                     </p>
                   </div>
                 </div>
@@ -405,6 +484,13 @@ export default function SuperAdminTenantsPage() {
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" />
                 </div>
                 <div>
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Ciudad</label>
+                  <input type="text" value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    placeholder="Ej: Santiago, Valparaíso, Concepción"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none" />
+                </div>
+                <div>
                   <label className="text-xs font-medium text-brand-gray block mb-1">Logo (URL)</label>
                   <input type="url" value={form.logo_url}
                     onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
@@ -448,6 +534,16 @@ export default function SuperAdminTenantsPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Rubro del negocio</label>
+                  <select value={form.business_category} onChange={(e) => setForm({ ...form, business_category: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                    <option value="">Sin clasificar</option>
+                    {BUSINESS_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-brand-gray block mb-1">
@@ -511,6 +607,10 @@ export default function SuperAdminTenantsPage() {
                 <div>
                   <p className="text-[10px] text-brand-gray uppercase font-medium">Direccion</p>
                   <p className="text-brand-dark">{viewingContact.address || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-brand-gray uppercase font-medium">Ciudad</p>
+                  <p className="text-brand-dark">{(viewingContact as any).city || "—"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-brand-gray uppercase font-medium">RUT empresa</p>
@@ -596,6 +696,44 @@ export default function SuperAdminTenantsPage() {
                   onChange={(e) => setEditForm({ ...editForm, max_professionals: Number(e.target.value) })}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
               </div>
+              {/* Cupos de mensajeria (Nico, 27-sep): override por negocio, mismo patron que
+                  Max. profesionales — vacio = usa el default del plan elegido arriba. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Cupo WhatsApp/mes</label>
+                  <input type="number" min={0} placeholder="Default del plan"
+                    value={editForm.whatsapp_quota_override ?? ""}
+                    onChange={(e) => setEditForm({ ...editForm, whatsapp_quota_override: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-brand-gray block mb-1">Cupo correos/mes</label>
+                  <input type="number" min={0} placeholder="Default del plan"
+                    value={editForm.email_quota_override ?? ""}
+                    onChange={(e) => setEditForm({ ...editForm, email_quota_override: e.target.value === "" ? null : Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+                </div>
+              </div>
+              {/* Rubro + carga de documentos en la ficha de cliente (Nico, 28-sep). */}
+              <div>
+                <label className="text-xs font-medium text-brand-gray block mb-1">Rubro del negocio</label>
+                <select value={editForm.business_category || ""} onChange={(e) => setEditForm({ ...editForm, business_category: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                  <option value="">Sin clasificar</option>
+                  {BUSINESS_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-start gap-2 text-sm text-brand-dark cursor-pointer">
+                <input type="checkbox" checked={!!editForm.client_files_enabled}
+                  onChange={(e) => setEditForm({ ...editForm, client_files_enabled: e.target.checked })}
+                  className="mt-0.5" />
+                <span>
+                  Habilitar carga de archivos en la ficha de cliente
+                  <span className="block text-[10px] text-brand-gray">PDF/Word por cliente. Pensado para clinicas, kinesiologia y estetica; para barberia no hace falta.</span>
+                </span>
+              </label>
             </div>
             <div className="flex gap-2 pt-4">
               <button onClick={() => setEditingTenant(null)}

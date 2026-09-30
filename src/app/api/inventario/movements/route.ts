@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { tenantHasFeature } from "@/lib/plan-features";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -45,6 +46,12 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const { tenantId: resolved } = await resolveTenantForRequest(searchParams.get("tenantId"));
     tenantId = resolved && resolved !== "ALL" ? resolved : null;
+  }
+
+  // Item 34: "Inventario" (control de stock/movimientos) es feature de plan (Pro+). No se
+  // gatea la venta de productos en si (POS), solo el registro de movimientos de stock.
+  if (!(await tenantHasFeature(tenantId, "inventory"))) {
+    return NextResponse.json({ error: "El control de inventario no esta incluido en tu plan actual. Mejora tu plan para usarlo." }, { status: 403 });
   }
 
   const needsApproval = requireApproval !== false && type !== "out_sale";

@@ -56,12 +56,22 @@ export default function RegistroPage() {
     }
 
     // Link to tenant via invite code
+    // Bug (reportado por Nico, 27-sep): esta llamada no revisaba la respuesta — si el
+    // negocio ya alcanzo su limite de profesionales (ver /api/invite-codes/verify), la
+    // cuenta de Auth ya creada arriba quedaba sin tenant_id/role asignado y el usuario
+    // igual era enviado a /dashboard, con una cuenta rota y sin ningun aviso del error.
     if (authData.user) {
-      await fetch("/api/invite-codes/verify", {
+      const linkRes = await fetch("/api/invite-codes/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: inviteCode, userId: authData.user.id }),
       });
+      const linkData = await linkRes.json();
+      if (!linkRes.ok) {
+        setError(linkData.error || "No se pudo vincular la cuenta al negocio.");
+        setLoading(false);
+        return;
+      }
     }
 
     setLoading(false);

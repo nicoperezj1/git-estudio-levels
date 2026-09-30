@@ -39,6 +39,7 @@ export default function TenantBookingPage() {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     // Skip known routes
@@ -54,6 +55,8 @@ export default function TenantBookingPage() {
         if (data.tenant) {
           setTenant(data.tenant);
           setBarbers(data.barbers || []);
+        } else if (data.error === "suspended") {
+          setUnavailable(true);
         } else {
           setNotFound(true);
         }
@@ -65,6 +68,17 @@ export default function TenantBookingPage() {
     return (
       <div className="min-h-screen bg-brand-light flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-brand-blue/20 border-t-brand-blue rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <div className="min-h-screen bg-brand-light flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-brand-dark">Reservas no disponibles</h1>
+          <p className="text-sm text-brand-gray mt-2">Este negocio no está recibiendo reservas por el momento.</p>
+        </div>
       </div>
     );
   }

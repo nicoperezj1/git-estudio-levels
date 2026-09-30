@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   // Find tenant by slug
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, slug, logo_url, phone, address, active")
+    .select("id, name, slug, logo_url, phone, address, active, status")
     .eq("slug", slug)
     .eq("active", true)
     .single();
@@ -42,6 +42,10 @@ export async function GET(req: NextRequest) {
       tenant: { id: branch.tenant_id, name: branch.name, slug: branch.slug, logo_url: null, phone: branch.phone, address: branch.address },
       barbers: barbers || [],
     });
+  }
+
+  if (tenant.status === "suspended") {
+    return NextResponse.json({ tenant: null, error: "suspended" });
   }
 
   // Get barbers for this tenant

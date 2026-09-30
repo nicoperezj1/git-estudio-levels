@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
+import {
+  ChevronLeft, Phone, Mail, MessageCircle, CalendarPlus, Camera, ImageIcon, FileText, Pin, X,
+  Wallet, Receipt, CalendarCheck, UserX, Clock, Scissors, Upload, StickyNote, TrendingUp, Percent, UserCheck,
+} from "lucide-react";
+import { Panel, StatCard, primaryButton, ghostButton, inputClass } from "@/components/ui/premium";
 
 interface ClientData {
   client: {
@@ -75,12 +80,66 @@ export default function ClienteDetailPage() {
   const [notes, setNotes] = useState<Array<{ id: string; note: string; pinned: boolean; created_at: string; created_by_profile: { name: string } | null }>>([]);
   const [newNote, setNewNote] = useState("");
   const [pinNote, setPinNote] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const [photos, setPhotos] = useState<Array<{ id: string; url: string; caption: string | null; created_at: string; barber: { name: string } | null }>>([]);
   const [uploading, setUploading] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Documentos PDF/Word del cliente (Nico, 28-sep). Solo se muestra la seccion si el
+  // negocio tiene habilitada la carga de archivos (tenants.client_files_enabled).
+  const [docsEnabled, setDocsEnabled] = useState(false);
+  const [documents, setDocuments] = useState<Array<{ id: string; file_name: string; size_bytes: number | null; created_at: string; uploaded_by_name: string | null; url: string | null }>>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docError, setDocError] = useState("");
+
+  const loadDocuments = async () => {
+    try {
+      const res = await fetch(`/api/clients/${params.id}/documents`, { cache: "no-store" });
+      const d = await res.json();
+      setDocsEnabled(!!d.enabled);
+      setDocuments(Array.isArray(d.documents) ? d.documents : []);
+    } catch {
+      setDocsEnabled(false);
+    }
+  };
+
+  const uploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDocError("");
+    setUploadingDoc(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`/api/clients/${params.id}/documents`, { method: "POST", body: formData });
+      if (res.ok) {
+        await loadDocuments();
+      } else {
+        const r = await res.json().catch(() => ({}));
+        setDocError(r.error || "No se pudo subir el archivo");
+      }
+    } catch {
+      setDocError("No se pudo subir el archivo. Revisa tu conexion.");
+    } finally {
+      setUploadingDoc(false);
+      e.target.value = "";
+    }
+  };
+
+  const deleteDocument = async (documentId: string) => {
+    if (!window.confirm("¿Eliminar este documento? Esta accion no se puede deshacer.")) return;
+    const res = await fetch(`/api/clients/${params.id}/documents?documentId=${documentId}`, { method: "DELETE" });
+    if (res.ok) {
+      setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+    } else {
+      const r = await res.json().catch(() => ({}));
+      setDocError(r.error || "No se pudo eliminar el documento");
+    }
+  };
 
   useEffect(() => {
     if (params.id) {
+      loadDocuments();
       fetch(`/api/clients/${params.id}`)
         .then((r) => r.json())
         .then((d) => { if (d.client) setData(d); })
@@ -94,22 +153,52 @@ export default function ClienteDetailPage() {
     }
   }, [params.id]);
 
+  const reloadNotes = async () => {
+    const res = await fetch(`/api/clients/${params.id}/notes`);
+    const n = await res.json();
+    setNotes(Array.isArray(n) ? n : []);
+  };
+
   const addNote = async () => {
     if (!newNote.trim()) return;
-    await fetch(`/api/clients/${params.id}/notes`, {
+    const res = await fetch(`/api/clients/${params.id}/notes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ note: newNote, pinned: pinNote }),
     });
+    if (!res.ok) { alert("No se pudo guardar la nota. Intenta de nuevo."); return; }
     setNewNote("");
     setPinNote(false);
-    const res = await fetch(`/api/clients/${params.id}/notes`);
-    setNotes(await res.json());
+    await reloadNotes();
+  };
+
+  const saveEditedNote = async (noteId: string) => {
+    if (!editingText.trim()) return;
+    const res = await fetch(`/api/clients/${params.id}/notes`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteId, note: editingText }),
+    });
+    if (!res.ok) { alert("No se pudo actualizar la nota."); return; }
+    setEditingNoteId(null);
+    setEditingText("");
+    await reloadNotes();
+  };
+
+  const togglePinNote = async (noteId: string, pinned: boolean) => {
+    const res = await fetch(`/api/clients/${params.id}/notes`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteId, pinned: !pinned }),
+    });
+    if (res.ok) await reloadNotes();
   };
 
   const deleteNote = async (noteId: string) => {
-    await fetch(`/api/clients/${params.id}/notes?noteId=${noteId}`, { method: "DELETE" });
-    setNotes(notes.filter((n) => n.id !== noteId));
+    if (!confirm("¿Eliminar esta nota?")) return;
+    const res = await fetch(`/api/clients/${params.id}/notes?noteId=${noteId}`, { method: "DELETE" });
+    if (!res.ok) { alert("No se pudo eliminar la nota."); return; }
+    setNotes((prev) => prev.filter((n) => n.id !== noteId));
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,296 +235,376 @@ export default function ClienteDetailPage() {
 
   const { client, stats, appointments, transactions } = data;
 
+  const initials = client.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const tags: string[] = (client as any).personality_tags || [];
+  const attendanceTone = stats.attendanceRate >= 80 ? "green" : stats.attendanceRate >= 50 ? "amber" : "red";
+  const sinceLabel = new Date(client.created_at).toLocaleDateString("es-CL", { month: "long", year: "numeric" });
+
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Back button */}
-      <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1">
-        ← Volver a clientes
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
+      {/* Volver */}
+      <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-sm font-medium text-brand-gray transition-colors hover:text-brand-blue">
+        <ChevronLeft className="h-4 w-4" strokeWidth={2} /> Volver a clientes
       </button>
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-2xl font-bold text-blue-600">
-            {client.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+      {/* Hero del cliente */}
+      <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 md:p-7">
+        <span className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-brand-blue/20 to-emerald-400/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4 md:gap-5">
+            <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-blue to-emerald-500 text-3xl font-black text-white shadow-lg shadow-brand-blue/25">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-bold tracking-tight text-brand-dark md:text-3xl">{client.name}</h1>
+              <p className="mt-0.5 text-sm text-brand-gray">
+                Cliente desde <span className="inline-block first-letter:uppercase">{sinceLabel}</span>
+                {stats.totalVisits === 0 && (
+                  <span className="ml-2 rounded-md bg-emerald-500 px-1.5 py-0.5 align-middle text-[9px] font-extrabold uppercase tracking-wide text-white">Nuevo</span>
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-brand-dark">
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-brand-gray" strokeWidth={1.75} />
+                  {client.phone || <span className="text-brand-gray">Sin teléfono</span>}
+                </span>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 flex-shrink-0 text-brand-gray" strokeWidth={1.75} />
+                  <span className="truncate">{client.email || <span className="text-brand-gray">Sin email</span>}</span>
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{client.name}</h1>
-            <p className="text-sm text-gray-500">Cliente desde {new Date(client.created_at).toLocaleDateString("es-CL", { month: "long", year: "numeric" })}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {client.phone && (
-            <a href={`https://wa.me/${client.phone.replace(/\D/g, "")}`} target="_blank"
-              className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1">
-              WhatsApp
-            </a>
-          )}
-          {client.email && (
-            <a href={`mailto:${client.email}`}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-              Email
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Contact info */}
-      <div className="bg-white rounded-lg shadow p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-        <div>
-          <p className="text-gray-400 text-xs uppercase">Email</p>
-          <p className="font-medium">{client.email || "Sin email"}</p>
-        </div>
-        <div>
-          <p className="text-gray-400 text-xs uppercase">Telefono</p>
-          <p className="font-medium">{client.phone || "Sin telefono"}</p>
-        </div>
-        <div>
-          <p className="text-gray-400 text-xs uppercase">Notas</p>
-          <p className="font-medium">{client.notes || "Sin notas"}</p>
-        </div>
-      </div>
-
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">{stats.totalVisits}</p>
-          <p className="text-xs text-gray-500">Visitas</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalSpent)}</p>
-          <p className="text-xs text-gray-500">Total Gastado</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className="text-2xl font-bold text-purple-600">{formatCurrency(stats.averageSpend)}</p>
-          <p className="text-xs text-gray-500">Ticket Promedio</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className={`text-2xl font-bold ${stats.attendanceRate >= 80 ? "text-green-600" : stats.attendanceRate >= 50 ? "text-yellow-600" : "text-red-600"}`}>
-            {stats.attendanceRate}%
-          </p>
-          <p className="text-xs text-gray-500">Asistencia</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className="text-2xl font-bold text-red-500">{stats.totalNoShows}</p>
-          <p className="text-xs text-gray-500">No Shows</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className="text-lg font-bold text-gray-800">{stats.favoriteBarber?.name || "-"}</p>
-          <p className="text-xs text-gray-500">Barbero Favorito</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 text-center">
-          <p className="text-lg font-bold text-gray-800">
-            {stats.lastVisit ? new Date(stats.lastVisit).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) : "Nunca"}
-          </p>
-          <p className="text-xs text-gray-500">Ultima Visita</p>
-        </div>
-      </div>
-
-      {/* Client personality tags */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="font-bold text-gray-800 mb-3">Perfil del Cliente</h3>
-        <div className="flex flex-wrap gap-2">
-          {["Reservado", "Extrovertido", "Puntual", "Impuntual", "VIP", "Conversador", "Apurado", "Detallista"].map((tag) => {
-            const isActive = (client as any).personality_tags?.includes(tag.toLowerCase());
-            return (
-              <button key={tag} onClick={async () => {
-                const current: string[] = (client as any).personality_tags || [];
-                const updated = isActive ? current.filter((t: string) => t !== tag.toLowerCase()) : [...current, tag.toLowerCase()];
-                await fetch(`/api/clients/${params.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personality_tags: updated }) });
-                setData({ ...data!, client: { ...client, personality_tags: updated } as any });
-              }}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${isActive ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                {tag}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Favorite services */}
-      {stats.favoriteServices.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="font-bold text-gray-800 mb-3">Servicios Favoritos</h3>
           <div className="flex flex-wrap gap-2">
-            {stats.favoriteServices.map((s) => (
-              <span key={s.name} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm">
-                {s.name} <span className="text-blue-400">({s.count}x)</span>
-              </span>
-            ))}
+            <button onClick={() => router.push("/dashboard/calendario")} className={primaryButton}>
+              <CalendarPlus className="h-4 w-4" strokeWidth={2} /> Agendar
+            </button>
+            {client.phone && (
+              <a href={`https://wa.me/${client.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2.5 text-sm font-bold text-emerald-500 ring-1 ring-emerald-500/20 transition-colors hover:bg-emerald-500/20">
+                <MessageCircle className="h-4 w-4" strokeWidth={2} /> WhatsApp
+              </a>
+            )}
+            {client.email && (
+              <a href={`mailto:${client.email}`} className={ghostButton}>
+                <Mail className="h-4 w-4" strokeWidth={2} /> Email
+              </a>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Photos of cuts */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-gray-800">Fotos de Trabajos</h3>
-            <p className="text-xs text-gray-400">Referencia visual del estilo del cliente</p>
-          </div>
-          {/* Punto 11 (Pablo): en celular "capture" fuerza la camara y no deja elegir
-              desde la galeria. Se agregan dos botones separados: uno que abre la camara
-              directo (capture="environment") y otro sin ese atributo, que en mobile abre
-              el selector de fotos/galeria del dispositivo. */}
-          <div className={`flex gap-2 ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
-            <label className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 cursor-pointer whitespace-nowrap">
-              {uploading ? "Subiendo..." : "📷 Tomar Foto"}
-              <input type="file" accept="image/*" capture="environment" onChange={uploadPhoto} className="hidden" />
-            </label>
-            <label className="px-3 py-2 bg-indigo-50 text-indigo-700 text-sm rounded-lg hover:bg-indigo-100 cursor-pointer whitespace-nowrap">
-              {uploading ? "Subiendo..." : "🖼️ Elegir de Galería"}
-              <input type="file" accept="image/*" onChange={uploadPhoto} className="hidden" />
-            </label>
-          </div>
-        </div>
-        <div className="p-4">
-          {photos.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-400 text-4xl mb-2">📸</p>
-              <p className="text-gray-400 text-sm">Sin fotos de trabajos</p>
-              <p className="text-gray-400 text-xs">Sube una foto despues de cada atencion para tener referencia</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {photos.map((photo) => (
-                <div key={photo.id} className="relative group">
-                  <img
-                    src={photo.url}
-                    alt={photo.caption || "Corte"}
-                    onClick={() => setLightboxUrl(photo.url)}
-                    className="w-full h-32 object-cover rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent rounded-b-xl p-2">
-                    <p className="text-[10px] text-white">
-                      {new Date(photo.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
-                      {photo.barber?.name && ` · ${photo.barber.name}`}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => deletePhoto(photo.id)}
-                    className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                  >✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {client.notes && (
+          <p className="relative mt-4 rounded-2xl bg-brand-light px-4 py-3 text-sm text-brand-dark">{client.notes}</p>
+        )}
       </div>
 
-      {/* Two columns: appointments & transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Metricas */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total gastado" value={formatCurrency(stats.totalSpent)} Icon={Wallet} hero className="col-span-2 lg:col-span-1" hint={`${stats.totalVisits} visitas`} />
+        <StatCard label="Ticket promedio" value={formatCurrency(stats.averageSpend)} Icon={TrendingUp} tone="violet" />
+        <StatCard label="Visitas" value={stats.totalVisits} Icon={CalendarCheck} tone="teal" />
+        <StatCard label="Asistencia" value={`${stats.attendanceRate}%`} Icon={Percent} tone={attendanceTone as any} hint={`${stats.totalNoShows} no asistió · ${stats.totalCancelled} canceladas`} />
+      </div>
 
-        {/* Internal Notes */}
-        <div className="bg-white rounded-lg shadow lg:col-span-2">
-          <div className="p-4 border-b">
-            <h3 className="font-bold text-gray-800">Notas Internas</h3>
-            <p className="text-xs text-gray-400">Preferencias y observaciones (solo visibles para el equipo)</p>
-          </div>
-          <div className="p-4">
-            {/* Add note */}
-            <div className="flex gap-2 mb-4">
-              <input type="text" value={newNote} onChange={(e) => setNewNote(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addNote()}
-                placeholder="Ej: Siempre pide fade bajo con linea..."
-                className="flex-1 border rounded-lg px-3 py-2 text-sm" />
-              <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                <input type="checkbox" checked={pinNote} onChange={(e) => setPinNote(e.target.checked)} className="rounded" />
-                Fijar
-              </label>
-              <button onClick={addNote} disabled={!newNote.trim()}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-                Agregar
-              </button>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Columna principal */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Notas internas */}
+          <Panel title="Notas internas" subtitle="Preferencias y observaciones (solo visibles para el equipo)">
+            {/* Enter hace salto de línea; la nota solo se guarda al apretar Agregar */}
+            <div className="space-y-2">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                rows={3}
+                placeholder="Ej: Prefiere atención por la tarde y avisar por WhatsApp..."
+                className={`${inputClass} w-full resize-y`}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-brand-gray">
+                  <input type="checkbox" checked={pinNote} onChange={(e) => setPinNote(e.target.checked)} className="rounded" />
+                  <Pin className="h-3.5 w-3.5" strokeWidth={2} /> Fijar arriba
+                </label>
+                <button onClick={addNote} disabled={!newNote.trim()} className={primaryButton}>Agregar</button>
+              </div>
             </div>
-            {/* Notes list */}
             {notes.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-4">Sin notas. Agrega preferencias del cliente aqui.</p>
+              <div className="mt-4 flex flex-col items-center rounded-2xl border border-dashed border-gray-200 py-8 text-center">
+                <StickyNote className="mb-2 h-6 w-6 text-brand-gray" strokeWidth={1.5} />
+                <p className="text-sm text-brand-gray">Sin notas todavía. Agrega las preferencias del cliente.</p>
+              </div>
             ) : (
-              <div className="space-y-2">
+              <div className="mt-4 space-y-2">
                 {notes.map((n) => (
-                  <div key={n.id} className={`flex items-start justify-between gap-3 p-3 rounded-lg ${n.pinned ? "bg-yellow-50 border border-yellow-200" : "bg-gray-50"}`}>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        {n.pinned && <span className="text-yellow-500 text-xs">📌</span>}
-                        <p className="text-sm text-gray-800">{n.note}</p>
+                  <div key={n.id} className={`rounded-2xl border p-3.5 ${n.pinned ? "border-amber-400/40 bg-amber-500/10" : "border-gray-100 bg-brand-light"}`}>
+                    {editingNoteId === n.id ? (
+                      <div className="space-y-2">
+                        <textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} rows={4} autoFocus className={`${inputClass} w-full resize-y`} />
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => { setEditingNoteId(null); setEditingText(""); }} className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-brand-gray hover:bg-white">Cancelar</button>
+                          <button onClick={() => saveEditedNote(n.id)} disabled={!editingText.trim()} className={primaryButton}>Guardar</button>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(n.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
-                        {n.created_by_profile && ` · ${n.created_by_profile.name}`}
-                      </p>
-                    </div>
-                    <button onClick={() => deleteNote(n.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button>
+                    ) : (
+                      <>
+                        <p className="flex items-start gap-1.5 whitespace-pre-wrap break-words text-sm text-brand-dark">
+                          {n.pinned && <Pin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" strokeWidth={2} />}
+                          <span className="min-w-0">{n.note}</span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[11px] text-brand-gray">
+                            {new Date(n.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
+                            {n.created_by_profile && ` · ${n.created_by_profile.name}`}
+                          </p>
+                          <div className="flex items-center gap-3 text-xs font-semibold">
+                            <button onClick={() => togglePinNote(n.id, n.pinned)} className="text-brand-gray hover:text-amber-600">{n.pinned ? "Desfijar" : "Fijar"}</button>
+                            <button onClick={() => { setEditingNoteId(n.id); setEditingText(n.note); }} className="text-brand-gray hover:text-brand-dark">Editar</button>
+                            <button onClick={() => deleteNote(n.id)} className="text-brand-gray hover:text-red-500">Eliminar</button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </Panel>
 
-        {/* Appointments history */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b">
-            <h3 className="font-bold text-gray-800">Historial de Citas ({appointments.length})</h3>
-          </div>
-          <div className="divide-y max-h-[400px] overflow-y-auto">
-            {appointments.length === 0 ? (
-              <p className="p-4 text-gray-400 text-center">Sin citas registradas</p>
-            ) : appointments.map((appt: any) => (
-              <div key={appt.id} className="p-3 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">
-                      {new Date(appt.date).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[appt.status] || ""}`}>
-                      {statusLabels[appt.status] || appt.status}
+          {/* Fotos */}
+          <Panel
+            title="Fotos y registro visual"
+            subtitle="Antes y después, evolución o referencias del cliente"
+            action={
+              /* Punto 11 (Pablo): en celular "capture" fuerza la camara; se dejan dos botones,
+                 uno abre la camara directo y el otro el selector de galeria. */
+              <div className={`flex gap-2 ${uploading ? "pointer-events-none opacity-50" : ""}`}>
+                <label className={`${primaryButton} cursor-pointer !px-3 !py-2 text-xs`}>
+                  <Camera className="h-4 w-4" strokeWidth={2} /> {uploading ? "Subiendo..." : "Tomar foto"}
+                  <input type="file" accept="image/*" capture="environment" onChange={uploadPhoto} className="hidden" />
+                </label>
+                <label className={`${ghostButton} cursor-pointer !px-3 !py-2 text-xs`}>
+                  <ImageIcon className="h-4 w-4" strokeWidth={2} /> Galería
+                  <input type="file" accept="image/*" onChange={uploadPhoto} className="hidden" />
+                </label>
+              </div>
+            }
+          >
+            {photos.length === 0 ? (
+              <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 py-10 text-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue">
+                  <Camera className="h-6 w-6" strokeWidth={1.5} />
+                </div>
+                <p className="text-sm font-semibold text-brand-dark">Aún no hay fotos</p>
+                <p className="mt-1 max-w-xs text-xs text-brand-gray">Sube una foto después de cada atención para llevar el registro de su evolución.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                {photos.map((photo) => (
+                  <div key={photo.id} className="group relative overflow-hidden rounded-2xl">
+                    <img
+                      src={photo.url}
+                      alt={photo.caption || "Foto del cliente"}
+                      onClick={() => setLightboxUrl(photo.url)}
+                      className="h-36 w-full cursor-pointer object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2.5">
+                      <p className="text-[10px] font-medium text-white">
+                        {new Date(photo.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
+                        {photo.barber?.name && ` · ${photo.barber.name}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => deletePhoto(photo.id)}
+                      aria-label="Eliminar foto"
+                      className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"
+                    >
+                      <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* Historial de citas */}
+          <Panel title={`Historial de citas (${appointments.length})`} flush>
+            <div className="max-h-[420px] divide-y divide-gray-50 overflow-y-auto px-5 pb-3">
+              {appointments.length === 0 ? (
+                <p className="py-8 text-center text-sm text-brand-gray">Sin citas registradas</p>
+              ) : appointments.map((appt: any) => (
+                <div key={appt.id} className="flex items-center gap-3 py-3">
+                  <div className="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-brand-light">
+                    <span className="text-sm font-bold leading-none tabular-nums text-brand-dark">{new Date(appt.date + "T12:00:00").getDate()}</span>
+                    <span className="mt-0.5 text-[9px] font-semibold uppercase text-brand-gray">
+                      {new Date(appt.date + "T12:00:00").toLocaleDateString("es-CL", { month: "short" }).replace(".", "")}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {appt.services?.map((s: any) => s.service?.name).join(", ")} · {appt.barber?.name}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-brand-dark">
+                      {appt.services?.map((s: any) => s.service?.name).join(", ") || "Sin servicio"}
+                    </p>
+                    <p className="truncate text-xs text-brand-gray">{appt.barber?.name}</p>
+                  </div>
+                  <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusColors[appt.status] || ""}`}>
+                      {statusLabels[appt.status] || appt.status}
+                    </span>
+                    {/* HH:MM tal cual viene guardado (toLocaleTimeString re-aplicaba el offset UTC-3). */}
+                    <span className="text-[11px] tabular-nums text-brand-gray">{appt.start_time?.match(/(\d{2}:\d{2})/)?.[1] || ""}</span>
+                  </div>
                 </div>
-                <span className="text-xs text-gray-400">
-                  {/* HH:MM straight from the stored string; new Date(...).toLocaleTimeString
-                      re-applied the UTC-3 offset and showed the wrong hour. */}
-                  {appt.start_time?.match(/(\d{2}:\d{2})/)?.[1] || ""}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Panel>
+
+          {/* Historial de compras */}
+          <Panel title={`Historial de compras (${transactions.length})`} flush>
+            <div className="max-h-[420px] divide-y divide-gray-50 overflow-y-auto px-5 pb-3">
+              {transactions.length === 0 ? (
+                <p className="py-8 text-center text-sm text-brand-gray">Sin compras registradas</p>
+              ) : transactions.map((tx: any) => (
+                <div key={tx.id} className="flex items-center gap-3 py-3">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                    <Receipt className="h-5 w-5" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-brand-dark">
+                      {tx.items?.map((i: any) => i.description).join(", ") || "Venta"}
+                    </p>
+                    <p className="text-xs text-brand-gray">
+                      {new Date(tx.created_at).toLocaleDateString("es-CL")} · {paymentLabels[tx.payment_method] || tx.payment_method}
+                    </p>
+                  </div>
+                  <span className="flex-shrink-0 text-sm font-bold tabular-nums text-emerald-500">{formatCurrency(Number(tx.total))}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
         </div>
 
-        {/* Transactions history */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b">
-            <h3 className="font-bold text-gray-800">Historial de Compras ({transactions.length})</h3>
-          </div>
-          <div className="divide-y max-h-[400px] overflow-y-auto">
-            {transactions.length === 0 ? (
-              <p className="p-4 text-gray-400 text-center">Sin compras registradas</p>
-            ) : transactions.map((tx: any) => (
-              <div key={tx.id} className="p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    {tx.items?.map((i: any) => i.description).join(", ") || "Venta"}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(tx.created_at).toLocaleDateString("es-CL")} · {paymentLabels[tx.payment_method] || tx.payment_method}
-                  </p>
-                </div>
-                <span className="text-sm font-bold text-green-600">{formatCurrency(Number(tx.total))}</span>
+        {/* Columna lateral */}
+        <div className="space-y-6">
+          <Panel title="Resumen">
+            <dl className="space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="inline-flex items-center gap-2 text-brand-gray"><UserCheck className="h-4 w-4" strokeWidth={1.75} /> Profesional favorito</dt>
+                <dd className="truncate font-semibold text-brand-dark">{stats.favoriteBarber?.name || "—"}</dd>
               </div>
-            ))}
-          </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="inline-flex items-center gap-2 text-brand-gray"><Clock className="h-4 w-4" strokeWidth={1.75} /> Última visita</dt>
+                <dd className="font-semibold text-brand-dark">
+                  {stats.lastVisit ? new Date(stats.lastVisit).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" }) : "Nunca"}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="inline-flex items-center gap-2 text-brand-gray"><UserX className="h-4 w-4" strokeWidth={1.75} /> No asistió</dt>
+                <dd className="font-semibold tabular-nums text-brand-dark">{stats.totalNoShows}</dd>
+              </div>
+            </dl>
+          </Panel>
+
+          <Panel title="Perfil del cliente" subtitle="Toca para marcar o quitar">
+            <div className="flex flex-wrap gap-2">
+              {["Reservado", "Extrovertido", "Puntual", "Impuntual", "VIP", "Conversador", "Apurado", "Detallista"].map((tag) => {
+                const isActive = tags.includes(tag.toLowerCase());
+                return (
+                  <button key={tag} onClick={async () => {
+                    const current: string[] = (client as any).personality_tags || [];
+                    const updated = isActive ? current.filter((t: string) => t !== tag.toLowerCase()) : [...current, tag.toLowerCase()];
+                    await fetch(`/api/clients/${params.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personality_tags: updated }) });
+                    setData({ ...data!, client: { ...client, personality_tags: updated } as any });
+                  }}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isActive ? "border-transparent bg-brand-blue text-white shadow-md shadow-brand-blue/25" : "border-gray-200 bg-white text-brand-gray hover:border-brand-blue/40 hover:text-brand-dark"
+                    }`}>
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
+
+          {stats.favoriteServices.length > 0 && (
+            <Panel title="Servicios favoritos">
+              <div className="space-y-2.5">
+                {stats.favoriteServices.map((sv) => {
+                  const max = Math.max(...stats.favoriteServices.map((x) => x.count), 1);
+                  return (
+                    <div key={sv.name}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="inline-flex items-center gap-2 font-semibold text-brand-dark">
+                          <Scissors className="h-3.5 w-3.5 text-brand-blue" strokeWidth={2} /> {sv.name}
+                        </span>
+                        <span className="text-xs font-semibold tabular-nums text-brand-gray">{sv.count}x</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-brand-light">
+                        <div className="h-full rounded-full bg-gradient-to-r from-brand-blue to-emerald-500" style={{ width: `${(sv.count / max) * 100}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Panel>
+          )}
+
+          {/* Documentos (PDF / Word) — solo si el negocio lo tiene habilitado. */}
+          {docsEnabled && (
+            <Panel
+              title="Documentos"
+              subtitle="Fichas, exámenes o consentimientos (PDF o Word, hasta 10 MB)"
+              action={
+                <label className={`${primaryButton} cursor-pointer !px-3 !py-2 text-xs ${uploadingDoc ? "pointer-events-none opacity-50" : ""}`}>
+                  <Upload className="h-4 w-4" strokeWidth={2} /> {uploadingDoc ? "Subiendo..." : "Subir"}
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={uploadDocument}
+                    className="hidden"
+                  />
+                </label>
+              }
+            >
+              {docError && <p className="mb-3 text-sm text-red-500">{docError}</p>}
+              {documents.length === 0 ? (
+                <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 py-8 text-center">
+                  <FileText className="mb-2 h-6 w-6 text-brand-gray" strokeWidth={1.5} />
+                  <p className="text-sm text-brand-gray">Sin documentos</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center gap-3 py-2.5">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+                        <FileText className="h-4 w-4" strokeWidth={1.75} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {doc.url ? (
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-semibold text-brand-blue hover:underline">{doc.file_name}</a>
+                        ) : (
+                          <span className="block truncate text-sm font-semibold text-brand-dark">{doc.file_name}</span>
+                        )}
+                        <p className="text-[11px] text-brand-gray">
+                          {new Date(doc.created_at).toLocaleDateString("es-CL", { day: "numeric", month: "short", year: "numeric" })}
+                          {doc.uploaded_by_name && ` · ${doc.uploaded_by_name}`}
+                          {doc.size_bytes ? ` · ${(doc.size_bytes / 1024 / 1024).toFixed(1)} MB` : ""}
+                        </p>
+                      </div>
+                      <button onClick={() => deleteDocument(doc.id)} className="text-xs font-semibold text-red-500 hover:text-red-400">Eliminar</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          )}
         </div>
       </div>
 
       {/* Lightbox */}
       {lightboxUrl && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setLightboxUrl(null)}>
-          <img src={lightboxUrl} alt="Corte" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl" />
-          <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4 text-white text-2xl hover:text-gray-300">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="Foto del cliente" className="max-h-[90vh] max-w-full rounded-2xl shadow-2xl" />
+          <button onClick={() => setLightboxUrl(null)} aria-label="Cerrar" className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
+            <X className="h-6 w-6" />
+          </button>
         </div>
       )}
     </div>

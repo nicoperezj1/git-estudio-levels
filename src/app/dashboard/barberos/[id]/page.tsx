@@ -62,6 +62,7 @@ export default function EditProfessionalPage() {
         name: data.name,
         email: data.email,
         phone: data.phone,
+        birth_date: (data as any).birth_date || null,
         work_mode: data.work_mode,
         commission_rate: data.commission_rate,
         rental_daily_rate: data.rental_daily_rate,
@@ -257,14 +258,14 @@ export default function EditProfessionalPage() {
             // the barber's booking_slug must exist; if either isn't ready yet we fall
             // back to /pro/<uuid>, which is longer but still resolves the right barber.
             const barberSlug = (data as any).booking_slug as string | undefined;
-            const tenantSlug = tenant?.slug;
+            const tenantSlug = (data as any).tenant_slug || tenant?.slug;
             const bookingLink = barberSlug && tenantSlug
               ? `${origin}/${tenantSlug}/${barberSlug}`
               : `${origin}/pro/${data.id}`;
             return (
               <>
                 <code className="flex-1 text-sm text-brand-blue bg-white px-3 py-2 rounded-xl border border-gray-200 truncate">
-                  {bookingLink}
+                  {bookingLink.replace(/^https?:\/\//, "")}
                 </code>
                 <button
                   onClick={() => {
@@ -330,6 +331,13 @@ export default function EditProfessionalPage() {
           <div>
             <label className="block text-xs text-gray-500 mb-1">Teléfono</label>
             <input type="text" value={data.phone || ""} onChange={(e) => setData({ ...data, phone: e.target.value })}
+              className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Fecha de nacimiento</label>
+            <input type="date" value={(data as any).birth_date || ""}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setData({ ...data, birth_date: e.target.value } as any)}
               className="w-full border rounded-xl px-3 py-2.5 text-sm" />
           </div>
           <div>
@@ -461,7 +469,7 @@ export default function EditProfessionalPage() {
               onChange={(e) => setData({ ...data, rental_cash_to_barber: e.target.checked } as any)}
               className="w-4 h-4 mt-0.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500" />
             <span className="text-sm text-gray-700">
-              <span className="font-medium">El barbero se lleva su efectivo directamente</span>
+              <span className="font-medium">El profesional se lleva su efectivo directamente</span>
               <span className="block text-xs text-gray-500 mt-0.5">
                 Si esta activo, el efectivo de sus ventas NO se cuenta en la caja ni en los
                 ingresos del salon (solo entra el arriendo). Dejalo desactivado si el efectivo
@@ -530,26 +538,30 @@ export default function EditProfessionalPage() {
             placeholder="Ej: Especialista en uñas, colorimetría, degradados. 5 años de experiencia."
             className="w-full border rounded-xl px-3 py-2.5 text-sm" />
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Especialidades (separar con coma)</label>
-          <input type="text" value={(data as any).specialties?.join(", ") || ""}
-            onChange={(e) => setData({ ...data, specialties: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) } as any)}
-            placeholder="Ej: Uñas, Color, Degradado, Diseño"
-            className="w-full border rounded-xl px-3 py-2.5 text-sm" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+        {/* Ocultos (Nico, 29-sep): Especialidades, Años de experiencia y Video intro.
+            Los datos y el guardado siguen intactos; solo se quita el campo de la pantalla. */}
+        <div className="hidden">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Años experiencia</label>
-            <input type="number" min="0" value={(data as any).years_experience || ""}
-              onChange={(e) => setData({ ...data, years_experience: parseInt(e.target.value) || null } as any)}
+            <label className="block text-xs text-gray-500 mb-1">Especialidades (separar con coma)</label>
+            <input type="text" value={(data as any).specialties?.join(", ") || ""}
+              onChange={(e) => setData({ ...data, specialties: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) } as any)}
+              placeholder="Ej: Uñas, Color, Degradado, Diseño"
               className="w-full border rounded-xl px-3 py-2.5 text-sm" />
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Video intro (URL)</label>
-            <input type="url" value={(data as any).intro_video_url || ""}
-              onChange={(e) => setData({ ...data, intro_video_url: e.target.value } as any)}
-              placeholder="https://..."
-              className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Años experiencia</label>
+              <input type="number" min="0" value={(data as any).years_experience || ""}
+                onChange={(e) => setData({ ...data, years_experience: parseInt(e.target.value) || null } as any)}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Video intro (URL)</label>
+              <input type="url" value={(data as any).intro_video_url || ""}
+                onChange={(e) => setData({ ...data, intro_video_url: e.target.value } as any)}
+                placeholder="https://..."
+                className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+            </div>
           </div>
         </div>
       </div>

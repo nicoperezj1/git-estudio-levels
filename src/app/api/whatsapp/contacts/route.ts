@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { todayInChile } from "@/lib/utils";
 
 // GET: Get all clients with phones for WhatsApp broadcast
 export async function GET(req: NextRequest) {
@@ -26,24 +27,41 @@ export async function GET(req: NextRequest) {
 
   const { data: clients } = await query;
 
-  // Get last visit for each client
+  // Ultima visita REAL de cada cliente. Mismo criterio que la pantalla de Retencion: solo
+  // visitas completadas y posteriores a tenants.retention_start_date (o a la creacion del
+  // negocio) — las anteriores son datos de importacion/pruebas y no son confiables.
   const clientIds = (clients || []).map((c) => c.id);
+  const { data: tenantRow } = await supabase
+    .from("tenants")
+    .select("retention_start_date, created_at")
+    .eq("id", tenantId)
+    .single();
+  const retentionStartDate = tenantRow?.retention_start_date || tenantRow?.created_at || null;
 
-  let lastVisits: Record<string, string> = {};
+  const lastVisits: Record<string, string> = {};
+  const upcoming = new Set<string>();
   if (clientIds.length > 0) {
-    const { data: appointments } = await supabase
+    let doneQuery = supabase
       .from("appointments")
       .select("client_id, date")
       .in("client_id", clientIds)
       .eq("status", "completed")
       .order("date", { ascending: false });
-
-    // Get most recent date per client
+    if (retentionStartDate) doneQuery = doneQuery.gte("date", retentionStartDate);
+    const { data: appointments } = await doneQuery;
     for (const appt of appointments || []) {
-      if (!lastVisits[appt.client_id]) {
-        lastVisits[appt.client_id] = appt.date;
-      }
+      if (!lastVisits[appt.client_id]) lastVisits[appt.client_id] = appt.date;
     }
+
+    // Clientes con una cita por venir (agendada/confirmada): NO son "inactivos" aunque su
+    // ultima visita sea vieja, y no tiene sentido pedirles que vuelvan.
+    const { data: future } = await supabase
+      .from("appointments")
+      .select("client_id")
+      .in("client_id", clientIds)
+      .in("status", ["scheduled", "confirmed", "in_progress"])
+      .gte("date", todayInChile());
+    for (const f of future || []) upcoming.add(f.client_id);
   }
 
   const result = (clients || []).map((c) => ({
@@ -52,6 +70,7 @@ export async function GET(req: NextRequest) {
     phone: c.phone,
     email: c.email,
     lastVisit: lastVisits[c.id] || null,
+    hasUpcoming: upcoming.has(c.id),
   }));
 
   return NextResponse.json(result);

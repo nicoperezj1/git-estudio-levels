@@ -28,13 +28,15 @@ export async function POST(req: NextRequest) {
   }
 
   let businessLogoUrl: string | null = null;
+  let businessName: string | null = null;
   if (tx.tenant_id) {
     const { data: tenantRow } = await supabase
       .from("tenants")
-      .select("logo_url")
+      .select("logo_url, name")
       .eq("id", tx.tenant_id)
       .single();
     businessLogoUrl = tenantRow?.logo_url || null;
+    businessName = tenantRow?.name || null;
   }
 
   try {
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
       date: new Date(tx.created_at),
       barberName: tx.barber?.name || "Tu profesional",
       businessLogoUrl,
+      businessName,
     });
 
     await supabase

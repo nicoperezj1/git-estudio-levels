@@ -1,7 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 
-// GET: Get public business info by slug (for subdomain booking pages)
+// GET: información pública del negocio por slug (página de reservas).
+// Se selecciona "*" y se devuelve solo una lista blanca de campos, así funciona aunque la
+// migración 082 (banner, descripción, Maps, vista) todavía no esté aplicada.
+function toPublic(t: any) {
+  return {
+    id: t.id,
+    name: t.name,
+    slug: t.slug,
+    logo_url: t.logo_url ?? null,
+    phone: t.phone ?? null,
+    address: t.address ?? null,
+    website: t.website ?? null,
+    banner_url: t.banner_url ?? null,
+    description: t.description ?? null,
+    google_maps_url: t.google_maps_url ?? null,
+    google_rating: t.google_rating ?? null,
+    google_reviews_count: t.google_reviews_count ?? null,
+    booking_view_mode: t.booking_view_mode ?? "professional",
+  };
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
   const { searchParams } = new URL(req.url);
@@ -11,27 +31,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "slug required" }, { status: 400 });
   }
 
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("id, name, slug, logo_url, phone, address")
-    .eq("slug", slug)
-    .eq("active", true)
-    .single();
+  let found: any = null;
+  const { data: tenant } = await supabase.from("tenants").select("*").eq("slug", slug).eq("active", true).single();
+  found = tenant;
 
-  if (!tenant) {
-    // Try partial match (e.g., "estudiolevels" matches "estudio-levels")
-    const { data: tenants } = await supabase
-      .from("tenants")
-      .select("id, name, slug, logo_url, phone, address")
-      .eq("active", true);
-
-    const match = (tenants || []).find((t) =>
+  if (!found) {
+    // Coincidencia parcial (ej: "estudiolevels" coincide con "estudio-levels")
+    const { data: tenants } = await supabase.from("tenants").select("*").eq("active", true);
+    found = (tenants || []).find((t: any) =>
       t.slug.replace(/-/g, "").toLowerCase() === slug.replace(/-/g, "").toLowerCase()
-    );
-
-    if (match) return NextResponse.json(match);
-    return NextResponse.json({ error: "Negocio no encontrado" }, { status: 404 });
+    ) || null;
   }
 
-  return NextResponse.json(tenant);
+  if (!found) return NextResponse.json({ error: "Negocio no encontrado" }, { status: 404 });
+
+  const { data: hours } = await supabase
+    .from("business_hours")
+    .select("day_of_week, open_time, close_time, is_closed")
+    .eq("tenant_id", found.id);
+
+  return NextResponse.json({ ...toPublic(found), suspended: found.status === "suspended", hours: hours || [] });
 }

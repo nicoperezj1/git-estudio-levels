@@ -1,3 +1,4 @@
+import { isTenantSuspended, isBarberTenantSuspended, TENANT_SUSPENDED_MESSAGE } from "@/lib/tenant-suspension";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 
@@ -40,6 +41,9 @@ export async function POST(req: NextRequest) {
 
   if (!barber?.tenant_id) {
     return NextResponse.json({ error: "Profesional sin negocio asignado" }, { status: 400 });
+  }
+  if (await isTenantSuspended(supabase, barber.tenant_id)) {
+    return NextResponse.json({ error: TENANT_SUSPENDED_MESSAGE, code: "tenant_suspended" }, { status: 403 });
   }
 
   // Get tenant settings (deposit config + MP token)

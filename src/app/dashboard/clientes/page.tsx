@@ -83,11 +83,21 @@ export default function ClientesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetch("/api/clients", {
+      // Bug (reportado por Nico, 27-sep): esto nunca revisaba si la respuesta fue exitosa
+      // — si el insert fallaba en el servidor (ej. error de base de datos), igual se
+      // mostraba "Cliente creado exitosamente" y se cerraba el modal, dando a entender
+      // que el origen (source) quedo guardado cuando en realidad el cliente ni siquiera
+      // se creo. Ahora se revisa la respuesta antes de celebrar el exito.
+      const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, tenantId: tenant?.id }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Error al crear cliente", "error");
+        return;
+      }
       showToast("Cliente creado exitosamente", "success");
       setShowModal(false);
       setFormData({ name: "", email: "", phone: "", notes: "", source: "walk_in", sourceDetail: "" });
@@ -388,14 +398,14 @@ export default function ClientesPage() {
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" value={formData.email}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input type="email" required value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
-                <input type="text" value={formData.phone}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono *</label>
+                <input type="text" required value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>

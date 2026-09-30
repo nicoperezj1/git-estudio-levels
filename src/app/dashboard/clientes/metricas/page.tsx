@@ -165,7 +165,7 @@ export default function ClientesMetricasPage() {
           {activeList.length === 0 ? (
             <p className="text-center py-8 text-gray-400 text-sm">Sin clientes en esta categoría</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left p-3 font-medium text-gray-600">Cliente</th>
@@ -194,7 +194,7 @@ export default function ClientesMetricasPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       )}

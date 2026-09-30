@@ -114,7 +114,7 @@ export default function BarberPreciosPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-700">
           <strong>Como funciona:</strong> Si dejas un campo vacio, se usa el precio/duracion default del servicio.
-          Solo completa los campos que sean diferentes para este barbero.
+          Solo completa los campos que sean diferentes para este profesional.
         </p>
       </div>
 

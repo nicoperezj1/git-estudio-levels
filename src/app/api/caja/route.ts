@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { todayInChile, chileDayBoundsUtc } from "@/lib/utils";
+import { tenantHasFeature } from "@/lib/plan-features";
 
 // GET: Current day's cash register status + transactions
 export async function GET(req: NextRequest) {
@@ -146,6 +147,13 @@ export async function POST(req: NextRequest) {
   }
   if (!tenantId) {
     return NextResponse.json({ error: "No se pudo determinar el negocio para abrir la caja." }, { status: 400 });
+  }
+
+  // Item 34 (Nico, 26-sep): "Modulo de caja" es una feature de plan (Pro+) — el sidebar ya
+  // la oculta/bloquea, esto es la verificacion del lado del servidor para que no se pueda
+  // abrir una caja igual llamando directo a la API.
+  if (!(await tenantHasFeature(tenantId, "cash_register"))) {
+    return NextResponse.json({ error: "El Modulo de Caja no esta incluido en tu plan actual. Mejora tu plan para usarlo." }, { status: 403 });
   }
 
   const today = todayInChile();
