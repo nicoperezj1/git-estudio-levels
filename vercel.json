@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/post-service",
       "schedule": "30 */1 * * *"
+    },
+    {
+      "path": "/api/cron/suspend-past-due",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/annual-renewals",
+      "schedule": "0 12 * * *"
     }
   ]
 }

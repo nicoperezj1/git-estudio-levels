@@ -6,7 +6,7 @@ import { createAdminSupabase } from "@/lib/supabase/server";
 //
 // La pieza de datos ya existia a medias: plan_limits.features (JSONB, migracion 028/030) y
 // un hasPlanFeature() en TenantProvider (src/lib/tenant-context.tsx) que lee ese arreglo —
-// pero nada llamaba a hasPlanFeature todavia (ningun modulo estaba realmente gateado) y los
+// pero nada llamaba a hasPlanFeature todavía (ningun modulo estaba realmente gateado) y los
 // valores de features estaban desalineados con el landing actual (ej. Starter tenia
 // "cash_register"/"loyalty" que el landing marca como NO incluidos en Starter). La
 // migracion 076 corrige esos valores; este archivo es el lado servidor del mismo chequeo
