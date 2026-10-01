@@ -7,6 +7,7 @@ import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
+import { buildConfirmWhatsAppUrl } from "@/lib/whatsapp-confirm";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun } from "lucide-react";
 import { Segmented, primaryButton } from "@/components/ui/premium";
@@ -124,9 +125,25 @@ export default function CalendarioPage() {
   // DEFAULT_*/FULL_DAY_*) para que toda la grilla, los calculos de posicion y el hover
   // reaccionen al toggle.
   const [fullDay, setFullDay] = useState(false);
-  // En celular el calendario se ve por defecto como tarjetas; "Grilla" muestra la misma
-  // grilla por hora que en computador (con scroll horizontal).
-  const [mobileGrid, setMobileGrid] = useState(false);
+  // En celular el calendario se ve por defecto como GRILLA (la misma grilla por hora que en
+  // computador, con scroll horizontal). "Tarjetas" es la alternativa en lista, y la eleccion
+  // de cada persona se recuerda en su equipo.
+  const [mobileGrid, setMobileGrid] = useState(true);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("calendar_mobile_view");
+      if (saved === "tarjetas") setMobileGrid(false);
+    } catch {}
+  }, []);
+  const chooseMobileView = (grid: boolean) => {
+    setMobileGrid(grid);
+    try { localStorage.setItem("calendar_mobile_view", grid ? "grilla" : "tarjetas"); } catch {}
+  };
+  // Vista "profesionales agrupados" (opcion del negocio, solo equipos de 2 a 4 personas):
+  // el selector 1/3/7 dias tambien aplica a TODOS los profesionales a la vez.
+  // Se activa en Configuracion > Calendario (admin). Ver /api/settings/calendar-view.
+  const [groupWeekActive, setGroupWeekActive] = useState(false);
+  const [rangeBlocks, setRangeBlocks] = useState<Array<{ id: string; barber_id: string; date: string; all_day: boolean; start_time: string | null; end_time: string | null; reason: string | null }>>([]);
   const START_HOUR = fullDay ? FULL_DAY_START_HOUR : DEFAULT_START_HOUR;
   const END_HOUR = fullDay ? FULL_DAY_END_HOUR : DEFAULT_END_HOUR;
   // Punto (Nico, 25-sep): tooltip que sigue el cursor mostrando hora (redondeada a 15
@@ -202,6 +219,20 @@ export default function CalendarioPage() {
     return [];
   };
   const displayBarbers: Barber[] = computeDisplayBarbers();
+
+  const groupPros: Barber[] = barbers.filter(attendsClients);
+  const groupedAllowed = !isBarber && groupWeekActive && groupPros.length >= 2 && groupPros.length <= 4;
+  // Varios dias a la vez: un profesional puntual (como antes) o, si el negocio lo activo,
+  // todos sus profesionales agrupados. Con "1 dia" y sin profesional sigue la grilla normal.
+  const multiDay = !!professionalFilter || (groupedAllowed && rangeDays > 1);
+  const multiPros: Barber[] = professionalFilter
+    ? (displayBarbers.filter((b) => b.id === professionalFilter).length > 0
+        ? displayBarbers.filter((b) => b.id === professionalFilter)
+        : [{ id: professionalFilter, name: "Profesional" } as Barber])
+    : groupPros;
+  const rangeDates = multiDay
+    ? Array.from({ length: rangeDays }, (_, i) => dateStrOffset(date, i))
+    : [date];
 
   const [selectedApptId, setSelectedApptId] = useState<string | null>(null);
   const [apptDetails, setApptDetails] = useState<any>(null);
@@ -333,22 +364,30 @@ export default function CalendarioPage() {
     if (tenantLoading) return;
     fetchAppointments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, tenantLoading, tenant?.id, isBarber, user?.id, professionalFilter, rangeDays]);
+  }, [date, tenantLoading, tenant?.id, isBarber, user?.id, professionalFilter, rangeDays, groupedAllowed]);
+
+  // Ajuste del negocio "profesionales agrupados" (se ignora si la migracion 087 no esta aplicada).
+  useEffect(() => {
+    if (tenantLoading) return;
+    const t = getActiveTenantId();
+    fetch(`/api/settings/calendar-view${t ? `?tenantId=${t}` : ""}`)
+      .then((r) => r.json())
+      .then((d) => setGroupWeekActive(!!d?.active))
+      .catch(() => setGroupWeekActive(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantLoading, tenant?.id]);
 
   // Cuando hay un profesional elegido (vista 1/3/7 dias), se pide el rango completo de
   // dias de una sola vez en vez de un fetch por dia -- ver dateFrom/dateTo en
   // /api/appointments. Sin profesional elegido, se comporta exactamente igual que antes
   // (un solo dia, todos los profesionales).
-  const rangeDates = professionalFilter
-    ? Array.from({ length: rangeDays }, (_, i) => dateStrOffset(date, i))
-    : [date];
 
   const fetchAppointments = async () => {
     setLoading(true);
     try {
       const t = getActiveTenantId();
       const params = new URLSearchParams();
-      if (professionalFilter) {
+      if (multiDay) {
         params.set("dateFrom", rangeDates[0]);
         params.set("dateTo", rangeDates[rangeDates.length - 1]);
       } else {
@@ -383,19 +422,24 @@ export default function CalendarioPage() {
     const targets = (barbers.length > 0 ? barbers : (user?.id ? [{ id: user.id }] : [])) as Array<{ id: string }>;
     if (targets.length === 0) { setBlocks([]); return; }
     let cancelled = false;
-    const month = date.slice(0, 7); // YYYY-MM
+    // Los bloqueos de TODO el rango visible (1/3/7 dias puede cruzar de mes), para la vista
+    // de varios dias y para las tarjetas del celular.
+    const months = Array.from(new Set([rangeDates[0], rangeDates[rangeDates.length - 1]].map((d) => d.slice(0, 7))));
     Promise.all(
-      targets.map((b) =>
-        fetch(`/api/barber/blocks?barberId=${b.id}&month=${month}`).then((r) => r.json()).catch(() => [])
+      targets.flatMap((b) =>
+        months.map((m) =>
+          fetch(`/api/barber/blocks?barberId=${b.id}&month=${m}`).then((r) => r.json()).catch(() => [])
+        )
       )
     ).then((results) => {
       if (cancelled) return;
-      const allBlocks = results.flat();
+      const allBlocks = results.flat().filter((bl: any) => bl && bl.date);
       setBlocks(allBlocks.filter((bl: any) => bl.date === date));
+      setRangeBlocks(allBlocks.filter((bl: any) => rangeDates.includes(bl.date)));
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barbers, date, blocksRefresh, user?.id]);
+  }, [barbers, date, blocksRefresh, user?.id, rangeDates.join(",")]);
 
   // Load each barber's working hours for the viewed weekday, to grey out slots outside
   // their shift. Weekday from the date string (avoid new Date(date) which shifts by TZ).
@@ -437,7 +481,7 @@ export default function CalendarioPage() {
     // En la vista por profesional a varios dias, "siguiente/anterior" avanza el bloque
     // completo (ej. la semana entera), no un solo dia -- si no, avanzar "1" solo movería
     // la primera columna y dejaría 6 dias repetidos.
-    const step = professionalFilter ? rangeDays : 1;
+    const step = multiDay ? rangeDays : 1;
     const d = new Date(date);
     d.setDate(d.getDate() + delta * step);
     setDate(d.toISOString().split("T")[0]);
@@ -858,13 +902,13 @@ export default function CalendarioPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-brand-dark md:text-3xl">Calendario</h1>
           <p className="mt-0.5 text-sm text-brand-gray first-letter:uppercase">
-            {professionalFilter && rangeDays > 1 ? (
+            {multiDay && rangeDays > 1 ? (
               <>
                 {new Date(rangeDates[0] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
                 {" – "}
                 {new Date(rangeDates[rangeDates.length - 1] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
                 {" · "}
-                {displayBarbers.find((b) => b.id === professionalFilter)?.name}
+                {professionalFilter ? displayBarbers.find((b) => b.id === professionalFilter)?.name : "Todos los profesionales"}
               </>
             ) : (
               new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })
@@ -913,8 +957,8 @@ export default function CalendarioPage() {
             <Segmented
               size="sm"
               value={mobileGrid ? "grilla" : "tarjetas"}
-              onChange={(v) => setMobileGrid(v === "grilla")}
-              options={[{ value: "tarjetas", label: "Tarjetas" }, { value: "grilla", label: "Grilla" }]}
+              onChange={(v) => chooseMobileView(v === "grilla")}
+              options={[{ value: "grilla", label: "Grilla" }, { value: "tarjetas", label: "Tarjetas" }]}
             />
           </div>
         )}
@@ -931,7 +975,7 @@ export default function CalendarioPage() {
             ))}
           </select>
         )}
-        {view === "calendario" && professionalFilter && (
+        {view === "calendario" && (professionalFilter || groupedAllowed) && (
           <div className={mobileGrid ? "block" : "hidden md:block"}>
             <Segmented
               size="sm"
@@ -1035,7 +1079,13 @@ export default function CalendarioPage() {
                 .filter((a: any) => (rangeDates.length === 1 || a.date === d) && (!professionalFilter || a.barber_id === professionalFilter))
                 .sort((x: any, y: any) => String(x.start_time).localeCompare(String(y.start_time))),
             }));
-            const totalItems = dayList.reduce((n, x) => n + x.items.length, 0);
+            // Bloqueos manuales del rango (solo de los profesionales visibles), para que en
+            // tarjetas tambien se vea cuando alguien tiene el horario bloqueado.
+            const blocksOf = (d: string) =>
+              rangeBlocks
+                .filter((bl) => bl.date === d && (!professionalFilter || bl.barber_id === professionalFilter) && displayBarbers.some((b) => b.id === bl.barber_id))
+                .sort((x, y) => String(x.start_time || "").localeCompare(String(y.start_time || "")));
+            const totalItems = dayList.reduce((n, x) => n + x.items.length + blocksOf(x.d).length, 0);
             if (totalItems === 0) {
               return (
                 <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
@@ -1056,6 +1106,32 @@ export default function CalendarioPage() {
                         {new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "short" })}
                       </p>
                     )}
+                    {blocksOf(d).map((bl) => (
+                      <button
+                        key={bl.id}
+                        type="button"
+                        onClick={() => setEditingBlock({
+                          id: bl.id,
+                          barberId: bl.barber_id,
+                          reason: bl.reason || "",
+                          allDay: bl.all_day,
+                          startTime: bl.start_time?.slice(0, 5) || "09:00",
+                          endTime: bl.end_time?.slice(0, 5) || "18:00",
+                        })}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-3 text-left active:scale-[0.99]"
+                      >
+                        <div className="flex w-14 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-gray-200/70 py-2">
+                          <span className="text-base font-bold tabular-nums text-gray-500">{bl.all_day ? "Día" : (bl.start_time?.slice(0, 5) || "")}</span>
+                          <span className="text-[10px] tabular-nums text-gray-400">{bl.all_day ? "completo" : (bl.end_time?.slice(0, 5) || "")}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-semibold text-gray-500">Bloqueo{bl.reason ? ` · ${bl.reason}` : ""}</p>
+                          {!professionalFilter && (
+                            <p className="truncate text-[11px] text-gray-400">{displayBarbers.find((b) => b.id === bl.barber_id)?.name}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
                     {items.map((a: any) => {
                       const st = statusBadge[a.status] || statusBadge.scheduled;
                       const t1 = a.start_time?.match(/(\d{2}:\d{2})/)?.[1] || "";
@@ -1122,22 +1198,43 @@ export default function CalendarioPage() {
         </div>
       )}
 
-      {/* Vista por profesional a 1/3/7 dias — una columna por dia, solo lectura (version
-          simple, punto pendiente pulir drag-to-create/mover en esta vista mas adelante). */}
-      {view === "calendario" && professionalFilter && (loading ? <Spinner /> : (
+      {/* Vista a 1/3/7 dias — una columna por dia, solo lectura (version simple: click para ver
+          el detalle; arrastrar para crear/mover sigue solo en la vista de 1 dia). Muestra UN
+          profesional (cuando se elige uno) o, si el negocio activo "profesionales agrupados"
+          (2 a 4 personas), TODOS agrupados: cada profesional con sus dias juntos. */}
+      {view === "calendario" && multiDay && (loading ? <Spinner /> : (
         <div className={`overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm ${mobileGrid ? "block" : "hidden md:block"}`}>
-          <div className="min-w-[800px]">
+          <div style={{ minWidth: Math.max(800, 56 + multiPros.length * rangeDates.length * 110) }}>
+            {multiPros.length > 1 && (
+              <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
+                <div className="w-14 flex-shrink-0 border-r border-gray-100" />
+                {multiPros.map((pro, pi) => {
+                  const color = barberColors[pi % barberColors.length];
+                  return (
+                    <div key={pro.id} style={{ flex: rangeDates.length }} className="flex items-center justify-center gap-2 border-r-2 border-gray-300 p-2">
+                      <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${color.bg} ${color.text} text-[10px] font-bold`}>
+                        {pro.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </span>
+                      <span className="truncate text-xs font-semibold text-brand-dark">{pro.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
               <div className="w-14 flex-shrink-0 border-r border-gray-100" />
-              {rangeDates.map((d) => {
-                const isColTodayHeader = d === todayInChile();
-                const label = new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
-                return (
-                  <div key={d} className={`flex-1 p-2 text-center border-r border-gray-100 min-w-[120px] ${isColTodayHeader ? "bg-blue-50" : ""}`}>
-                    <p className={`text-[11px] font-medium truncate mt-0.5 ${isColTodayHeader ? "text-blue-700" : "text-gray-700"}`}>{label}</p>
-                  </div>
-                );
-              })}
+              {multiPros.map((pro) =>
+                rangeDates.map((d, di) => {
+                  const isColTodayHeader = d === todayInChile();
+                  const label = new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
+                  const lastOfGroup = multiPros.length > 1 && di === rangeDates.length - 1;
+                  return (
+                    <div key={`${pro.id}-${d}`} className={`flex-1 p-2 text-center min-w-[110px] ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-100"} ${isColTodayHeader ? "bg-blue-50" : ""}`}>
+                      <p className={`text-[11px] font-medium truncate mt-0.5 ${isColTodayHeader ? "text-blue-700" : "text-gray-700"}`}>{label}</p>
+                    </div>
+                  );
+                })
+              )}
             </div>
             <div className="relative flex">
               <div className="w-14 flex-shrink-0 border-r border-gray-100">
@@ -1147,57 +1244,97 @@ export default function CalendarioPage() {
                   </div>
                 ))}
               </div>
-              {rangeDates.map((d) => {
-                const dayAppts = appointments.filter((a: any) => a.date === d && a.barber_id === professionalFilter);
-                const isColToday = d === todayInChile();
-                return (
-                  <div key={d} className="flex-1 relative border-r border-gray-50 min-w-[120px]">
-                    {hours.map((h) => (
-                      <div key={h} className="h-16 border-b border-gray-50" />
-                    ))}
-                    {isColToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60 && (
-                      <div
-                        className="absolute left-0 right-0 z-20 pointer-events-none h-[2px] bg-red-500"
-                        style={{ top: `${((nowMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT}px` }}
-                      />
-                    )}
-                    {dayAppts.map((appt: any) => {
-                      const sm = appt.start_time?.match(/(\d{2}):(\d{2})/);
-                      const em = appt.end_time?.match(/(\d{2}):(\d{2})/);
-                      const timeLabel = sm && em ? `${parseInt(sm[1])}:${sm[2]} – ${parseInt(em[1])}:${em[2]}` : "";
-                      return (
+              {multiPros.map((pro, pi) =>
+                rangeDates.map((d, di) => {
+                  const dayAppts = appointments.filter((a: any) => a.date === d && a.barber_id === pro.id);
+                  const dayBlocks = rangeBlocks.filter((bl) => bl.date === d && bl.barber_id === pro.id);
+                  const isColToday = d === todayInChile();
+                  const lastOfGroup = multiPros.length > 1 && di === rangeDates.length - 1;
+                  // Con un solo profesional se mantiene el azul de siempre; con varios, un color por profesional.
+                  const color = multiPros.length > 1 ? barberColors[pi % barberColors.length] : { bg: "bg-blue-100", border: "border-l-blue-500", text: "text-blue-800" };
+                  return (
+                    <div key={`${pro.id}-${d}`} className={`flex-1 relative min-w-[110px] ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-50"}`}>
+                      {hours.map((h) => (
+                        <div key={h} className="h-16 border-b border-gray-50" />
+                      ))}
+                      {isColToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60 && (
                         <div
-                          key={appt.id}
-                          onClick={() => openApptDetails(appt.id)}
-                          className="absolute left-1 right-1 rounded-lg border-l-[3px] shadow-sm bg-blue-100 border-l-blue-500 text-blue-800 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10"
-                          style={getBlockStyle(appt)}
-                        >
-                          <p className="flex items-center gap-1 text-[11px] font-bold">
-                            <span className="truncate">{appt.client?.name || "Cliente"}</span>
-                            {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded bg-emerald-500 px-1 py-px text-[8px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
-                          </p>
-                          <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
-                          <div className="flex items-center justify-between gap-1">
-                            <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
-                            <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
-                              {(statusBadge[appt.status] || statusBadge.scheduled).label}
-                            </span>
+                          className="absolute left-0 right-0 z-20 pointer-events-none h-[2px] bg-red-500"
+                          style={{ top: `${((nowMinutes - START_HOUR * 60) / 60) * HOUR_HEIGHT}px` }}
+                        />
+                      )}
+                      {dayBlocks.map((block) => {
+                        let top = 0, height = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+                        if (!block.all_day && block.start_time && block.end_time) {
+                          const sm = block.start_time.match(/(\d{2}):(\d{2})/);
+                          const em = block.end_time.match(/(\d{2}):(\d{2})/);
+                          if (sm && em) {
+                            const startMin = parseInt(sm[1]) * 60 + parseInt(sm[2]);
+                            const endMin = parseInt(em[1]) * 60 + parseInt(em[2]);
+                            top = Math.max(((startMin - START_HOUR * 60) / 60) * HOUR_HEIGHT, 0);
+                            height = Math.max(((endMin - START_HOUR * 60) / 60) * HOUR_HEIGHT - top, 24);
+                          }
+                        }
+                        return (
+                          <div
+                            key={block.id}
+                            className="absolute left-1 right-1 rounded-md bg-gray-100 border border-gray-200 px-1.5 py-1 overflow-hidden z-[5] cursor-pointer hover:bg-gray-200/70"
+                            style={{ top: `${top}px`, height: `${Math.max(height, 24)}px` }}
+                            onClick={() => setEditingBlock({
+                              id: block.id,
+                              barberId: block.barber_id,
+                              reason: block.reason || "",
+                              allDay: block.all_day,
+                              startTime: block.start_time?.slice(0, 5) || "09:00",
+                              endTime: block.end_time?.slice(0, 5) || "18:00",
+                            })}
+                          >
+                            <p className="text-[10px] font-medium text-gray-500 truncate">{block.reason || "Bloqueado"}</p>
+                            {!block.all_day && block.start_time && block.end_time && (
+                              <p className="text-[9px] text-gray-400">{block.start_time.slice(0, 5)} – {block.end_time.slice(0, 5)}</p>
+                            )}
+                            {block.all_day && <p className="text-[9px] text-gray-400">Todo el dia</p>}
                           </div>
-                        </div>
-                      );
-                    })}
-                    {dayAppts.length === 0 && (
-                      <p className="absolute inset-x-0 top-4 text-center text-[11px] text-gray-300">Sin citas</p>
-                    )}
-                  </div>
-                );
-              })}
+                        );
+                      })}
+                      {dayAppts.map((appt: any) => {
+                        const sm = appt.start_time?.match(/(\d{2}):(\d{2})/);
+                        const em = appt.end_time?.match(/(\d{2}):(\d{2})/);
+                        const timeLabel = sm && em ? `${parseInt(sm[1])}:${sm[2]} – ${parseInt(em[1])}:${em[2]}` : "";
+                        return (
+                          <div
+                            key={appt.id}
+                            onClick={() => openApptDetails(appt.id)}
+                            className={`absolute left-1 right-1 rounded-lg border-l-[3px] shadow-sm ${color.bg} ${color.border} ${color.text} px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10`}
+                            style={getBlockStyle(appt)}
+                          >
+                            <p className="flex items-center gap-1 text-[11px] font-bold">
+                              <span className="truncate">{appt.client?.name || "Cliente"}</span>
+                              {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded bg-emerald-500 px-1 py-px text-[8px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+                            </p>
+                            <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
+                              <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
+                                {(statusBadge[appt.status] || statusBadge.scheduled).label}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {dayAppts.length === 0 && dayBlocks.length === 0 && (
+                        <p className="absolute inset-x-0 top-4 text-center text-[11px] text-gray-300">Sin citas</p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
       ))}
 
-      {view === "calendario" && !professionalFilter && (loading ? <Spinner /> : (
+      {view === "calendario" && !multiDay && (loading ? <Spinner /> : (
         <div className={`overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm ${mobileGrid ? "block" : "hidden md:block"}`}>
           <div className="min-w-[800px]">
             {/* Barber headers */}
@@ -1827,17 +1964,21 @@ export default function CalendarioPage() {
                               <p className="text-xs text-brand-gray">{apptDetails.client.phone}</p>
                               {/* WhatsApp the client straight from the appointment card — for
                                   the morning confirmation flow, without hunting for the number.
-                                  Pre-fills a message with the appointment date/time/service. */}
+                                  Mensaje compartido con Mi Agenda: src/lib/whatsapp-confirm.ts */}
                               {(() => {
-                                const raw = String(apptDetails.client.phone).replace(/\D/g, "").replace(/^0/, "");
-                                const phone = raw.startsWith("56") ? raw : `56${raw}`;
-                                const fecha = new Date(apptDetails.date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
-                                const hora = apptDetails.start_time?.match(/(\d{2}:\d{2})/)?.[1] || "";
-                                const servicio = apptDetails.services?.map((s: any) => s.service?.name).join(", ") || "";
-                                const msg = `Hola ${apptDetails.client.name}! Te escribimos para confirmar tu hora${servicio ? ` de ${servicio}` : ""} el ${fecha} a las ${hora}. Nos confirmas si asistiras? Gracias!`;
+                                const waUrl = buildConfirmWhatsAppUrl({
+                                  clientName: apptDetails.client.name,
+                                  phone: apptDetails.client.phone,
+                                  businessName: tenant?.name,
+                                  professionalName: apptDetails.barber?.name,
+                                  serviceNames: (apptDetails.services || []).map((s: any) => s.service?.name),
+                                  date: apptDetails.date,
+                                  time: apptDetails.start_time,
+                                });
+                                if (!waUrl) return null;
                                 return (
                                   <a
-                                    href={`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`}
+                                    href={waUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#25D366] text-white text-[10px] font-medium rounded-full hover:bg-[#1da851] transition-colors"

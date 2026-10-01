@@ -199,6 +199,8 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
       // Nico's request: receptionist also gets Caja, Profesionales (schedules only) and
       // Inventario (read-only, changes gated behind the admin PIN).
       "/dashboard/caja", "/dashboard/barberos", "/dashboard/inventario",
+      // Cada usuario (tambien recepcion) puede entrar a Mi Perfil a elegir su propio tema.
+      "/dashboard/mi-perfil",
     ],
     barber: [
       "/dashboard/standby", "/dashboard/mi-agenda", "/dashboard/calendario",

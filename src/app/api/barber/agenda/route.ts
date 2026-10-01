@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     .from("appointments")
     .select(`
       *,
-      client:clients(name, phone),
+      client:clients(id, name, phone),
       services:appointment_services(
         price,
         service:services(name, duration)
