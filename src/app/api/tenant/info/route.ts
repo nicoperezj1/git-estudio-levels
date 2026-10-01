@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 
 // GET: Get tenant info + plan features for the current user's tenant
 //
@@ -51,5 +51,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ tenant, features });
+  // Tema propio del usuario (migracion 086). Si la columna aun no existe en la base o falla
+  // la consulta, se ignora y se usa el tema del negocio: nunca debe romper la carga.
+  let userTheme: "light" | "dark" | null = null;
+  try {
+    const { userId } = await getCurrentUserRoleAndTenant();
+    if (userId) {
+      const { data: prof, error } = await supabase.from("profiles").select("theme").eq("id", userId).single();
+      if (!error && (prof?.theme === "light" || prof?.theme === "dark")) userTheme = prof.theme;
+    }
+  } catch {
+    userTheme = null;
+  }
+
+  return NextResponse.json({ tenant, features, userTheme });
 }

@@ -124,6 +124,9 @@ export default function CalendarioPage() {
   // DEFAULT_*/FULL_DAY_*) para que toda la grilla, los calculos de posicion y el hover
   // reaccionen al toggle.
   const [fullDay, setFullDay] = useState(false);
+  // En celular el calendario se ve por defecto como tarjetas; "Grilla" muestra la misma
+  // grilla por hora que en computador (con scroll horizontal).
+  const [mobileGrid, setMobileGrid] = useState(false);
   const START_HOUR = fullDay ? FULL_DAY_START_HOUR : DEFAULT_START_HOUR;
   const END_HOUR = fullDay ? FULL_DAY_END_HOUR : DEFAULT_END_HOUR;
   // Punto (Nico, 25-sep): tooltip que sigue el cursor mostrando hora (redondeada a 15
@@ -906,10 +909,21 @@ export default function CalendarioPage() {
         />
 
         {view === "calendario" && (
+          <div className="md:hidden">
+            <Segmented
+              size="sm"
+              value={mobileGrid ? "grilla" : "tarjetas"}
+              onChange={(v) => setMobileGrid(v === "grilla")}
+              options={[{ value: "tarjetas", label: "Tarjetas" }, { value: "grilla", label: "Grilla" }]}
+            />
+          </div>
+        )}
+
+        {view === "calendario" && (
           <select
             value={professionalFilter}
             onChange={(e) => { setProfessionalFilter(e.target.value); setRangeDays(1); }}
-            className="hidden h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-brand-dark outline-none focus:border-brand-blue md:block"
+            className={`h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-brand-dark outline-none focus:border-brand-blue ${mobileGrid ? "block" : "hidden md:block"}`}
           >
             <option value="">Todos los profesionales</option>
             {displayBarbers.map((b) => (
@@ -918,7 +932,7 @@ export default function CalendarioPage() {
           </select>
         )}
         {view === "calendario" && professionalFilter && (
-          <div className="hidden md:block">
+          <div className={mobileGrid ? "block" : "hidden md:block"}>
             <Segmented
               size="sm"
               value={String(rangeDays)}
@@ -931,7 +945,7 @@ export default function CalendarioPage() {
           <button
             onClick={() => setFullDay((v) => !v)}
             title={fullDay ? "Ver horario reducido (08:00 - 21:00)" : "Ver todo el dia (00:00 - 24:00)"}
-            className={`hidden h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors md:inline-flex ${
+            className={`${mobileGrid ? "inline-flex" : "hidden md:inline-flex"} h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors ${
               fullDay ? "border-brand-blue bg-brand-blue/10 text-brand-blue" : "border-gray-200 bg-white text-brand-dark hover:border-brand-blue/40"
             }`}
           >
@@ -955,7 +969,7 @@ export default function CalendarioPage() {
 
       {/* Celular: tira de dias + chips de profesional + agenda por tarjetas (la grilla de
           columnas queda para pantallas medianas en adelante). */}
-      {view === "calendario" && (
+      {view === "calendario" && !mobileGrid && (
         <div
           className="space-y-3 md:hidden"
           onTouchStart={(e) => { swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
@@ -1111,7 +1125,7 @@ export default function CalendarioPage() {
       {/* Vista por profesional a 1/3/7 dias — una columna por dia, solo lectura (version
           simple, punto pendiente pulir drag-to-create/mover en esta vista mas adelante). */}
       {view === "calendario" && professionalFilter && (loading ? <Spinner /> : (
-        <div className="hidden overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm md:block">
+        <div className={`overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm ${mobileGrid ? "block" : "hidden md:block"}`}>
           <div className="min-w-[800px]">
             <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
               <div className="w-14 flex-shrink-0 border-r border-gray-100" />
@@ -1184,7 +1198,7 @@ export default function CalendarioPage() {
       ))}
 
       {view === "calendario" && !professionalFilter && (loading ? <Spinner /> : (
-        <div className="hidden overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm md:block">
+        <div className={`overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm ${mobileGrid ? "block" : "hidden md:block"}`}>
           <div className="min-w-[800px]">
             {/* Barber headers */}
             <div className="flex border-b border-gray-200 sticky top-0 bg-white z-10">
