@@ -74,6 +74,8 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedBarber, setSelectedBarber] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
+  // Cita que viene del boton "Cobrar" del calendario: al cobrar queda completada.
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   // Alta rapida de cliente desde el POS (Nico, 29-sep): si el nombre escrito no existe.
   const [addingClient, setAddingClient] = useState(false);
@@ -156,6 +158,8 @@ export default function POSPage() {
         const preBarber = sp.get("barberId");
         const preClient = sp.get("clientId");
         const preServices = sp.get("serviceIds");
+        const preAppt = sp.get("appointmentId");
+        if (preAppt) setAppointmentId(preAppt);
         if (preBarber) setSelectedBarber(preBarber);
         if (preClient) {
           setSelectedClient(preClient);
@@ -510,10 +514,12 @@ export default function POSPage() {
           subtotal,
           total,
           redeemedPoints: redeemedPoints || 0,
+          appointmentId: appointmentId || null,
         }),
       });
       if (res.ok) {
         const result = await res.json();
+        setAppointmentId(null);
         // Was any part of this sale paid by card? The terminal asks for a tip itself
         // when that happens, so we ask the cashier to record it afterwards — we never
         // charge the tip ourselves, only log what the client added on the machine.

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { todayInChile } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { items, clientId, barberId, paymentMethod, payments, couponCode, discount, subtotal, total, redeemedPoints } = body;
+  const { items, clientId, barberId, paymentMethod, payments, couponCode, discount, subtotal, total, redeemedPoints, appointmentId } = body;
   // payments: optional array [{method: "cash", amount: 10000}, {method: "debit_card", amount: 7000}]
   // If not provided, falls back to single paymentMethod for full total
 
@@ -240,6 +241,38 @@ export async function POST(req: NextRequest) {
       // Don't fail checkout if email fails
       console.error("Error enviando boleta:", e);
     }
+  }
+
+  // Al cobrar, la cita queda COMPLETADA (asi el cliente ya cuenta como visita hecha y no hace
+  // falta acordarse de marcarla a mano). Si viene desde el boton "Cobrar" del calendario se usa esa
+  // cita; si se cobra directo en el POS, se completa la cita activa de HOY de ese cliente con ese
+  // profesional, pero solo cuando hay exactamente una (si hubiera dos, no se adivina). Nunca
+  // debe hacer fallar el cobro.
+  try {
+    const active = ["scheduled", "confirmed", "in_progress"];
+    let apptToComplete: string | null = null;
+    if (appointmentId) {
+      const { data: a } = await supabase
+        .from("appointments")
+        .select("id, barber_id, status")
+        .eq("id", appointmentId)
+        .maybeSingle();
+      if (a && a.barber_id === barberId && active.includes(a.status)) apptToComplete = a.id;
+    } else if (clientId && barberId) {
+      const { data: list } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("barber_id", barberId)
+        .eq("date", todayInChile())
+        .in("status", active);
+      if (list && list.length === 1) apptToComplete = list[0].id;
+    }
+    if (apptToComplete) {
+      await supabase.from("appointments").update({ status: "completed" }).eq("id", apptToComplete);
+    }
+  } catch (e) {
+    console.error("Error completando la cita al cobrar:", e);
   }
 
   return NextResponse.json({ success: true, transactionId: tx.id, receiptSent: !!clientId });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { newClientAppointmentIds } from "@/lib/new-client";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -38,18 +39,10 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json([]);
   const rows: any[] = data || [];
 
-  // Distintivo "Nuevo" del calendario: cliente sin ninguna visita completada todavía
-  // (mismo criterio que isNewClient en /api/appointments/[id]/details).
-  const clientIds = Array.from(new Set(rows.map((r) => r.client?.id).filter(Boolean)));
-  if (clientIds.length > 0) {
-    const { data: done } = await supabase
-      .from("appointments")
-      .select("client_id")
-      .in("client_id", clientIds)
-      .eq("status", "completed");
-    const withVisits = new Set((done || []).map((d: any) => d.client_id));
-    for (const r of rows) r.is_new_client = !!r.client?.id && !withVisits.has(r.client.id);
-  }
+  // Distintivo "Nuevo" del calendario: primera cita del cliente, o cita sin ficha de cliente
+  // vinculada. Ver src/lib/new-client.ts.
+  const newIds = await newClientAppointmentIds(supabase, rows);
+  for (const r of rows) r.is_new_client = newIds.has(r.id);
   return NextResponse.json(rows);
 }
 

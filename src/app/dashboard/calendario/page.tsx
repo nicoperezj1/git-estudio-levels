@@ -2015,6 +2015,8 @@ export default function CalendarioPage() {
                           const params = new URLSearchParams();
                           if (apptDetails.client?.id) params.set("clientId", apptDetails.client.id);
                           if (apptDetails.barber?.id) params.set("barberId", apptDetails.barber.id);
+                          // La cita viaja al POS para que quede completada al cobrar.
+                          if (apptDetails.id) params.set("appointmentId", apptDetails.id);
                           const svcIds = (apptDetails.services || [])
                             .map((s: any) => s.service?.id)
                             .filter(Boolean);
