@@ -1267,7 +1267,7 @@ export default function POSPage() {
                 </button>
               ))}
             </div>
-            <input type="number" min="0" step="500" value={tipInput}
+            <input type="number" min="0" step="1" value={tipInput}
               onChange={(e) => setTipInput(e.target.value)}
               placeholder="Otro monto ($)"
               className="w-full border rounded-xl px-3 py-2.5 text-sm text-center mb-4" />

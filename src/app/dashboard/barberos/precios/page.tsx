@@ -181,7 +181,7 @@ function ServiceRow({ service, customPrice, customDuration, saving, active, onTo
       <td className="p-4 font-medium">{service.name}</td>
       <td className="p-4 text-center text-gray-500">{formatCurrency(Number(service.price))}</td>
       <td className="p-4 text-center">
-        <input type="number" min="0" step="500" value={price}
+        <input type="number" min="0" step="1" value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder={String(service.price)}
           className="w-24 border rounded px-2 py-1 text-center text-sm" />

@@ -25,6 +25,9 @@ interface TenantInfo {
 
 interface TenantContextType {
   tenant: TenantInfo | null;
+  // Tema propio del usuario (null = usa el del negocio). Ver api/profile/theme.
+  userTheme: "light" | "dark" | null;
+  setUserTheme: (theme: "light" | "dark" | null) => void;
   loading: boolean;
   isTrialExpired: boolean;
   daysLeft: number;
@@ -37,6 +40,8 @@ interface TenantContextType {
 
 const TenantContext = createContext<TenantContextType>({
   tenant: null,
+  userTheme: null,
+  setUserTheme: () => {},
   loading: true,
   isTrialExpired: false,
   daysLeft: 0,
@@ -48,6 +53,7 @@ const TenantContext = createContext<TenantContextType>({
 
 export function TenantProvider({ children, serverTenantId }: { children: ReactNode; serverTenantId?: string | null }) {
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [userTheme, setUserTheme] = useState<"light" | "dark" | null>(null);
   const [planFeatures, setPlanFeatures] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const { effectiveRole } = useAuth();
@@ -105,6 +111,7 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
         if (data?.tenant) {
           setTenant(data.tenant);
           setPlanFeatures(data.features || []);
+          setUserTheme(data.userTheme === "light" || data.userTheme === "dark" ? data.userTheme : null);
           setGlobalTenantId(data.tenant.id);
         } else {
           setTenant(null);
@@ -121,11 +128,13 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
   // esa pantalla no se quede oscura por un tema que ya no aplica.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.documentElement.classList.toggle("dark", tenant?.theme === "dark");
+    // El tema del usuario manda; si no eligio uno, aplica el del negocio.
+    const effective = userTheme ?? tenant?.theme;
+    document.documentElement.classList.toggle("dark", effective === "dark");
     return () => {
       document.documentElement.classList.remove("dark");
     };
-  }, [tenant?.theme]);
+  }, [userTheme, tenant?.theme]);
 
   const switchTenant = (tenantId: string, tenantName: string) => {
     localStorage.setItem("tenant_override", JSON.stringify({ tenantId, tenantName }));
@@ -161,7 +170,7 @@ export function TenantProvider({ children, serverTenantId }: { children: ReactNo
   };
 
   return (
-    <TenantContext.Provider value={{ tenant, loading, isTrialExpired, daysLeft, hasPlanFeature, isOverriding: isOverriding && isSuperAdmin, switchTenant, exitTenant }}>
+    <TenantContext.Provider value={{ tenant, userTheme, setUserTheme, loading, isTrialExpired, daysLeft, hasPlanFeature, isOverriding: isOverriding && isSuperAdmin, switchTenant, exitTenant }}>
       {children}
     </TenantContext.Provider>
   );

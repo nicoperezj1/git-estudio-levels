@@ -638,7 +638,7 @@ export default function ServiciosPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-brand-gray mb-1">Precio ($)</label>
-                  <input type="number" required min="0" step="500" value={form.price}
+                  <input type="number" required min="0" step="1" value={form.price}
                     onChange={(e) => setForm({ ...form, price: e.target.value })}
                     placeholder="8000"
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />

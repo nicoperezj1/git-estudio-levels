@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
-import { Copy, ExternalLink, Globe, Clock, Building2, Image as ImageIcon, Lock, Moon, Sun, MessageCircle, Mail } from "lucide-react";
+import { Copy, ExternalLink, Globe, Clock, Building2, Image as ImageIcon, Lock, Moon, Sun, MessageCircle, Mail, CalendarDays } from "lucide-react";
 import { compressImage } from "@/lib/image-compress";
 
 const dayNames = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
@@ -58,6 +58,37 @@ export default function ConfiguracionPage() {
   // actual y avisarle al servidor cuando cambia.
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [savingTheme, setSavingTheme] = useState(false);
+
+  // Calendario "profesionales agrupados" (solo negocios de 2 a 4 profesionales). Lo lee y lo
+  // guarda /api/settings/calendar-view; si el negocio no cumple el rango, la tarjeta no aparece.
+  const [calView, setCalView] = useState<{ enabled: boolean; eligible: boolean; professionals: number } | null>(null);
+  const [savingCalView, setSavingCalView] = useState(false);
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/settings/calendar-view?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((d) => setCalView({ enabled: !!d?.enabled, eligible: !!d?.eligible, professionals: Number(d?.professionals) || 0 }))
+      .catch(() => setCalView(null));
+  }, [tenantId]);
+  const handleCalViewToggle = async (next: boolean) => {
+    if (!tenantId || savingCalView || !calView) return;
+    setSavingCalView(true);
+    try {
+      const res = await fetch("/api/settings/calendar-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId, enabled: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "No se pudo guardar");
+      setCalView({ ...calView, enabled: next });
+      showToast(next ? "Vista de todos los profesionales activada" : "Vista de todos los profesionales desactivada", "success");
+    } catch (e: any) {
+      showToast(e?.message || "No se pudo guardar", "error");
+    } finally {
+      setSavingCalView(false);
+    }
+  };
 
   // Deposit/abono settings
   const [depositEnabled, setDepositEnabled] = useState(false);
@@ -810,6 +841,35 @@ export default function ConfiguracionPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Calendario: vista de varios dias para TODOS los profesionales. Solo administrador y solo
+          si el negocio tiene entre 2 y 4 profesionales (con mas, la vista se veria recargada). */}
+      {isAdmin && calView?.eligible && (
+        <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-brand-gray" />
+            <div>
+              <h2 className="font-bold text-brand-dark">Calendario</h2>
+              <p className="text-xs text-brand-gray">Disponible para negocios de 2 a 4 profesionales (el tuyo tiene {calView.professionals})</p>
+            </div>
+          </div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={calView.enabled}
+              disabled={savingCalView}
+              onChange={(e) => handleCalViewToggle(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300"
+            />
+            <span>
+              <span className="block text-sm font-medium text-brand-dark">Vista profesionales agrupados por semana</span>
+              <span className="block text-xs text-brand-gray">
+                En el Calendario, los botones 1 / 3 / 7 días se pueden usar con todos los profesionales a la vez (cada uno con sus días juntos), no solo con uno.
+              </span>
+            </span>
+          </label>
         </div>
       )}
 

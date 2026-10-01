@@ -5,16 +5,40 @@ import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { Copy, Camera } from "lucide-react";
+import { Copy, Camera, Sun, Moon, Monitor } from "lucide-react";
 
 export default function MiPerfilPage() {
   const { user } = useAuth();
-  const { tenant } = useTenant();
+  const { tenant, userTheme, setUserTheme } = useTenant();
   const { showToast } = useToast();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [savingTheme, setSavingTheme] = useState(false);
+
+  // Tema propio: claro, oscuro o "igual que el negocio" (null). Se aplica al instante
+  // desde TenantProvider y se guarda en el perfil del usuario.
+  const changeTheme = async (next: "light" | "dark" | null) => {
+    if (savingTheme || next === userTheme) return;
+    const previous = userTheme;
+    setUserTheme(next);
+    setSavingTheme(true);
+    try {
+      const res = await fetch("/api/profile/theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: next }),
+      });
+      if (!res.ok) throw new Error();
+      showToast("Tema guardado", "success");
+    } catch {
+      setUserTheme(previous);
+      showToast("No se pudo cambiar el tema", "error");
+    } finally {
+      setSavingTheme(false);
+    }
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -153,6 +177,34 @@ export default function MiPerfilPage() {
           className="w-full py-2.5 bg-brand-blue text-white rounded-xl text-sm font-medium hover:bg-brand-blue/90 disabled:opacity-50">
           {saving ? "Guardando..." : "Guardar cambios"}
         </button>
+      </div>
+
+      {/* Mi tema: cada usuario elige el suyo; "Igual que el negocio" usa el del administrador. */}
+      <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-5 space-y-3">
+        <h3 className="font-bold text-brand-dark">Mi tema</h3>
+        <p className="text-xs text-brand-gray">Elige como ves re-booking. No cambia lo que ven los demas.</p>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { value: "light", label: "Claro", icon: Sun },
+            { value: "dark", label: "Oscuro", icon: Moon },
+            { value: null, label: "Del negocio", icon: Monitor },
+          ] as const).map(({ value, label, icon: Icon }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => changeTheme(value)}
+              disabled={savingTheme}
+              className={`flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-xs font-medium transition-colors disabled:opacity-50 ${
+                userTheme === value
+                  ? "border-brand-blue bg-brand-blue/5 text-brand-blue"
+                  : "border-gray-200 dark:border-white/10 text-brand-gray hover:border-gray-300 dark:hover:border-white/20"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Link de agenda */}
