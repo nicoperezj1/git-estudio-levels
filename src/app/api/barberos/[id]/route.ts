@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeProfileAccess } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
 
@@ -31,14 +31,23 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: antes no pedia sesion y devolvia el perfil completo (PIN y token de MP).
+  const access = await authorizeProfileAccess(params.id);
+  if (!access.ok) return access.response;
+
   const supabase = createAdminSupabase();
-  const { data, error } = await supabase
+  const { data: full, error } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", params.id)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !full) return NextResponse.json({ error: error?.message || "No encontrado" }, { status: 500 });
+
+  // Nunca se entrega el token de Mercado Pago del profesional. El PIN personal solo lo ve
+  // el propio profesional o un administrador (la pantalla de perfil lo muestra).
+  const { mp_access_token: _mpToken, ...data } = full as Record<string, any>;
+  if (access.level === "receptionist") delete (data as any).personal_pin;
 
   // Link personal corto (re-booking.cl/<negocio>/<profesional>): la UI necesita el slug del
   // negocio y el del profesional. Se devuelven aqui (y se genera el del profesional si aun
@@ -61,11 +70,15 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: antes no pedia sesion (cualquiera podia cambiar PIN, email o comisiones).
+  const access = await authorizeProfileAccess(params.id);
+  if (!access.ok) return access.response;
+
   const supabase = createAdminSupabase();
   const body = await req.json();
 
-  // Only allow updating specific fields
-  const allowedFields = [
+  // Campos permitidos segun quien edita. Un campo no permitido se ignora.
+  const adminFields = [
     "name", "email", "phone", "active", "work_mode",
     "commission_rate", "rental_daily_rate", "rental_min_days",
     "rental_max_days", "rental_deductions", "rental_notes",
@@ -73,6 +86,19 @@ export async function PATCH(
     "intro_video_url", "years_experience", "slot_duration",
     "also_attends_clients", "instagram", "rental_cash_to_barber", "birth_date",
   ];
+  // El propio profesional edita su presentacion y su PIN, no su comision ni su estado.
+  const selfFields = [
+    "phone", "personal_pin", "avatar_url", "bio", "specialties",
+    "intro_video_url", "years_experience", "instagram", "birth_date",
+  ];
+  // Recepcion solo completa los datos de presentacion (ver saveBasic en la ficha).
+  const receptionFields = ["bio", "instagram", "avatar_url"];
+  const allowedFields =
+    access.level === "super_admin" || access.level === "admin"
+      ? adminFields
+      : access.level === "self"
+      ? selfFields
+      : receptionFields;
 
   const update: Record<string, any> = {};
   for (const key of allowedFields) {
@@ -122,6 +148,13 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: antes no pedia sesion. Solo un admin del mismo negocio (o super_admin).
+  const access = await authorizeProfileAccess(params.id);
+  if (!access.ok) return access.response;
+  if (access.level !== "admin" && access.level !== "super_admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
   const supabase = createAdminSupabase();
   const barberId = params.id;
 

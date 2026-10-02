@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase, createAdminSupabase, getCurrentTenantId, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createServerSupabase, createAdminSupabase, getCurrentTenantId, resolveTenantForRequest, requireRole } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
@@ -65,9 +65,26 @@ async function generateUniqueBookingSlug(adminSupabase: ReturnType<typeof create
 }
 
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes esta ruta no pedia sesion y creaba cuentas con cualquier rol en
+  // cualquier negocio. Solo un admin crea profesionales, y solo en su propio negocio.
+  const guard = await requireRole(["admin", "super_admin"]);
+  if (!guard.ok) return guard.response;
+
   const adminSupabase = createAdminSupabase();
   const body = await req.json();
-  const { name, email, phone, password, tenantId, role } = body;
+  const { name, email, phone, password } = body;
+  const role = body.role;
+  // Un admin no puede apuntar a otro negocio; solo super_admin elige el negocio.
+  const tenantId: string | null | undefined = guard.role === "super_admin" ? body.tenantId : guard.tenantId;
+  if (!email || !name) {
+    return NextResponse.json({ error: "Nombre y email son obligatorios" }, { status: 400 });
+  }
+  if (role !== undefined && !["barber", "admin", "receptionist", "super_admin"].includes(role)) {
+    return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
+  }
+  if (role === "super_admin" && guard.role !== "super_admin") {
+    return NextResponse.json({ error: "No autorizado para crear un super administrador" }, { status: 403 });
+  }
   const birthDate: string | null = typeof body.birthDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate) ? body.birthDate : null;
 
   const tempPassword = password || Math.random().toString(36).slice(-8);
