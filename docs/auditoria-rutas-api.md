@@ -1,5 +1,13 @@
 # Auditoría de rutas API que usan `createAdminSupabase()`
 
+> **Actualización del 2 de oct. 2026 (contrastado con producción, `pdencina/barberia`, rama `main`).**
+> El informe original se hizo sobre una copia desactualizada. Al compararlo con producción:
+> - **Ya corregido por Pablo** (commit `d01bef1`, 26-sep): `barberos` (GET/PATCH/DELETE, `[id]`, `role`, `avatar`, `resend-credentials` y crear), que ahora exigen sesión de admin del mismo negocio (`authorizeBarberManagement`), más la migración 073 (el registro ya no toma el rol desde los metadatos). Por eso **la "cadena de riesgo principal" de más abajo ya no aplica**; se deja como registro.
+> - **Siguen sin cambios en producción** (no hay commits de Pablo que las toquen): `pos/checkout`, `pos/checkout/tip`, `pos/verify-pin`, `caja/reopen`, `comisiones/adjust`, `arriendo/adjust`, `wallet`, `loyalty/earn` y `redeem`, `mercadopago*`, `tuu*`, `audit`, `invite-codes/verify`, `boletas/*`, `appointments/[id]*`, `clients/[id]*`, `services/*`, `products/[id]`, `cupones/[id]`, `barber-*`, `gallery*`, `waitlist*`, `push/*`, `finanzas/[id]`, entre otras. Esas siguen a revisar.
+> - Nota sobre `GET /api/barberos/[id]`: ahora exige sesión, pero sigue devolviendo el perfil completo (`select *`), incluido el PIN, a admin, recepción y al propio profesional. Conviene limitar las columnas.
+> - Conteo actualizado (149 rutas con la llave de servicio): (a) 30, (b) 74, (c) 45. Las cuatro rutas de `barberos` pasaron de (c) a (b).
+> - `suscripcion/resultado` ya está corregido en producción (commit `ef85865`).
+
 Informe de **solo lectura**: no se modificó ninguna ruta. Revisadas las 148 rutas de `src/app/api` que usan la llave de servicio (esa llave se salta las reglas de acceso de Supabase, así que la protección tiene que estar en cada ruta).
 
 ## Cómo leer este informe
@@ -13,14 +21,14 @@ Importante: el `middleware.ts` **no exige sesión** en `/api/*`. Solo bloquea ne
 | Categoría | Rutas |
 |---|---|
 | (a) Pública a propósito | 30 |
-| (b) Ya valida sesión y negocio | 69 |
-| (c) A revisar | 49 |
+| (b) Ya valida sesión y negocio | 74 (69 + 4 de `barberos` ya corregidas + `settings/calendar-view`) |
+| (c) A revisar | 45 (eran 49) |
 
 Limitaciones: las rutas de (c) las revisé leyendo el código, no ejecutándolas. En (b) comprobé que validan sesión y negocio, pero **no auditamos línea por línea** que cada consulta filtre por negocio (hice un muestreo, ver sección (b)). `webhooks/deposit` (255 líneas) solo lo revisé en su inicio.
 
 ---
 
-## Cadena de riesgo principal (léela primero)
+## Cadena de riesgo principal — YA CORREGIDA EN PRODUCCIÓN (se deja como registro)
 
 Estos cuatro hallazgos se combinan y permiten **tomar el control de un negocio sin tener cuenta**:
 
@@ -29,7 +37,7 @@ Estos cuatro hallazgos se combinan y permiten **tomar el control de un negocio s
 3. Con ese PIN, `PATCH /api/barberos/[id]/role` (sin sesión) cambia el rol de cualquier usuario, incluido `super_admin`.
 4. Además `GET /api/barberos/[id]` devuelve el perfil completo (`select *`), que incluye `personal_pin` y `mp_access_token`.
 
-Es lo primero que recomiendo arreglar. Ninguna de estas cuatro rutas es pública a propósito.
+Pablo la corrigió en el commit `d01bef1`. Verificado contra `main` de producción el 2 de oct.
 
 ---
 
@@ -41,8 +49,8 @@ Fix general para casi todas: validar sesión con `resolveTenantForRequest` / `ge
 
 | Ruta | Qué queda expuesto hoy | Arreglo propuesto |
 |---|---|---|
-| `barberos/[id]` (GET, PATCH, DELETE) | GET devuelve `select *`: **PIN personal y token de MercadoPago** de cualquier profesional. PATCH cambia PIN, email, comisión y activo sin sesión. DELETE borra. | Sesión + `canAccessBarber`. PATCH/DELETE solo admin. GET con lista explícita de columnas, sin PIN ni token. |
-| `barberos/[id]/role` (PATCH) | Cambia el rol de cualquier usuario (incluso a `super_admin`) conociendo un PIN de admin de **cualquier negocio**. PIN de 4 dígitos = 10.000 combinaciones, sin límite de intentos. | Exigir sesión de admin del mismo negocio; solo un super admin puede asignar `super_admin`; comprobar que el usuario objetivo es del negocio. |
+| ~~`barberos/[id]` (GET, PATCH, DELETE)~~ **CORREGIDO** (queda: limitar columnas del GET) | GET devuelve `select *`: **PIN personal y token de MercadoPago** de cualquier profesional. PATCH cambia PIN, email, comisión y activo sin sesión. DELETE borra. | Sesión + `canAccessBarber`. PATCH/DELETE solo admin. GET con lista explícita de columnas, sin PIN ni token. |
+| ~~`barberos/[id]/role` (PATCH)~~ **CORREGIDO** | Cambia el rol de cualquier usuario (incluso a `super_admin`) conociendo un PIN de admin de **cualquier negocio**. PIN de 4 dígitos = 10.000 combinaciones, sin límite de intentos. | Exigir sesión de admin del mismo negocio; solo un super admin puede asignar `super_admin`; comprobar que el usuario objetivo es del negocio. |
 | `pos/checkout` (POST) | Crea ventas en cualquier negocio (lo decide el `barberId`), descuenta stock, suma puntos y usa cupones. **Confía en `total`, `subtotal` y `descuento` que manda el navegador.** | Sesión; que `barberId` y `clientId` sean del negocio; recalcular el total en el servidor desde los precios reales; validar que el cupón sea del negocio. |
 | `caja/reopen` (POST) | Sin sesión ni negocio: reabre "la caja cerrada de hoy" de cualquier negocio (la consulta no filtra por negocio ni sucursal). | Sesión de admin + filtrar por negocio/sucursal + PIN de ese negocio. |
 | `comisiones/adjust` (POST, DELETE) | Con **un PIN de admin de cualquier negocio** se crean ajustes de plata a cualquier `barberId` y se **anulan transacciones** por id. Si dos admins comparten PIN, `.single()` falla. | Sesión admin + PIN filtrado por negocio + verificar que `barberId`/`transactionId` son del negocio. |
@@ -69,7 +77,7 @@ Fix general para casi todas: validar sesión con `resolveTenantForRequest` / `ge
 | `appointments/[id]/details` (GET) | Nombre, email, teléfono y puntos del cliente de cualquier cita. | Sesión + cita del negocio. |
 | `boletas/emit` (POST) | Emite boleta electrónica (efecto tributario) de cualquier transacción. | Sesión admin/recepción + transacción del negocio. |
 | `boletas/send` (POST) | Envía correos con el recibo a **cualquier email** desde la cuenta del negocio. | Igual; no permitir `email` libre sin sesión. |
-| `barberos/resend-credentials` (POST) | Genera una contraseña temporal nueva para cualquier cuenta indicada por `profileId` o `email`. | Sesión admin + profesional del mismo negocio. |
+| ~~`barberos/resend-credentials` (POST)~~ **CORREGIDO** | Genera una contraseña temporal nueva para cualquier cuenta indicada por `profileId` o `email`. | Sesión admin + profesional del mismo negocio. |
 | `invite-codes/verify` (POST) | Con un código válido se puede mover **cualquier `userId`** a un negocio y dejarlo como barber (incluso sacar a un admin de su negocio). | Exigir que `userId` sea el de la sesión actual. |
 | `audit` (GET, POST) | GET lista el registro de auditoría de **todos los negocios**. POST permite escribir entradas falsas con cualquier usuario. | Sesión admin + filtrar por negocio; POST solo desde el servidor. |
 | `push/send` (POST) | Envía notificaciones push a cualquier usuario o a todos los roles de **cualquier negocio** (el `tenantId` viene del cuerpo): sirve para phishing. | Sesión; o hacerla función interna del servidor. |
@@ -123,7 +131,7 @@ Observaciones (no se tocó nada):
 
 ## Orden de arreglo sugerido (cada paso, un commit pequeño)
 
-1. Cadena de riesgo: `barberos/[id]` (+ `role`, + `resend-credentials`, + `invite-codes/verify`).
+1. ~~Cadena de riesgo `barberos`~~ (ya corregida). Queda `invite-codes/verify` y limitar columnas del `GET barberos/[id]`.
 2. PIN de plata: `comisiones/adjust`, `arriendo/adjust`, `pos/verify-pin`, `caja/reopen`.
 3. `pos/checkout` (recalcular total en el servidor) + `loyalty/earn` y `loyalty/redeem`.
 4. Cobros: `mercadopago*`, `tuu*` (empezar por `tuu/cancel` con `cancelAll`).

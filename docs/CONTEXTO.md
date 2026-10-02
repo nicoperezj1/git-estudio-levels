@@ -2,6 +2,8 @@
 
 Última actualización: 2 de octubre de 2026. Léelo al empezar una sesión nueva.
 
+> **Producción es la referencia, no esta copia.** El repo oficial es `pdencina/barberia`, rama `main` (público; se puede clonar solo para leer). Esta rama de trabajo se actualiza trayendo ese `main` (`git fetch https://github.com/pdencina/barberia main` y merge). **Antes de cualquier tarea, comparar con producción**, porque Pablo también cambia código. A 2 de oct.: producción **ya incluye** los parches 0011 y 0012 (commit `f7931c2`), la corrección de seguridad de `/api/barberos` (`d01bef1`) y el arreglo de Suspense. **No incluye aún** el parche 0013 (Nuevo = primera cita + el cobro completa la cita).
+
 ## Proyecto
 - SaaS de agenda y punto de venta (POS) para barberías. Next.js 14 + Supabase, desplegado en Vercel. Código en `src/`, migraciones SQL en `supabase/migrations/`.
 - **Quién es quién:** Nicolás es el dueño de Estudio Levels y trabaja en este repo (`nicoperezj1/git-estudio-levels`). Pablo es el desarrollador. Su repo oficial es `pdencina/barberia`, rama `mejoras/tema-caja-superadmin`. Pablo aplica los parches, corre las migraciones SQL **a mano** en el SQL Editor de Supabase de producción y despliega.
@@ -40,14 +42,8 @@
 Los dos zips incluyen un parche incremental y uno acumulado desde `e386ee8`. Pablo usa **solo uno** según lo que ya haya aplicado.
 
 ## Pendiente / ideas
-1. **Seguridad (urgente):** el informe `docs/auditoria-rutas-api.md` clasifica las 148 rutas con `createAdminSupabase()`: 30 públicas a propósito, 69 que validan, **49 a revisar**. Lo más grave es una cadena que permite tomar control de un negocio sin cuenta:
-   - `public/barbers` entrega los ids de profesionales.
-   - `PATCH /api/barberos/[id]` no pide sesión y acepta `personal_pin`.
-   - `PATCH /api/barberos/[id]/role` cambia roles (incluso a `super_admin`) con un PIN de 4 dígitos, sin límite de intentos.
-   - `GET /api/barberos/[id]` devuelve el perfil completo, con el PIN y el token de MercadoPago.
-
-   Otros críticos: `pos/checkout`, `comisiones/adjust`, `arriendo/adjust`, `caja/reopen`, `pos/verify-pin`, `wallet`, `loyalty/earn` y `redeem`, `mercadopago*`, `tuu*`. El informe trae un orden de arreglo en commits pequeños. **Antes de arreglar**, confirmar qué pantallas llaman a cada ruta, porque algunas se llaman de servidor a servidor, sin cookies.
-2. **Build de Vercel:** `next build` falla en `src/app/suscripcion/resultado/page.tsx` porque usa `useSearchParams()` sin `<Suspense>`. No viene de nuestros cambios. El arreglo es envolver el componente en `Suspense`. Pendiente de que Nicolás lo pida.
+1. **Seguridad (urgente):** el informe `docs/auditoria-rutas-api.md` clasifica las 149 rutas con `createAdminSupabase()`: 30 públicas a propósito, 74 que validan, **45 a revisar**. La cadena de `/api/barberos` (cambiar roles y PIN sin sesión) **ya la corrigió Pablo en producción** (`d01bef1`); queda limitar las columnas que devuelve `GET /api/barberos/[id]` (hoy incluye el PIN). Siguen abiertas, sin cambios en producción: `pos/checkout`, `comisiones/adjust`, `arriendo/adjust`, `caja/reopen`, `pos/verify-pin`, `wallet`, `loyalty/earn` y `redeem`, `mercadopago*`, `tuu*`. El informe trae un orden de arreglo en commits pequeños. **Antes de arreglar**, confirmar qué pantallas llaman a cada ruta, porque algunas se llaman de servidor a servidor, sin cookies.
+2. ~~Build de Vercel (`suscripcion/resultado` sin `Suspense`)~~: ya corregido en producción (`ef85865`).
 3. **Pixel de Meta (solo conversado, no implementado):**
    - Un pixel **por negocio**, con campo "ID de Pixel" en Configuración (admin) y una migración.
    - Cargarlo solo en las páginas públicas de reservas (`/[slug]`, `/booking`).
