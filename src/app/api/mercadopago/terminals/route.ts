@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, authorizeProfileAccess } from "@/lib/supabase/server";
 
 // GET: List rental barbers (with own MP terminal) for a tenant.
 // IMPORTANT: this used to have no tenant filter at all, so any admin fetching this
@@ -44,6 +44,14 @@ export async function POST(req: NextRequest) {
 
   if (!barberId) {
     return NextResponse.json({ error: "barberId required" }, { status: 400 });
+  }
+
+  // SEGURIDAD: antes no pedia sesion: se podia poner un token de cobro propio en el perfil de
+  // cualquier profesional y desviar sus pagos. Solo un admin del mismo negocio.
+  const access = await authorizeProfileAccess(barberId);
+  if (!access.ok) return access.response;
+  if (access.level !== "admin" && access.level !== "super_admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   const updateData: Record<string, string | null> = {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, requireTenantRole } from "@/lib/supabase/server";
 
 // GET: Fetch deposit settings for a tenant
 export async function GET(req: NextRequest) {
@@ -27,9 +27,13 @@ export async function GET(req: NextRequest) {
 // POST: Save deposit settings
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
-  const { tenantId, deposit_enabled, deposit_percentage, cancellation_free_hours, deposit_message } = await req.json();
-
-  if (!tenantId) return NextResponse.json({ error: "tenantId required" }, { status: 400 });
+  const body = await req.json();
+  const { deposit_enabled, deposit_percentage, cancellation_free_hours, deposit_message } = body;
+  // SEGURIDAD: antes no pedia sesion y confiaba en el tenantId del cuerpo: cualquiera podia
+  // cambiar las credenciales de cobro de cualquier negocio. Solo admin, solo de su negocio.
+  const guard = await requireTenantRole(["admin", "super_admin"], body.tenantId);
+  if (!guard.ok) return guard.response;
+  const tenantId = guard.tenantId;
 
   const { error } = await supabase
     .from("tenant_settings")
