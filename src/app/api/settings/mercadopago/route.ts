@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, requireTenantRole } from "@/lib/supabase/server";
 
 // GET: Fetch MP settings for current tenant
 export async function GET(req: NextRequest) {
@@ -39,11 +39,13 @@ export async function GET(req: NextRequest) {
 // POST: Save MP settings for tenant
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
-  const { tenantId, mp_access_token, mp_device_id, mp_device_name } = await req.json();
-
-  if (!tenantId) {
-    return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-  }
+  const body = await req.json();
+  const { mp_access_token, mp_device_id, mp_device_name } = body;
+  // SEGURIDAD: antes no pedia sesion y confiaba en el tenantId del cuerpo: cualquiera podia
+  // cambiar las credenciales de cobro de cualquier negocio. Solo admin, solo de su negocio.
+  const guard = await requireTenantRole(["admin", "super_admin"], body.tenantId);
+  if (!guard.ok) return guard.response;
+  const tenantId = guard.tenantId;
 
   // Build update object - only update token if a new one is provided (not masked)
   const update: any = {

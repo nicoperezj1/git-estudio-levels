@@ -110,8 +110,13 @@ export function canAccessRoute(role: Role, pathname: string): boolean {
   if (!perms) return false;
 
   return perms.routes.some((route) => {
-    // "/dashboard" as a listed route means access to ALL dashboard routes for that role
-    if (route === "/dashboard") return pathname.startsWith("/dashboard");
+    // "/dashboard" as a listed route means access to ALL dashboard routes for that role,
+    // EXCEPT the platform-owner area (/dashboard/superadmin: empresas, auditoria, sesiones),
+    // which only the super_admin may open. Before, admin and reception could reach it by URL.
+    if (route === "/dashboard") {
+      if (pathname.startsWith("/dashboard/superadmin")) return role === "super_admin";
+      return pathname.startsWith("/dashboard");
+    }
     return pathname === route || pathname.startsWith(route + "/");
   });
 }

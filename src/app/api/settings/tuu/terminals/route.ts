@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, requireTenantRole, requireRole } from "@/lib/supabase/server";
 
 // CRUD for TUU terminals (device serial numbers). Mirrors
 // /api/settings/mercadopago/terminals exactly, but for tuu_terminals.
@@ -26,10 +26,16 @@ export async function GET(req: NextRequest) {
 // POST: Add a terminal
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
-  const { tenantId, name, device_serial, terminal_type } = await req.json();
+  const body = await req.json();
+  const { name, device_serial, terminal_type } = body;
+  // SEGURIDAD: antes no pedia sesion y confiaba en el tenantId del cuerpo: cualquiera podia
+  // cambiar las credenciales de cobro de cualquier negocio. Solo admin, solo de su negocio.
+  const guard = await requireTenantRole(["admin", "super_admin"], body.tenantId);
+  if (!guard.ok) return guard.response;
+  const tenantId = guard.tenantId;
 
-  if (!tenantId || !name || !device_serial) {
-    return NextResponse.json({ error: "tenantId, name y device_serial son obligatorios" }, { status: 400 });
+  if (!name || !device_serial) {
+    return NextResponse.json({ error: "name y device_serial son obligatorios" }, { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -50,9 +56,18 @@ export async function POST(req: NextRequest) {
 // PATCH: Update a terminal
 export async function PATCH(req: NextRequest) {
   const supabase = createAdminSupabase();
-  const { id, name, device_serial, terminal_type, active } = await req.json();
+  const body = await req.json();
+  const { id, name, device_serial, terminal_type, active } = body;
 
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // SEGURIDAD: la terminal debe pertenecer al negocio de quien edita.
+  const guard = await requireRole(["admin", "super_admin"]);
+  if (!guard.ok) return guard.response;
+  const { data: owned } = await supabase.from("tuu_terminals").select("tenant_id").eq("id", id).maybeSingle();
+  if (!owned || (guard.role !== "super_admin" && owned.tenant_id !== guard.tenantId)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
   const update: any = {};
   if (name !== undefined) update.name = name;
@@ -78,6 +93,14 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
 
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // SEGURIDAD: solo un admin, y solo de una terminal de su propio negocio.
+  const guard = await requireRole(["admin", "super_admin"]);
+  if (!guard.ok) return guard.response;
+  const { data: owned } = await supabase.from("tuu_terminals").select("tenant_id").eq("id", id).maybeSingle();
+  if (!owned || (guard.role !== "super_admin" && owned.tenant_id !== guard.tenantId)) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
   await supabase.from("tuu_terminals").update({ active: false }).eq("id", id);
   return NextResponse.json({ success: true });

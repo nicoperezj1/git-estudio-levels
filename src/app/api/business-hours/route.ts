@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, requireTenantRole } from "@/lib/supabase/server";
 
 const dayNames = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 
@@ -38,27 +38,20 @@ export async function GET(req: NextRequest) {
 
 // PATCH: Update business hours for a specific day (per business)
 export async function PATCH(req: NextRequest) {
-  const supabase = createAdminSupabase();
   const body = await req.json();
   const { dayOfWeek, openTime, closeTime, isClosed } = body;
+
+  // SEGURIDAD: antes no pedia sesion y confiaba en el tenantId del cuerpo: cualquiera podia
+  // pisar los horarios de cualquier negocio. Ahora solo un admin, y solo de su negocio.
+  const guard = await requireTenantRole(["admin", "super_admin"], body.tenantId);
+  if (!guard.ok) return guard.response;
+  const supabase = createAdminSupabase();
 
   if (dayOfWeek === undefined || dayOfWeek < 0 || dayOfWeek > 6) {
     return NextResponse.json({ error: "dayOfWeek invalido (0-6)" }, { status: 400 });
   }
 
-  // Resolve the business: body param first, then the session.
-  let tenantId: string | null = body.tenantId || null;
-  if (!tenantId) {
-    const { searchParams } = new URL(req.url);
-    const { tenantId: resolved } = await resolveTenantForRequest(searchParams.get("tenantId"));
-    tenantId = resolved && resolved !== "ALL" ? resolved : null;
-  }
-  if (!tenantId) {
-    return NextResponse.json(
-      { error: "No se pudo determinar el negocio para guardar los horarios." },
-      { status: 400 }
-    );
-  }
+  const tenantId = guard.tenantId;
 
   // The unique index is (tenant_id, day_of_week) — see migration 050. Using only
   // day_of_week here would fail (no matching constraint) or clobber another salon's row.

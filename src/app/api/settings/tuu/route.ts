@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, requireTenantRole } from "@/lib/supabase/server";
 
 // GET: Fetch TUU settings for current tenant (mirrors /api/settings/mercadopago)
 export async function GET(req: NextRequest) {
@@ -38,11 +38,13 @@ export async function GET(req: NextRequest) {
 // POST: Save TUU settings for tenant (API key and/or which provider is active)
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
-  const { tenantId, tuu_api_key, card_payment_provider } = await req.json();
-
-  if (!tenantId) {
-    return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-  }
+  const body = await req.json();
+  const { tuu_api_key, card_payment_provider } = body;
+  // SEGURIDAD: antes no pedia sesion y confiaba en el tenantId del cuerpo: cualquiera podia
+  // cambiar las credenciales de cobro de cualquier negocio. Solo admin, solo de su negocio.
+  const guard = await requireTenantRole(["admin", "super_admin"], body.tenantId);
+  if (!guard.ok) return guard.response;
+  const tenantId = guard.tenantId;
 
   const update: any = {};
 

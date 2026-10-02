@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export function createServerSupabase() {
   const cookieStore = cookies();
@@ -201,4 +202,84 @@ export async function getCurrentTenantId(): Promise<string | null> {
     console.error("getCurrentTenantId error:", e);
     return null;
   }
+}
+
+
+// ---------------------------------------------------------------------------------
+// Guardas de autorizacion para rutas API (el middleware NO exige sesion en /api/*).
+// ---------------------------------------------------------------------------------
+
+type GuardFail = { ok: false; response: NextResponse };
+
+// Exige sesion y que el rol del usuario este en `allowed`.
+export async function requireRole(allowed: string[]): Promise<
+  GuardFail | { ok: true; userId: string; role: string; tenantId: string | null }
+> {
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  if (!userId) {
+    return { ok: false, response: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
+  }
+  if (!role || !allowed.includes(role)) {
+    return { ok: false, response: NextResponse.json({ error: "No autorizado" }, { status: 403 }) };
+  }
+  return { ok: true, userId, role, tenantId };
+}
+
+// Igual que requireRole, y ademas resuelve el negocio sobre el que se puede operar:
+// el del propio usuario; solo super_admin puede indicar otro (y debe indicarlo).
+export async function requireTenantRole(
+  allowed: string[],
+  requestedTenantId?: string | null
+): Promise<GuardFail | { ok: true; userId: string; role: string; tenantId: string }> {
+  const g = await requireRole(allowed);
+  if (!g.ok) return g;
+  const tenantId = g.role === "super_admin" ? requestedTenantId || null : g.tenantId;
+  if (!tenantId || tenantId === "ALL") {
+    return { ok: false, response: NextResponse.json({ error: "tenantId required" }, { status: 400 }) };
+  }
+  return { ok: true, userId: g.userId, role: g.role, tenantId };
+}
+
+// Autoriza el acceso al perfil de UN profesional. Nivel de acceso:
+//   super_admin  -> todo
+//   admin        -> perfiles de su mismo negocio (nunca el de un super_admin)
+//   receptionist -> perfiles de su negocio, solo lectura y datos de presentacion
+//   self         -> su propio perfil
+export type ProfileLevel = "super_admin" | "admin" | "receptionist" | "self";
+export async function authorizeProfileAccess(targetId: string): Promise<
+  GuardFail | {
+    ok: true;
+    level: ProfileLevel;
+    userId: string;
+    role: string;
+    tenantId: string | null;
+    target: { id: string; tenant_id: string | null; role: string; email: string | null };
+  }
+> {
+  const caller = await getCurrentUserRoleAndTenant();
+  if (!caller.userId) {
+    return { ok: false, response: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
+  }
+  const { data: target } = await createAdminSupabase()
+    .from("profiles")
+    .select("id, tenant_id, role, email")
+    .eq("id", targetId)
+    .maybeSingle();
+  if (!target) {
+    return { ok: false, response: NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 }) };
+  }
+
+  const isSelf = caller.userId === targetId;
+  const sameTenant = !!caller.tenantId && target.tenant_id === caller.tenantId;
+  let level: ProfileLevel | null = null;
+  if (caller.role === "super_admin") level = "super_admin";
+  else if (target.role === "super_admin") level = isSelf ? "self" : null;
+  else if (sameTenant && caller.role === "admin") level = "admin";
+  else if (isSelf) level = "self";
+  else if (sameTenant && caller.role === "receptionist") level = "receptionist";
+
+  if (!level) {
+    return { ok: false, response: NextResponse.json({ error: "No autorizado" }, { status: 403 }) };
+  }
+  return { ok: true, level, userId: caller.userId, role: caller.role || "", tenantId: caller.tenantId, target };
 }
