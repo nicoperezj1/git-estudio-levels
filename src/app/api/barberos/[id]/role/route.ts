@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 
 // PATCH: Change a user's role (requires admin PIN)
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createAdminSupabase();
   const { role, pin } = await req.json();
+
+  // SEGURIDAD: antes bastaba adivinar el PIN de 4 digitos de CUALQUIER admin (sin login)
+  // para cambiar el rol de cualquiera, incluso a super_admin. Ahora exige sesion de admin
+  // del mismo negocio (o super_admin), y solo super_admin puede otorgar super_admin.
+  const auth = await authorizeBarberManagement(params.id);
+  if (!auth.ok || (auth.role !== "admin" && auth.role !== "super_admin")) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+  if (role === "super_admin" && auth.role !== "super_admin") {
+    return NextResponse.json({ error: "Solo un super admin puede asignar ese rol" }, { status: 403 });
+  }
 
   // Validate PIN
   if (!pin || pin.length !== 4) {
@@ -17,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select("id, name")
     .in("role", ["admin", "super_admin"])
     .eq("personal_pin", pin)
+    .eq("id", auth.userId)
     .eq("active", true)
     .single();
 

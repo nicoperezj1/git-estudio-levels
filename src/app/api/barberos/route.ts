@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase, createAdminSupabase, getCurrentTenantId, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createServerSupabase, createAdminSupabase, getCurrentTenantId, resolveTenantForRequest, authorizeBarberManagement } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
@@ -70,8 +70,21 @@ export async function POST(req: NextRequest) {
   const { name, email, phone, password, tenantId, role } = body;
   const birthDate: string | null = typeof body.birthDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate) ? body.birthDate : null;
 
-  const tempPassword = password || Math.random().toString(36).slice(-8);
+  // SEGURIDAD: antes no pedia login — cualquiera podia crear usuarios (incluso super_admin).
+  const caller = await authorizeBarberManagement(null);
+  if (!caller.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
   const userRole = role || "barber";
+  const allowedRoles = caller.role === "super_admin"
+    ? ["barber", "receptionist", "admin", "super_admin"]
+    : caller.role === "admin" ? ["barber", "receptionist", "admin"] : ["barber"];
+  if (!allowedRoles.includes(userRole)) {
+    return NextResponse.json({ error: "No puedes crear un usuario con ese rol" }, { status: 403 });
+  }
+  // Solo super_admin elige negocio; el resto siempre crea en el suyo.
+  const tenantForNew = caller.role === "super_admin" ? tenantId : caller.tenantId;
+
+  const tempPassword = password || Math.random().toString(36).slice(-8);
 
   // Bug (reportado por Nico, 27-sep): esto nunca validaba tenants.max_professionals —
   // se podian crear profesionales sin limite sin importar el plan contratado (probado en
@@ -130,7 +143,7 @@ export async function POST(req: NextRequest) {
   // Update phone and tenant in profile
   if (authData.user) {
     // Resolve tenant_id: prefer param, fallback to session
-    let resolvedTenantId = tenantId;
+    let resolvedTenantId = tenantForNew;
     if (!resolvedTenantId) {
       const { getCurrentTenantId } = await import("@/lib/supabase/server");
       resolvedTenantId = await getCurrentTenantId();

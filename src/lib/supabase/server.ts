@@ -137,6 +137,32 @@ export async function canAccessBarber(barberId: string): Promise<boolean> {
   return barber?.tenant_id === tenantId;
 }
 
+// Authorize MANAGING a professional's account (profile edit, role, password reset,
+// delete). The /api/barberos routes ran with the service role and no login check, so
+// anyone could edit/delete professionals, reset passwords or create a super_admin.
+// Returns who the caller is so routes can apply finer rules (self vs manager).
+export async function authorizeBarberManagement(
+  barberId: string | null,
+  opts: { allowSelf?: boolean } = {}
+): Promise<{ ok: boolean; self: boolean; role: string | null; tenantId: string | null; userId: string | null }> {
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  const deny = { ok: false, self: false, role, tenantId, userId };
+  if (!userId) return deny;
+  if (role === "super_admin") return { ok: true, self: false, role, tenantId, userId };
+  if (role === "admin" || role === "receptionist") {
+    if (!barberId) return { ok: !!tenantId, self: false, role, tenantId, userId };
+    const { data: barber } = await createAdminSupabase()
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", barberId)
+      .single();
+    if (barber?.tenant_id && barber.tenant_id === tenantId) return { ok: true, self: false, role, tenantId, userId };
+  }
+  // A plain professional may only touch their own profile (routes limit the fields).
+  if (barberId && opts.allowSelf && userId === barberId) return { ok: true, self: true, role, tenantId, userId };
+  return deny;
+}
+
 // Get the current user's tenant_id from the session
 // Returns: tenant_id string, "ALL" for super_admin, or null if can't determine
 export async function getCurrentTenantId(): Promise<string | null> {
