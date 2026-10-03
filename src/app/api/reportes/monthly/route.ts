@@ -1,3 +1,4 @@
+import { accountingColumnsAvailable, monthFilter } from "@/lib/accounting";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 import { todayInChile, chileDayBoundsUtc } from "@/lib/utils";
@@ -58,23 +59,23 @@ export async function GET(req: NextRequest) {
   // and every card shows $0 for super_admin.
   const tf = (q: any) => (tenantId && tenantId !== "ALL") ? q.eq("tenant_id", tenantId) : q;
 
+  // Ingresos y egresos por fecha contable ("Corresponde al mes"); ver src/lib/accounting.ts.
+  const acc = await accountingColumnsAvailable(supabase);
+  const mr = { first: firstDayStr, last: lastDayStr, startIso: startDate, endIso: endDate };
+
   // Income transactions
-  const { data: incomeTx } = await tf(supabase
+  const { data: incomeTx } = await tf(monthFilter(supabase
     .from("transactions")
     .select("total, payment_method, barber_id")
     .eq("type", "income")
-    .eq("status", "completed")
-    .gte("created_at", startDate)
-    .lt("created_at", endDate));
+    .eq("status", "completed"), acc, mr));
 
   // Expense transactions
-  const { data: expenseTx } = await tf(supabase
+  const { data: expenseTx } = await tf(monthFilter(supabase
     .from("transactions")
     .select("id, total")
     .eq("type", "expense")
-    .eq("status", "completed")
-    .gte("created_at", startDate)
-    .lt("created_at", endDate));
+    .eq("status", "completed"), acc, mr));
 
   const totalIncome = (incomeTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
   const totalExpenses = (expenseTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { accountingColumnsAvailable, monthStart } from "@/lib/accounting";
 
 // Punto 5 (Pablo): editar/eliminar movimientos manuales, disponible solo para el
 // administrador (pueden existir errores de digitacion o movimientos mal ingresados).
@@ -24,7 +25,7 @@ export async function PATCH(
 
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { description, amount, paymentMethod, notes, assignedTo, barberId } = body;
+  const { description, amount, paymentMethod, notes, assignedTo, barberId, accountingMonth } = body;
 
   const updates: Record<string, any> = {};
   if (amount !== undefined) {
@@ -39,6 +40,12 @@ export async function PATCH(
     // so a movement re-tagged as Recepcion/Negocio general doesn't keep pointing at a
     // barber that no longer applies.
     updates.barber_id = updates.assigned_to === "professional" && barberId ? barberId : null;
+  }
+
+  // "Corresponde al mes": solo si la columna existe (migracion 090) y el mes es valido.
+  if (accountingMonth !== undefined && (await accountingColumnsAvailable(supabase))) {
+    const m = monthStart(accountingMonth);
+    if (m) updates.accounting_month = m;
   }
 
   if (Object.keys(updates).length > 0) {

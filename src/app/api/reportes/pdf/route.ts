@@ -1,3 +1,4 @@
+import { accountingColumnsAvailable, monthFilter } from "@/lib/accounting";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 import { todayInChile, chileDayBoundsUtc } from "@/lib/utils";
@@ -89,29 +90,29 @@ export async function GET(req: NextRequest) {
   const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
 
   // ---------- Datos del mes ----------
-  const { data: incomeTx } = await scoped(supabase
+  // Ingresos y egresos se cuentan por su fecha contable ("Corresponde al mes"); ver src/lib/accounting.ts.
+  const acc = await accountingColumnsAvailable(supabase);
+  const mf = (q: any, r: { first: string; last: string; startUtc: string; endUtc: string }) =>
+    monthFilter(q, acc, { first: r.first, last: r.last, startIso: r.startUtc, endIso: r.endUtc });
+  const { data: incomeTx } = await scoped(mf(supabase
     .from("transactions")
     .select("id, total, subtotal, discount, payment_method, barber_id, client_id, coupon_id, created_at")
-    .eq("type", "income").eq("status", "completed")
-    .gte("created_at", cur.startUtc).lt("created_at", cur.endUtc));
+    .eq("type", "income").eq("status", "completed"), cur));
   const income: any[] = incomeTx || [];
 
-  const { data: expenseTx } = await scoped(supabase
+  const { data: expenseTx } = await scoped(mf(supabase
     .from("transactions")
     .select("id, total")
-    .eq("type", "expense").eq("status", "completed")
-    .gte("created_at", cur.startUtc).lt("created_at", cur.endUtc));
+    .eq("type", "expense").eq("status", "completed"), cur));
   const expenses: any[] = expenseTx || [];
 
   // Mes anterior (solo totales, para las comparaciones).
-  const { data: prevIncomeTx } = await scoped(supabase
+  const { data: prevIncomeTx } = await scoped(mf(supabase
     .from("transactions").select("total")
-    .eq("type", "income").eq("status", "completed")
-    .gte("created_at", prev.startUtc).lt("created_at", prev.endUtc));
-  const { data: prevExpenseTx } = await scoped(supabase
+    .eq("type", "income").eq("status", "completed"), prev));
+  const { data: prevExpenseTx } = await scoped(mf(supabase
     .from("transactions").select("total")
-    .eq("type", "expense").eq("status", "completed")
-    .gte("created_at", prev.startUtc).lt("created_at", prev.endUtc));
+    .eq("type", "expense").eq("status", "completed"), prev));
   const { count: prevNewClients } = await scoped(supabase
     .from("clients").select("id", { count: "exact", head: true })
     .gte("created_at", prev.startUtc).lt("created_at", prev.endUtc));

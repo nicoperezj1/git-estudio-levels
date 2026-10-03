@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
+import { chileDayBoundsUtc, todayInChile } from "@/lib/utils";
+import { accountingColumnsAvailable, monthEnd, monthFilter, monthStart } from "@/lib/accounting";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -11,6 +13,9 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const barberId = searchParams.get("barberId");
+  // "Mes contable": movimientos que corresponden a ese mes (aunque se hayan registrado en otro).
+  const month = monthStart(searchParams.get("month"));
+  const acc = await accountingColumnsAvailable(supabase);
 
   let query = supabase
     .from("transactions")
@@ -31,16 +36,33 @@ export async function GET(req: NextRequest) {
   // "ALL" means super_admin (no filter, sees every business).
   if (tenantId && tenantId !== "ALL") query = query.eq("tenant_id", tenantId);
   if (type && type !== "ALL") query = query.eq("type", type.toLowerCase());
-  if (from) query = query.gte("created_at", new Date(from).toISOString());
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setDate(toDate.getDate() + 1);
-    query = query.lte("created_at", toDate.toISOString());
+  if (month) {
+    const last = monthEnd(month);
+    query = monthFilter(query, acc, {
+      first: month, last,
+      startIso: chileDayBoundsUtc(month).startUtc,
+      endIso: chileDayBoundsUtc(last).endUtc,
+    });
+  } else {
+    if (from) query = query.gte("created_at", new Date(from).toISOString());
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setDate(toDate.getDate() + 1);
+      query = query.lte("created_at", toDate.toISOString());
+    }
   }
   if (barberId) query = query.eq("barber_id", barberId);
 
   const { data: transactions, error } = await query;
   if (error) return NextResponse.json({ transactions: [], stats: { totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 } });
+
+  // "Emitido por": nombre de quien registro el movimiento (solo los hechos desde la migracion 090).
+  const creatorIds = Array.from(new Set((transactions || []).map((t: any) => t.created_by).filter(Boolean)));
+  if (creatorIds.length > 0) {
+    const { data: creators } = await supabase.from("profiles").select("id, name").in("id", creatorIds);
+    const nameById = new Map((creators || []).map((c: any) => [c.id, c.name]));
+    for (const t of transactions as any[]) t.created_by_name = t.created_by ? nameById.get(t.created_by) || null : null;
+  }
 
   // Calculate stats
   const income = (transactions || []).filter((t) => t.type === "income");
@@ -77,7 +99,7 @@ const ASSIGNED_TO_VALUES = new Set(["professional", "reception", "business"]);
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { type, description, amount, paymentMethod, notes, tenantId: bodyTenantId, assignedTo, barberId } = body;
+  const { type, description, amount, paymentMethod, notes, tenantId: bodyTenantId, assignedTo, barberId, accountingMonth } = body;
 
   // Resolve tenant: prefer explicit param, fallback to session. Never save a manual
   // income/expense entry without a business, or it becomes invisible in Finanzas.
@@ -97,19 +119,27 @@ export async function POST(req: NextRequest) {
   const resolvedAssignedTo = ASSIGNED_TO_VALUES.has(assignedTo) ? assignedTo : null;
   const resolvedBarberId = resolvedAssignedTo === "professional" && barberId ? barberId : null;
 
+  // Fecha contable ("Corresponde al mes"): por defecto el mes de hoy. Y quien emite el movimiento.
+  const acc = await accountingColumnsAvailable(supabase);
+  const base = {
+    type: type.toLowerCase(),
+    status: "completed",
+    subtotal: amount,
+    total: amount,
+    payment_method: paymentMethod.toLowerCase(),
+    notes,
+    tenant_id: resolvedTenantId,
+    assigned_to: resolvedAssignedTo,
+    barber_id: resolvedBarberId,
+  };
+  const { userId } = await getCurrentUserRoleAndTenant();
+  const row = acc
+    ? { ...base, accounting_month: monthStart(accountingMonth) || monthStart(todayInChile()), created_by: userId }
+    : base;
+
   const { data: tx, error: txError } = await supabase
     .from("transactions")
-    .insert({
-      type: type.toLowerCase(),
-      status: "completed",
-      subtotal: amount,
-      total: amount,
-      payment_method: paymentMethod.toLowerCase(),
-      notes,
-      tenant_id: resolvedTenantId,
-      assigned_to: resolvedAssignedTo,
-      barber_id: resolvedBarberId,
-    })
+    .insert(row)
     .select()
     .single();
 

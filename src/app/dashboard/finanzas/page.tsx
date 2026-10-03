@@ -21,6 +21,10 @@ interface Transaction {
   items: Array<{ description: string; total: number }>;
   assigned_to: "professional" | "reception" | "business" | null;
   barber_id: string | null;
+  // Fecha contable ("Corresponde al mes", dia 1) y quien registro el movimiento (migracion 090).
+  // Vacios en los movimientos de antes: se entiende "el mes de su fecha de creacion" / "sin dato".
+  accounting_month?: string | null;
+  created_by_name?: string | null;
 }
 
 interface Barber {
@@ -63,6 +67,22 @@ const emptyFormData = {
   notes: "",
   assignedTo: "" as "" | "professional" | "reception" | "business",
   barberId: "",
+  accountingMonth: "", // "" = el mes de hoy
+};
+
+const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const CL_TZ = "America/Santiago";
+// Mes (YYYY-MM) de un instante, en hora de Chile.
+const monthOf = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: CL_TZ, year: "numeric", month: "2-digit" }).format(new Date(iso)).slice(0, 7);
+const monthLabel = (ym: string) => `${MONTH_NAMES[parseInt(ym.slice(5, 7), 10) - 1]} ${ym.slice(0, 4)}`;
+// Hoy y los 14 meses anteriores (para "Corresponde al mes" y el filtro por mes).
+const monthOptions = (): Array<{ value: string; label: string }> => {
+  const [y, m] = todayInChile().split("-").map(Number);
+  return Array.from({ length: 15 }, (_, i) => {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));
+    const v = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    return { value: v, label: monthLabel(v) };
+  });
 };
 
 export default function FinanzasPage() {
@@ -75,6 +95,8 @@ export default function FinanzasPage() {
   const [quickRange, setQuickRange] = useState<string>("month");
   const [dateFrom, setDateFrom] = useState(() => chileDateOffset(-30));
   const [dateTo, setDateTo] = useState(() => todayInChile());
+  // "" = filtrar por fechas; "YYYY-MM" = solo lo que CORRESPONDE a ese mes (fecha contable).
+  const [monthFilter, setMonthFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   // Punto 5: null = creando una transaccion nueva; con id = editando una existente
@@ -114,8 +136,11 @@ export default function FinanzasPage() {
     setLoading(true);
     const params = new URLSearchParams();
     if (filter !== "all") params.set("type", filter);
-    if (dateFrom) params.set("from", dateFrom);
-    if (dateTo) params.set("to", dateTo);
+    if (monthFilter) params.set("month", monthFilter);
+    else {
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
+    }
     const t = getActiveTenantId();
     if (t) params.set("tenantId", t);
     try {
@@ -134,7 +159,7 @@ export default function FinanzasPage() {
     if (tenantLoading) return;
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, dateFrom, dateTo, tenantLoading, tenant?.id]);
+  }, [filter, dateFrom, dateTo, monthFilter, tenantLoading, tenant?.id]);
 
   const totalIncome = transactions
     .filter((t) => t.type === "income")
@@ -143,12 +168,39 @@ export default function FinanzasPage() {
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + Number(t.total), 0);
   const balance = totalIncome - totalExpenses;
-  const rangeLabel = QUICK_RANGES.find((r) => r.key === quickRange)?.label || null;
+  const rangeLabel = monthFilter ? monthLabel(monthFilter) : QUICK_RANGES.find((r) => r.key === quickRange)?.label || null;
 
   const applyQuickRange = (key: string, days: number) => {
     setQuickRange(key);
     setDateFrom(chileDateOffset(-days));
     setDateTo(todayInChile());
+  };
+
+  // Descarga lo que se ve en pantalla (mismos filtros) como CSV, que abre directo en Excel.
+  const exportCsv = () => {
+    const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const head = ["Hora", "Fecha", "Tipo", "Descripción", "Profesional / Corresponde a", "Emitido por", "Cliente", "Método de pago", "Monto", "Corresponde al mes"];
+    const rows = transactions.map((t) => {
+      const d = new Date(t.created_at);
+      return [
+        d.toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" }),
+        d.toLocaleDateString("es-CL", { timeZone: CL_TZ }),
+        t.type === "income" ? "Ingreso" : "Egreso",
+        t.items?.map((i: any) => i.description).join(", ") || t.notes || "",
+        t.barber?.name || (t.assigned_to ? assignedToLabels[t.assigned_to] : ""),
+        t.created_by_name || "",
+        t.client?.name || "",
+        paymentMethodLabels[t.payment_method] || t.payment_method,
+        (t.type === "expense" ? -1 : 1) * Number(t.total),
+        monthLabel((t.accounting_month || "").slice(0, 7) || monthOf(t.created_at)),
+      ].map(q).join(";");
+    });
+    const blob = new Blob(["\uFEFF" + [head.map(q).join(";"), ...rows].join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `ingresos-egresos-${monthFilter || `${dateFrom}_${dateTo}`}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const closeModal = () => {
@@ -172,6 +224,7 @@ export default function FinanzasPage() {
           notes: formData.notes,
           assignedTo: formData.assignedTo || null,
           barberId: formData.assignedTo === "professional" ? formData.barberId || null : null,
+          accountingMonth: formData.accountingMonth || todayInChile().slice(0, 7),
           tenantId: getActiveTenantId() || undefined,
         }),
       });
@@ -204,6 +257,7 @@ export default function FinanzasPage() {
       notes: t.notes || "",
       assignedTo: t.assigned_to || "",
       barberId: t.barber_id || "",
+      accountingMonth: (t.accounting_month || "").slice(0, 7) || monthOf(t.created_at),
     });
     setOpenMenuId(null);
     setShowModal(true);
@@ -236,16 +290,21 @@ export default function FinanzasPage() {
         title="Ingresos y egresos"
         subtitle="Todos los movimientos del negocio, en el periodo que elijas."
         actions={
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setFormData(emptyFormData);
-              setShowModal(true);
-            }}
-            className={primaryButton}
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} /> Nueva transacción
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={exportCsv} disabled={transactions.length === 0} className={ghostButton}>
+              Exportar a Excel
+            </button>
+            <button
+              onClick={() => {
+                setEditingId(null);
+                setFormData(emptyFormData);
+                setShowModal(true);
+              }}
+              className={primaryButton}
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} /> Nueva transacción
+            </button>
+          </div>
         }
       />
 
@@ -295,6 +354,17 @@ export default function FinanzasPage() {
           options={QUICK_RANGES.map((r) => ({ value: r.key, label: r.label }))}
         />
         <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray">
+          <span className="text-xs font-semibold">Corresponde al mes</span>
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="bg-transparent text-sm text-brand-dark outline-none"
+          >
+            <option value="">Usar fechas</option>
+            {monthOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <div className={`flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray ${monthFilter ? "opacity-50" : ""}`}>
           <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
           <input
             type="date"
@@ -318,29 +388,38 @@ export default function FinanzasPage() {
           <table className={ts.table}>
             <thead className={ts.thead}>
               <tr>
+                <th className={ts.th}>Hora</th>
                 <th className={ts.th}>Fecha</th>
                 <th className={ts.th}>Tipo</th>
                 <th className={ts.th}>Descripción</th>
-                <th className={ts.th}>Cliente / Profesional</th>
-                <th className={ts.th}>Corresponde a</th>
-                <th className={ts.th}>Método</th>
+                <th className={ts.th}>Profesional / Corresponde a</th>
+                <th className={ts.th}>Emitido por</th>
+                <th className={ts.th}>Cliente</th>
+                <th className={ts.th}>Método de pago</th>
                 <th className={ts.thRight}>Monto</th>
                 {isAdmin && <th className="w-10 px-3 py-3"></th>}
               </tr>
             </thead>
             <tbody className={ts.tbody}>
               {loading ? (
-                <tr><td colSpan={isAdmin ? 8 : 7}><Spinner /></td></tr>
+                <tr><td colSpan={isAdmin ? 10 : 9}><Spinner /></td></tr>
               ) : transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="px-5 py-12 text-center text-sm text-brand-gray">
+                  <td colSpan={isAdmin ? 10 : 9} className="px-5 py-12 text-center text-sm text-brand-gray">
                     No hay transacciones en este periodo
                   </td>
                 </tr>
               ) : (
                 transactions.map((t) => (
                   <tr key={t.id} className={ts.tr}>
-                    <td className={`${ts.td} whitespace-nowrap tabular-nums text-brand-gray`}>{new Date(t.created_at).toLocaleDateString("es-CL")}</td>
+                    <td className={`${ts.td} whitespace-nowrap tabular-nums text-brand-gray`}>{new Date(t.created_at).toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" })}</td>
+                    <td className={`${ts.td} whitespace-nowrap tabular-nums text-brand-gray`}>
+                      {new Date(t.created_at).toLocaleDateString("es-CL", { timeZone: CL_TZ })}
+                      {/* Si corresponde a otro mes que el de su registro, se avisa (ej. egreso de septiembre cargado en octubre). */}
+                      {t.accounting_month && t.accounting_month.slice(0, 7) !== monthOf(t.created_at) && (
+                        <span className="mt-0.5 block text-[10px] font-semibold text-amber-600">Corresponde a {monthLabel(t.accounting_month.slice(0, 7))}</span>
+                      )}
+                    </td>
                     <td className={ts.td}>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -352,8 +431,9 @@ export default function FinanzasPage() {
                       </span>
                     </td>
                     <td className={`${ts.td} max-w-[260px] truncate`}>{t.items?.map((i: any) => i.description).join(", ") || t.notes || "-"}</td>
-                    <td className={ts.td}>{t.client?.name || t.barber?.name || "-"}</td>
-                    <td className={`${ts.td} text-brand-gray`}>{t.assigned_to ? assignedToLabels[t.assigned_to] : "-"}</td>
+                    <td className={ts.td}>{t.barber?.name || (t.assigned_to ? assignedToLabels[t.assigned_to] : "-")}</td>
+                    <td className={`${ts.td} text-brand-gray`}>{t.created_by_name || "-"}</td>
+                    <td className={ts.td}>{t.client?.name || "-"}</td>
                     <td className={ts.td}>
                       <span className="rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-medium text-brand-gray dark:bg-white/10">
                         {paymentMethodLabels[t.payment_method] || t.payment_method}
@@ -468,6 +548,17 @@ export default function FinanzasPage() {
                     <option value="transfer">Transferencia</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Corresponde al mes</label>
+                <select
+                  value={formData.accountingMonth || todayInChile().slice(0, 7)}
+                  onChange={(e) => setFormData({ ...formData, accountingMonth: e.target.value })}
+                  className={inputClass}
+                >
+                  {monthOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-brand-gray">Define en qué cierre mensual e informe cuenta este movimiento, aunque lo registres después.</p>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Notas</label>
