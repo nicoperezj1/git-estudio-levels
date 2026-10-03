@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
 import {
-  ChevronLeft, Phone, Mail, MessageCircle, CalendarPlus, Camera, ImageIcon, FileText, Pin, X,
+  ChevronLeft, MoreVertical, Phone, Mail, MessageCircle, CalendarPlus, Camera, ImageIcon, FileText, Pin, X,
   Wallet, Receipt, CalendarCheck, UserX, Clock, Scissors, Upload, StickyNote, TrendingUp, Percent, UserCheck,
 } from "lucide-react";
 import { Panel, StatCard, primaryButton, ghostButton, inputClass } from "@/components/ui/premium";
@@ -92,6 +92,7 @@ export default function ClienteDetailPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docError, setDocError] = useState("");
   // Editar datos del cliente (nombre, celular, correo, notas)
+  const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", notes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
@@ -284,6 +285,24 @@ export default function ClienteDetailPage() {
       {/* Hero del cliente */}
       <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 md:p-7">
         <span className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-brand-blue/20 to-emerald-400/10 blur-3xl" />
+        {/* Menú de 3 puntos (arriba a la derecha) */}
+        <div className="absolute right-3 top-3 z-20">
+          <button onClick={() => setMenuOpen((o) => !o)} aria-label="Más opciones"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-brand-gray transition-colors hover:bg-gray-100 hover:text-brand-dark">
+            <MoreVertical className="h-5 w-5" strokeWidth={2} />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
+                <button onClick={() => { setMenuOpen(false); openEdit(); }}
+                  className="block w-full px-4 py-2 text-left text-sm text-brand-dark hover:bg-gray-50">
+                  Modificar datos
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4 md:gap-5">
             <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-blue to-emerald-500 text-3xl font-black text-white shadow-lg shadow-brand-blue/25">
@@ -310,9 +329,6 @@ export default function ClienteDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={openEdit} className={ghostButton}>
-              <StickyNote className="h-4 w-4" strokeWidth={2} /> Editar datos
-            </button>
             <button onClick={() => router.push("/dashboard/calendario")} className={primaryButton}>
               <CalendarPlus className="h-4 w-4" strokeWidth={2} /> Agendar
             </button>
