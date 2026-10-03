@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, resolveTenantForRequest, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { todayInChile, chileDayBoundsUtc } from "@/lib/utils";
 import { tenantHasFeature } from "@/lib/plan-features";
+import { getWithdrawals, getCashCap } from "@/lib/cash-withdrawals";
 
 // GET: Current day's cash register status + transactions
 export async function GET(req: NextRequest) {
@@ -112,7 +113,11 @@ export async function GET(req: NextRequest) {
     .reduce((sum, t) => sum + Number(t.total), 0);
 
   const openingAmount = register ? Number(register.opening_amount) : 0;
-  const expectedCash = openingAmount + cashIncome - cashExpense;
+  // Retiros a la caja fuerte (reduccion de efectivo): salen de la caja, asi que se restan.
+  const specific = !!tenantId && tenantId !== "ALL";
+  const wd = specific ? await getWithdrawals(supabase, tenantId as string, date) : { total: 0, rows: [] };
+  const cashCap = specific ? await getCashCap(supabase, tenantId as string) : null;
+  const expectedCash = openingAmount + cashIncome - cashExpense - wd.total;
 
   return NextResponse.json({
     register: register || null,
@@ -126,25 +131,29 @@ export async function GET(req: NextRequest) {
       totalExpense,
       expectedCash,
       rentalCashToBarber, // cash pocketed by rental barbers, NOT in the salon till
+      withdrawalsTotal: wd.total,
+      cashCap, // tope de efectivo del negocio (null = sin tope)
       transactionCount: (transactions || []).length,
     },
     transactions: transactions || [],
+    withdrawals: wd.rows,
   });
 }
 
 // POST: Open register
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes no pedia sesion y confiaba en el tenantId del cuerpo: se podia abrir la caja
+  // de otro negocio. Ahora hace falta sesion y el negocio sale de la sesion (salvo super_admin).
+  const caller = await getCurrentUserRoleAndTenant();
+  if (!caller.userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { openingAmount, userId, tenantId: bodyTenantId } = body;
 
   // Resolve tenant: prefer explicit param, fallback to session.
-  let tenantId: string | null = bodyTenantId || null;
-  if (!tenantId) {
-    const { searchParams } = new URL(req.url);
-    const { tenantId: resolved } = await resolveTenantForRequest(searchParams.get("tenantId"));
-    tenantId = resolved && resolved !== "ALL" ? resolved : null;
-  }
+  const { searchParams: sp } = new URL(req.url);
+  const { tenantId: resolvedT } = await resolveTenantForRequest(bodyTenantId || sp.get("tenantId"));
+  let tenantId: string | null = resolvedT && resolvedT !== "ALL" ? resolvedT : null;
   if (!tenantId) {
     return NextResponse.json({ error: "No se pudo determinar el negocio para abrir la caja." }, { status: 400 });
   }
@@ -189,17 +198,17 @@ export async function POST(req: NextRequest) {
 
 // PATCH: Close register
 export async function PATCH(req: NextRequest) {
+  // SEGURIDAD: igual que al abrir, hace falta sesion y el negocio sale de la sesion.
+  const caller = await getCurrentUserRoleAndTenant();
+  if (!caller.userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { closingAmount, userId, notes, tenantId: bodyTenantId } = body;
 
   // Resolve tenant: prefer explicit param, fallback to session.
-  let tenantId: string | null = bodyTenantId || null;
-  if (!tenantId) {
-    const { searchParams } = new URL(req.url);
-    const { tenantId: resolved } = await resolveTenantForRequest(searchParams.get("tenantId"));
-    tenantId = resolved && resolved !== "ALL" ? resolved : null;
-  }
+  const { searchParams: sp } = new URL(req.url);
+  const { tenantId: resolvedT } = await resolveTenantForRequest(bodyTenantId || sp.get("tenantId"));
+  let tenantId: string | null = resolvedT && resolvedT !== "ALL" ? resolvedT : null;
   if (!tenantId) {
     return NextResponse.json({ error: "No se pudo determinar el negocio para cerrar la caja." }, { status: 400 });
   }
@@ -263,7 +272,8 @@ export async function PATCH(req: NextRequest) {
     .filter((t: any) => t.type === "expense" && isCashLike(t))
     .reduce((sum: number, t: any) => sum + Number(cashAmountOf(t)), 0);
 
-  const expectedAmount = Number(register.opening_amount) + cashIncome - cashExpense;
+  const closeWd = await getWithdrawals(supabase, tenantId, today);
+  const expectedAmount = Number(register.opening_amount) + cashIncome - cashExpense - closeWd.total;
   const difference = (closingAmount || 0) - expectedAmount;
 
   const { data, error } = await supabase
