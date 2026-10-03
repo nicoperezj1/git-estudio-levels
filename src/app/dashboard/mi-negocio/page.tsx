@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plane, Percent, KeyRound, Tag, Truck } from "lucide-react";
+import { Plane, Percent, KeyRound, Tag, Truck, FileText } from "lucide-react";
 
 // Mi negocio: todo lo que el administrador maneja del negocio, en un solo lugar.
 const ITEMS = [
@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/dashboard/arriendo", title: "Arriendo", desc: "Días trabajados y cobro de los profesionales que arriendan.", icon: KeyRound },
   { href: "/dashboard/servicios", title: "Servicios", desc: "Tu carta de servicios, categorías y el orden en que se ve al reservar.", icon: Tag },
   { href: "/dashboard/proveedores", title: "Proveedores", desc: "Tus proveedores y las cotizaciones por WhatsApp.", icon: Truck },
+  { href: "/dashboard/remuneraciones", title: "Remuneraciones", desc: "Liquidaciones de sueldo de tus trabajadores con contrato.", icon: FileText },
 ];
 
 export default function MiNegocioPage() {

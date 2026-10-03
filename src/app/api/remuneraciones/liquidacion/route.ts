@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
     name: pro.name, month: first, monthLabel: monthLabelEs(first), status: saved?.status || "none",
     inputs, auto, result, suggestedSemanaCorrida: base.suggestedSemanaCorrida,
     params: { source, paramsMonth, missing: paramsMissing(params) },
+    paramsValues: params,
     closed: await isMonthClosed(supabase, c.tenantId!, first),
   });
 }

@@ -107,6 +107,7 @@ const sections: NavSection[] = [
           { name: "Arriendo", href: "/dashboard/arriendo", icon: KeyRound, minRole: "admin", feature: "rental" },
           { name: "Servicios", href: "/dashboard/servicios", icon: Tag, minRole: "admin" },
           { name: "Proveedores", href: "/dashboard/proveedores", icon: Truck, minRole: "admin" },
+          { name: "Remuneraciones", href: "/dashboard/remuneraciones", icon: FileText, minRole: "admin" },
         ],
       },
       { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
