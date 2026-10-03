@@ -21,6 +21,8 @@ interface CajaData {
     totalExpense: number;
     expectedCash: number;
     rentalCashToBarber?: number;
+    withdrawalsTotal?: number;
+    cashCap?: number | null;
     transactionCount: number;
   };
   transactions: Array<{
@@ -94,6 +96,64 @@ export default function CajaPage() {
   const [editForm, setEditForm] = useState({ barberId: "", serviceName: "", amount: "", paymentMethod: "cash", tip: "" });
   const [editPin, setEditPin] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Apagar caja (Fase 5): oculta montos y acciones; se enciende con el PIN de la recepcionista. Es
+  // distinto de cerrar la caja del dia. El bloqueo vive en este navegador.
+  const lockKey = `caja_off_${tenant?.id || "x"}`;
+  const [lockReady, setLockReady] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [unlockPin, setUnlockPin] = useState("");
+  const [unlockError, setUnlockError] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  useEffect(() => {
+    if (tenantLoading) return;
+    try { setLocked(localStorage.getItem(lockKey) === "1"); } catch {}
+    setLockReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantLoading, tenant?.id]);
+  const lockCaja = () => { try { localStorage.setItem(lockKey, "1"); } catch {} setLocked(true); setUnlockPin(""); setUnlockError(""); };
+  const unlockCaja = async () => {
+    if (unlockPin.length !== 4 || unlocking) return;
+    setUnlocking(true); setUnlockError("");
+    try {
+      const res = await fetch("/api/caja/desbloquear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: unlockPin }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.valid) { setUnlockError(d.error || "PIN incorrecto"); return; }
+      try { localStorage.removeItem(lockKey); } catch {}
+      setLocked(false); setUnlockPin("");
+    } finally { setUnlocking(false); }
+  };
+
+  // Descuento por planilla: recepcion o el administrador ingresa el codigo que genero el profesional.
+  const [planillaCode, setPlanillaCode] = useState("");
+  const [planillaBusy, setPlanillaBusy] = useState(false);
+  const [planillaPending, setPlanillaPending] = useState<Array<{ id: string; barber_name: string; product_name: string; quantity: number; total: number; over_limit: boolean }>>([]);
+  const loadPlanilla = () => { fetch("/api/planilla").then((r) => r.json()).then((d) => setPlanillaPending(d?.pending || [])).catch(() => {}); };
+  const approvePlanilla = async (confirmOver = false) => {
+    const code = planillaCode.trim().toUpperCase();
+    if (code.length !== 6 || planillaBusy) return;
+    setPlanillaBusy(true);
+    try {
+      const res = await fetch("/api/planilla/aprobar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, confirmOver }) });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 409 && d.needsConfirm) {
+        setPlanillaBusy(false);
+        const ok = await confirm({ title: "Supera el 15%", message: d.message, confirmText: "Confirmar igual", variant: "warning" });
+        if (ok) await approvePlanilla(true);
+        return;
+      }
+      if (!res.ok) throw new Error(d.error || "No se pudo aprobar");
+      showToast(`Descuento por planilla aprobado (${formatCurrency(d.total)})`, "success");
+      setPlanillaCode(""); loadPlanilla();
+    } catch (e: any) {
+      showToast(e?.message || "No se pudo aprobar", "error");
+    } finally { setPlanillaBusy(false); }
+  };
+  const rejectPlanilla = async (id: string) => {
+    const res = await fetch("/api/planilla", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    if (res.ok) { showToast("Descuento rechazado", "success"); loadPlanilla(); }
+  };
+  useEffect(() => { if (!tenantLoading) loadPlanilla(); }, [tenantLoading, tenant?.id]);
 
   const getActiveTenantId = () => {
     if (tenant?.id) return tenant.id;
@@ -388,7 +448,28 @@ export default function CajaPage() {
     }
   };
 
-  if (loading) return <Spinner />;
+  if (loading || !lockReady) return <Spinner />;
+
+  if (locked) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="w-full max-w-xs text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl">🔒</div>
+          <h1 className="text-xl font-bold text-gray-900">Caja apagada</h1>
+          <p className="text-sm text-gray-500 mt-1 mb-5">Ingresa el PIN de recepción para encenderla.</p>
+          <input type="password" inputMode="numeric" maxLength={4} value={unlockPin} autoFocus
+            onChange={(e) => setUnlockPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            onKeyDown={(e) => { if (e.key === "Enter") unlockCaja(); }}
+            placeholder="••••" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-center text-2xl tracking-[0.5em]" />
+          {unlockError && <p className="text-red-500 text-sm mt-2">{unlockError}</p>}
+          <button onClick={unlockCaja} disabled={unlockPin.length !== 4 || unlocking}
+            className="w-full mt-4 py-3 bg-brand-blue text-white rounded-xl font-bold disabled:opacity-40">
+            {unlocking ? "Verificando…" : "Encender caja"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const todayLabel = new Date().toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const selectedDateLabel = new Intl.DateTimeFormat("es-CL", {
@@ -403,6 +484,10 @@ export default function CajaPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Caja Diaria</h1>
           <p className="text-gray-500 text-sm">{isToday ? todayLabel : selectedDateLabel}</p>
         </div>
+        <button type="button" onClick={lockCaja}
+          className="px-3 py-2 rounded-lg text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+          🔒 Apagar caja
+        </button>
         {/* Punto Nico (25-sep): ver e historiar dias anteriores, solo Administrador. */}
         {isAdmin && (
           <div className="flex flex-wrap items-center gap-2">
@@ -464,6 +549,33 @@ export default function CajaPage() {
         </div>
       </div>
 
+      {/* Descuento por planilla: aprobar con el codigo del profesional */}
+      {isToday && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <h3 className="font-bold text-gray-800">Descuento por planilla</h3>
+          <p className="text-xs text-gray-500 mb-3">Ingresa el código que te da el profesional. Recién ahí se descuenta el stock y se anota en su libro.</p>
+          <div className="flex gap-2">
+            <input value={planillaCode} onChange={(e) => setPlanillaCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+              onKeyDown={(e) => { if (e.key === "Enter") approvePlanilla(); }}
+              placeholder="CÓDIGO" className="w-40 border border-gray-200 rounded-xl px-3 py-2 text-center font-mono tracking-widest" />
+            <button onClick={() => approvePlanilla()} disabled={planillaCode.length !== 6 || planillaBusy}
+              className="px-4 py-2 bg-brand-blue text-white rounded-xl text-sm font-medium disabled:opacity-40">
+              {planillaBusy ? "Aprobando…" : "Aprobar"}
+            </button>
+          </div>
+          {planillaPending.length > 0 && (
+            <ul className="mt-3 divide-y text-sm">
+              {planillaPending.map((p) => (
+                <li key={p.id} className="py-2 flex items-center justify-between gap-2">
+                  <span className="text-gray-700">{p.barber_name} · {p.product_name} x{p.quantity} · {formatCurrency(Number(p.total))}{p.over_limit && <span className="ml-1 text-amber-600">(supera 15%)</span>}</span>
+                  <button onClick={() => rejectPlanilla(p.id)} className="text-xs text-red-500 hover:underline">Rechazar</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Open register — solo aplica al dia de hoy */}
       {isToday && !data?.register && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
@@ -505,6 +617,11 @@ export default function CajaPage() {
               <p className="text-xl font-bold text-blue-600">{formatCurrency(data.summary.expectedCash)}</p>
             </div>
           </div>
+          {!!data.summary.withdrawalsTotal && data.summary.withdrawalsTotal > 0 && (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-800">
+              Se retiraron {formatCurrency(data.summary.withdrawalsTotal)} a la caja fuerte (reducción de efectivo); ya están descontados del esperado.
+            </div>
+          )}
 
           {/* Additional stats */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
