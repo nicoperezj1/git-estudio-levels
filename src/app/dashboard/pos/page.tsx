@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { SaleCelebration } from "@/components/pos/sale-celebration";
 import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
+import { useLedgerEnabled } from "@/components/finance/professional-ledger-view";
 
 interface Service {
   id: string;
@@ -240,6 +241,10 @@ export default function POSPage() {
   // to MercadoPago as part of the charge. See tipAmount / tip modal below.
   const total = subtotal - discount;
   const [showTipModal, setShowTipModal] = useState(false);
+  // Con el libro de movimientos encendido (Configuracion) la propina se pregunta en TODA venta (tambien efectivo) y se
+  // sugiere el 10%; va al profesional que atendio. Apagado: solo se pregunta tras un pago con tarjeta, como siempre.
+  const ledgerOn = !!useLedgerEnabled();
+  const [tipKind, setTipKind] = useState<"card" | "cash">("card");
   const [tipInput, setTipInput] = useState("");
   const [lastTransactionId, setLastTransactionId] = useState<string | null>(null);
 
@@ -543,8 +548,9 @@ export default function POSPage() {
         setSplitChargeProgress("");
         setSuccessAmount(total);
 
-        if (hadCardPayment && result.transactionId) {
+        if ((hadCardPayment || ledgerOn) && result.transactionId) {
           setLastTransactionId(result.transactionId);
+          setTipKind(hadCardPayment ? "card" : "cash");
           setTipInput("");
           setShowTipModal(true);
         } else {
@@ -1281,14 +1287,19 @@ export default function POSPage() {
       {showTipModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
-            <div className="text-3xl mb-3">💳</div>
-            <h3 className="text-lg font-bold text-brand-dark">Cliente agrego propina?</h3>
-            <p className="text-sm text-brand-gray mt-1 mb-4">Preguntale al cliente si agrego propina en la maquina. Esto solo se registra, no se cobra de nuevo.</p>
-            <div className="flex items-center justify-center gap-1 mb-3">
-              {[0, 1000, 2000, 5000].map((t) => (
+            <div className="text-3xl mb-3">{tipKind === "card" ? "💳" : "💵"}</div>
+            <h3 className="text-lg font-bold text-brand-dark">{tipKind === "card" ? "Cliente agrego propina?" : "¿El cliente dejó propina?"}</h3>
+            <p className="text-sm text-brand-gray mt-1 mb-4">
+              {tipKind === "card"
+                ? "Preguntale al cliente si agrego propina en la maquina. Esto solo se registra, no se cobra de nuevo."
+                : "Se registra para el profesional que atendió. No se suma al cobro."}
+              {ledgerOn && " Va 100% al profesional."}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-1 mb-3">
+              {[0, ...(ledgerOn ? [Math.round(successAmount * 0.1 / 100) * 100] : []), 1000, 2000, 5000].filter((t, i, a) => a.indexOf(t) === i).map((t) => (
                 <button key={t} onClick={() => setTipInput(t ? String(t) : "")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium ${(parseInt(tipInput) || 0) === t ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-                  {t === 0 ? "Sin propina" : `$${(t/1000).toFixed(0)}K`}
+                  {t === 0 ? "Sin propina" : ledgerOn && t > 0 && t === Math.round(successAmount * 0.1 / 100) * 100 ? `10% · ${formatCurrency(t)}` : `$${(t/1000).toFixed(0)}K`}
                 </button>
               ))}
             </div>
