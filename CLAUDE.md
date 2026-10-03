@@ -62,6 +62,9 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 - Opcional si Nico lo pide: SQL para dar "Emitido por" a 4 ventas de prueba antiguas (datos irrecuperables, solo cosmético); plan Isapre en $ vs UF.
 - Fase 0 con Pablo: sitio de prueba en Vercel conectado a `rebooking-pruebas`; parche `0013` ya incluido en la rama.
 
+## 7b. Próximo proyecto: app móvil (propuesta, sin aprobar)
+Plan completo en `docs/PLAN-APP-MOVIL.html` (también publicado como página): Capacitor sobre la misma app Next.js, disposición móvil por rol, centro de notificaciones (`notifications`, `notification_preferences`, `device_tokens`, FCM + web-push), Fase 0 de seguridad (cerrar `/api/push/send`, que hoy no pide sesión) y cumplimiento de la Ley 21.719 antes del 1 dic. 2026 (política de privacidad que hoy no existe, contrato de encargo, canal de derechos). Decisiones pendientes al final del plan.
+
 ## 8. Commits
 Terminar cada mensaje de commit con:
 ```

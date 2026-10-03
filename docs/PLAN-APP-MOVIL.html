@@ -1,0 +1,404 @@
+<title>App móvil re-booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: documento de una columna (~72ch) con índice lateral en escritorio; tablas y cronograma con scroll propio. */
+:root{
+  --bg:#f6f8f8; --surface:#ffffff; --fg:#14201f; --muted:#5a6b6a; --line:#dbe3e2;
+  --accent:#0f8b8d; --accent-soft:#e2f2f2; --warn:#b26a00; --warn-soft:#fdf1df; --crit:#b42318; --crit-soft:#fbe7e5; --ok:#1f7a3a; --ok-soft:#e5f4ea;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1716; --surface:#16211f; --fg:#e4eceb; --muted:#9fb1af; --line:#2a3836;
+  --accent:#3cc3c4; --accent-soft:#163233; --warn:#f0b357; --warn-soft:#33270f; --crit:#f2867a; --crit-soft:#3a1a17; --ok:#6fd08f; --ok-soft:#14301e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1716; --surface:#16211f; --fg:#e4eceb; --muted:#9fb1af; --line:#2a3836;
+  --accent:#3cc3c4; --accent-soft:#163233; --warn:#f0b357; --warn-soft:#33270f; --crit:#f2867a; --crit-soft:#3a1a17; --ok:#6fd08f; --ok-soft:#14301e; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.6;padding-inline:16px;padding-block:0}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:48px;padding-block:40px 80px}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}.toc{display:none}}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;font-size:13.5px}
+.toc p{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:t}
+.toc a{color:var(--muted);text-decoration:none}.toc a:hover,.toc a:focus-visible{color:var(--accent)}
+main{min-width:0;max-width:780px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2rem,4.5vw,2.8rem);font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.6rem;font-weight:700;margin-top:56px;padding-top:24px;border-top:1px solid var(--line)}
+h3{font-size:1.15rem;font-weight:600;margin-top:28px}
+p,li{max-width:68ch}
+a{color:var(--accent)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.lede{font-size:1.15rem;color:var(--muted);margin-top:16px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--muted);margin-top:20px;font-family:var(--mono)}
+code{font-family:var(--mono);font-size:.88em;background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:28px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.fact b{display:block;font-family:var(--display);font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums}
+.fact span{font-size:13px;color:var(--muted)}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:14px 18px;border-radius:0 8px 8px 0;margin:20px 0}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+.callout.crit{border-color:var(--crit);background:var(--crit-soft)}
+.callout p{margin:0}.callout p+p{margin-top:8px}
+.tbl{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.p-hi{background:var(--crit-soft);color:var(--crit)}.p-md{background:var(--warn-soft);color:var(--warn)}.p-lo{background:var(--ok-soft);color:var(--ok)}
+.rec{background:var(--accent-soft);color:var(--accent)}
+/* Cronograma: 15 semanas desde el lunes 6 de octubre de 2026 */
+.gantt{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px}
+.g{display:grid;grid-template-columns:230px repeat(15,minmax(34px,1fr));gap:4px 2px;min-width:780px;font-size:13px;align-items:center}
+.g .wk{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center}
+.g .lbl{grid-column:1;padding-right:8px}
+.bar{height:20px;border-radius:4px;background:var(--accent)}
+.bar.legal{background:var(--warn)}.bar.store{background:var(--muted)}
+.mile{font-family:var(--mono);font-size:11px;color:var(--crit);font-weight:500;text-align:center}
+.checks{list-style:none;padding:0;display:grid;gap:8px}
+.checks li{padding-left:28px;position:relative}
+.checks li::before{content:"";position:absolute;left:0;top:5px;width:16px;height:16px;border:1.5px solid var(--accent);border-radius:4px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.card h3{margin-top:0;font-size:1.05rem}
+.card ul{padding-left:18px;margin:8px 0 0}
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Índice">
+  <p>Contenido</p>
+  <ol>
+    <li><a href="#resumen">Resumen</a></li>
+    <li><a href="#hoy">Lo que ya tenemos</a></li>
+    <li><a href="#tecnologia">Cómo se construye</a></li>
+    <li><a href="#alcance">Qué trae la app</a></li>
+    <li><a href="#notificaciones">Notificaciones</a></li>
+    <li><a href="#cronograma">Fases y tiempos</a></li>
+    <li><a href="#costos">Costos</a></li>
+    <li><a href="#riesgos">Riesgos</a></li>
+    <li><a href="#ley">Ley 21.719</a></li>
+    <li><a href="#datos">Política de datos</a></li>
+    <li><a href="#permisos">Permisos del celular</a></li>
+    <li><a href="#terminos">Términos y condiciones</a></li>
+    <li><a href="#tiendas">Requisitos de las tiendas</a></li>
+    <li><a href="#decisiones">Decisiones pendientes</a></li>
+  </ol>
+</nav>
+
+<main>
+<p class="eyebrow">Plan de acción · re-booking</p>
+<h1>App móvil re-booking para Android y iPhone</h1>
+<p class="lede">La app cubre desde el inicio de sesión en adelante. Usa el mismo código y la misma lógica que la web, con pantallas pensadas para el celular y notificaciones al equipo. Todo debe cumplir la Ley 21.719 de protección de datos personales.</p>
+<div class="meta"><span>Preparado: 3 oct. 2026</span><span>Para: Nico y Pablo</span><span>Estado: propuesta</span></div>
+
+<section id="resumen">
+<h2>Resumen</h2>
+<div class="facts">
+  <div class="fact"><b>~13–15 semanas</b><span>de hoy al lanzamiento en tiendas (mediados de enero 2027)</span></div>
+  <div class="fact"><b>225–350 h</b><span>de desarrollo estimado</span></div>
+  <div class="fact"><b>~$120.000</b><span>en cuentas de tiendas el primer año (Apple + Google)</span></div>
+  <div class="fact"><b>1 dic. 2026</b><span>entra en vigencia la Ley 21.719: lo legal va primero</span></div>
+</div>
+<div class="callout">
+<p><b>Recomendación:</b> envolver la misma aplicación Next.js en una app nativa con <b>Capacitor</b>, con una disposición móvil nueva dentro del mismo código. Se le suman las funciones propias del celular que exigen las tiendas: notificaciones nativas, desbloqueo con Face ID o huella y enlaces que abren la cita correcta.</p>
+<p>Es la única opción que cumple "mismo código y lógica". Cada arreglo en la web llega a la app el mismo día, sin pasar por revisión de las tiendas.</p>
+</div>
+<div class="callout warn">
+<p><b>Plazo que no se mueve:</b> la Ley 21.719 rige desde el <b>1 de diciembre de 2026</b>, con o sin app. Hoy re-booking no tiene una política de privacidad publicada y sus términos tienen 9 secciones breves. Esa parte se trabaja en paralelo desde la semana 1.</p>
+</div>
+</section>
+
+<section id="hoy">
+<h2>Lo que ya tenemos</h2>
+<p>Revisado en el código de la rama <code>claude/hopeful-mayer-jtqlh4</code>:</p>
+<div class="cols">
+  <div class="card"><h3>Sirve como base</h3><ul>
+    <li><code>manifest.json</code> y <code>sw.js</code>: la web ya se instala como app (PWA).</li>
+    <li>Notificaciones web con <code>web-push</code> y tabla <code>push_subscriptions</code>.</li>
+    <li>Ya se avisa al profesional cuando se agenda (calendario, reserva online, depósito) y cuando llega el cliente.</li>
+    <li>Calendario y agenda ya adaptados al celular (tarjetas, toque para agendar).</li>
+  </ul></div>
+  <div class="card"><h3>Falta o hay que arreglar</h3><ul>
+    <li><b>La ruta que envía notificaciones (<code>/api/push/send</code>) no pide sesión.</b> Cualquiera podría mandar avisos al equipo de cualquier negocio. Se cierra en la Fase 0.</li>
+    <li>No existe página de política de privacidad.</li>
+    <li>No hay bandeja de avisos dentro de la app ni preferencias por persona.</li>
+    <li>No hay forma de eliminar la cuenta desde la app, algo que Apple y Google exigen.</li>
+    <li>Siguen abiertas las rutas de seguridad pendientes (ver <code>docs/auditoria-rutas-api.md</code>).</li>
+  </ul></div>
+</div>
+</section>
+
+<section id="tecnologia">
+<h2>Cómo se construye</h2>
+<div class="tbl"><table>
+<thead><tr><th>Opción</th><th>Mismo código</th><th>Notificaciones</th><th>Tiendas</th><th>Costo relativo</th><th></th></tr></thead>
+<tbody>
+<tr><td><b>PWA mejorada</b> (instalar desde Safari/Chrome)</td><td>Sí, 100%</td><td>Android bien; iPhone solo si se instala en la pantalla de inicio (iOS 16.4+)</td><td>No aparece en App Store ni Play</td><td>Bajo</td><td><span class="pill p-md">Paso intermedio</span></td></tr>
+<tr><td><b>Capacitor</b> (app nativa que carga la misma app)</td><td>Sí, 95%+</td><td>Nativas en ambos (FCM y APNs)</td><td>Sí, en ambas</td><td>Medio</td><td><span class="pill rec">Recomendada</span></td></tr>
+<tr><td><b>React Native / Expo</b> (app nueva)</td><td>Solo la lógica del servidor</td><td>Nativas</td><td>Sí</td><td>Alto (3 a 5 veces más): se rehacen todas las pantallas</td><td><span class="pill p-hi">Descartada</span></td></tr>
+</tbody></table></div>
+<h3>Arquitectura propuesta</h3>
+<ol>
+  <li><b>Una sola web.</b> La app nativa abre <code>re-booking.cl</code> en una vista propia. Si detecta que corre dentro de la app, muestra la <b>disposición móvil</b>: barra inferior por rol, botones grandes, gestos y sin menú lateral. En la web de siempre no cambia nada.</li>
+  <li><b>Notificaciones en dos canales.</b> Se mantiene <code>web-push</code> para quien use la web. Se agrega Firebase Cloud Messaging para la app (Android directo; iPhone a través de APNs). Una tabla nueva <code>device_tokens</code> guarda los dispositivos.</li>
+  <li><b>Bandeja de avisos.</b> Tablas nuevas <code>notifications</code> (lo que se envió, leído o no) y <code>notification_preferences</code> (qué quiere recibir cada persona y horario de silencio). El aviso en el celular es solo el timbre; el detalle se ve dentro de la app y con sesión iniciada.</li>
+  <li><b>Funciones nativas:</b> Face ID o huella para desbloquear, vibración al confirmar acciones, pantalla clara sin conexión, enlace profundo (tocar el aviso abre esa cita) y botón "Eliminar mi cuenta".</li>
+  <li><b>Migraciones aditivas y re-ejecutables</b>, como siempre. Lo nuevo queda apagado por defecto y se prueba primero en <code>rebooking-pruebas</code>.</li>
+</ol>
+</section>
+
+<section id="alcance">
+<h2>Qué trae la app</h2>
+<p>Desde el inicio de sesión en adelante. La app <b>no tiene</b> registro de negocios, venta de planes, pagos de suscripción ni página de presentación. Eso evita la regla de compras dentro de la app de Apple y simplifica la revisión.</p>
+<div class="cols">
+  <div class="card"><h3>Profesional</h3><ul>
+    <li>Mi agenda del día y la semana</li><li>Ficha del cliente y WhatsApp</li><li>Mi billetera / comisiones / arriendo</li><li>Generar código de descuento por planilla</li><li>Mis vacaciones</li><li>Avisos del equipo</li></ul></div>
+  <div class="card"><h3>Recepción</h3><ul>
+    <li>Calendario y agendar</li><li>Punto de venta y caja</li><li>Clientes (buscar, crear, editar)</li><li>Aprobar descuentos por planilla</li><li>Solicitud de insumos</li><li>Avisos del equipo</li></ul></div>
+  <div class="card"><h3>Administrador</h3><ul>
+    <li>Resumen del día (Dashboard)</li><li>Problemas de caja y su revisión</li><li>Enviar avisos al equipo (nuevo)</li><li>Finanzas y cierre (lectura)</li><li>Configuración básica</li><li>Todo lo de recepción</li></ul></div>
+</div>
+<p>El Standby (tablet del local) sigue siendo web; no hace falta llevarlo a las tiendas.</p>
+</section>
+
+<section id="notificaciones">
+<h2>Notificaciones</h2>
+<p>Regla de privacidad: <b>lo que aparece con el celular bloqueado no lleva datos personales del cliente ni montos.</b> Se ve cuando la persona abre la app con su sesión.</p>
+<div class="tbl"><table>
+<thead><tr><th>Evento</th><th>Quién recibe</th><th>Texto en pantalla bloqueada</th><th>¿Se puede apagar?</th></tr></thead>
+<tbody>
+<tr><td>Nueva cita (online, calendario, primer disponible)</td><td>Profesional asignado; recepción opcional</td><td>"Nueva cita mañana 15:30"</td><td>Sí</td></tr>
+<tr><td>Cita cancelada o cambiada de hora</td><td>Profesional</td><td>"Se canceló tu cita de hoy 11:00"</td><td>Sí</td></tr>
+<tr><td>Cliente llegó (ya existe)</td><td>Profesional</td><td>"Tu cliente de las 15:30 llegó"</td><td>Sí</td></tr>
+<tr><td>Descuento por planilla: código generado</td><td>Recepción y admin</td><td>"Hay un descuento por planilla por aprobar"</td><td>No (operativo)</td></tr>
+<tr><td>Descuento por planilla: aprobado</td><td>Profesional</td><td>"Se aprobó tu descuento por planilla"</td><td>No</td></tr>
+<tr><td>Mensaje del admin al equipo (nuevo)</td><td>Todo el equipo o personas elegidas</td><td>"Nuevo aviso de {negocio}"</td><td>No; con confirmación de lectura</td></tr>
+<tr><td>Problema de caja reportado</td><td>Administradores</td><td>"Se reportó un problema de caja"</td><td>No</td></tr>
+<tr><td>Solicitud de insumos</td><td>Administradores</td><td>"Nueva solicitud de insumos"</td><td>Sí</td></tr>
+<tr><td>Vacaciones registradas</td><td>Profesional</td><td>"Se registraron tus vacaciones"</td><td>Sí</td></tr>
+<tr><td>Liquidación emitida (cuando se active Remuneraciones)</td><td>Trabajador con contrato</td><td>"Tu liquidación de octubre está disponible"</td><td>No</td></tr>
+</tbody></table></div>
+<p>Cada persona elige además un <b>horario de silencio</b>, por ejemplo de 22:00 a 8:00. Los avisos de ese tramo quedan en la bandeja y no suenan.</p>
+</section>
+
+<section id="cronograma">
+<h2>Fases y tiempos</h2>
+<p>Semanas desde el lunes 6 de octubre de 2026. Supone a Pablo con dedicación parcial más Claude Code, y a Nico probando cada fase en <code>rebooking-pruebas</code>.</p>
+<div class="gantt" role="img" aria-label="Cronograma de 15 semanas, del 6 de octubre de 2026 al 18 de enero de 2027">
+<div class="g">
+  <div></div>
+  <div class="wk">6 oct</div><div class="wk">13</div><div class="wk">20</div><div class="wk">27</div><div class="wk">3 nov</div><div class="wk">10</div><div class="wk">17</div><div class="wk">24</div><div class="wk">1 dic</div><div class="wk">8</div><div class="wk">15</div><div class="wk">22</div><div class="wk">29</div><div class="wk">5 ene</div><div class="wk">12</div>
+
+  <div class="lbl">F0 · Seguridad y cimientos</div><div class="bar" style="grid-column:2 / 4"></div>
+  <div class="lbl">Cuentas Apple y Google (D-U-N-S)</div><div class="bar store" style="grid-column:2 / 6"></div>
+  <div class="lbl">Ley 21.719 (política, contratos, derechos)</div><div class="bar legal" style="grid-column:2 / 10"></div>
+  <div class="lbl">F1 · Diseño móvil por rol</div><div class="bar" style="grid-column:4 / 9"></div>
+  <div class="lbl">F2 · Centro de notificaciones</div><div class="bar" style="grid-column:6 / 10"></div>
+  <div class="lbl">F3 · App nativa (Capacitor)</div><div class="bar" style="grid-column:8 / 11"></div>
+  <div class="lbl">F4 · Beta con Estudio Levels</div><div class="bar" style="grid-column:11 / 13"></div>
+  <div class="lbl">F5 · Revisión de tiendas y lanzamiento</div><div class="bar store" style="grid-column:13 / 17"></div>
+  <div class="lbl"></div><div class="mile" style="grid-column:10 / 11">▲ Ley</div>
+</div></div>
+
+<div class="tbl"><table>
+<thead><tr><th>Fase</th><th>Qué se entrega</th><th>Horas</th><th>Se prueba con</th></tr></thead>
+<tbody>
+<tr><td><b>F0</b> Seguridad y cimientos</td><td>Cerrar <code>/api/push/send</code> y las rutas abiertas (comisiones, arriendo, billetera, fidelidad, MP, TUU, clientes); PIN con hash; inventario de datos; abrir cuentas de tiendas.</td><td class="num">30–45</td><td>Pruebas de rutas sin sesión</td></tr>
+<tr><td><b>F1</b> Diseño móvil</td><td>Disposición móvil con barra inferior por rol; pantallas de agenda, ficha, POS, caja, clientes y billetera rehechas para el pulgar; modo sin conexión claro.</td><td class="num">90–140</td><td>Nico en su celular vía web</td></tr>
+<tr><td><b>F2</b> Notificaciones</td><td>Tablas <code>notifications</code>, <code>notification_preferences</code> y <code>device_tokens</code>; bandeja; preferencias y horario de silencio; "Avisos del equipo" con confirmación de lectura; todos los eventos de la tabla.</td><td class="num">45–70</td><td>Web push en pruebas</td></tr>
+<tr><td><b>F3</b> App nativa</td><td>Proyecto Capacitor iOS y Android; push nativo; Face ID y huella; enlaces profundos; íconos y pantalla de inicio; eliminar cuenta.</td><td class="num">40–60</td><td>Xcode (Mac de Nico) y Android Studio</td></tr>
+<tr><td><b>F4</b> Beta</td><td>TestFlight y prueba interna de Google Play con el equipo de Estudio Levels; corrección de lo que aparezca.</td><td class="num">20–35</td><td>Equipo real, datos reales</td></tr>
+<tr><td><b>F5</b> Tiendas</td><td>Fichas, capturas, etiquetas de privacidad, cuenta demo para revisión, respuestas a rechazos. Diciembre y fin de año alargan la revisión.</td><td class="num">incluido</td><td>—</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="costos">
+<h2>Costos</h2>
+<p>Montos aproximados en pesos chilenos, con el dólar cerca de $950. Hay que confirmarlos al momento de pagar.</p>
+<h3>Únicos y anuales</h3>
+<div class="tbl"><table>
+<thead><tr><th>Ítem</th><th>Monto</th><th>Frecuencia</th><th>Nota</th></tr></thead>
+<tbody>
+<tr><td>Apple Developer Program</td><td class="num">USD 99 (~$95.000)</td><td>Anual</td><td>Cuenta de organización: requiere empresa con número D-U-N-S (gratis, puede tardar semanas)</td></tr>
+<tr><td>Google Play Console</td><td class="num">USD 25 (~$24.000)</td><td>Una vez</td><td>Cuenta de organización: evita la exigencia de 12 testers por 14 días de las cuentas personales</td></tr>
+<tr><td>Firebase Cloud Messaging</td><td class="num">$0</td><td>—</td><td>Gratuito para notificaciones</td></tr>
+<tr><td>Xcode / Android Studio / Capacitor</td><td class="num">$0</td><td>—</td><td>Se usa el Mac de Nico para compilar iOS</td></tr>
+<tr><td>Celulares de prueba</td><td class="num">$0–$250.000</td><td>Una vez</td><td>Solo si no hay un iPhone y un Android a mano</td></tr>
+<tr><td>Abogado: política, términos, contrato de encargo, evaluación de impacto</td><td class="num">$800.000–$2.500.000</td><td>Una vez</td><td>Rango orientativo; pedir 2 cotizaciones</td></tr>
+<tr><td>Delegado de protección de datos externo</td><td class="num">$150.000–$400.000</td><td>Mensual, opcional</td><td>No es obligatorio; ayuda como atenuante (modelo de prevención)</td></tr>
+</tbody></table></div>
+<h3>Desarrollo (225 a 350 horas)</h3>
+<div class="tbl"><table>
+<thead><tr><th>Escenario</th><th>Cómo</th><th>Costo estimado</th></tr></thead>
+<tbody>
+<tr><td><b>A · Equipo actual</b></td><td>Pablo + Claude Code; Nico prueba. Conviene subir a un plan de Claude con más uso, porque esta semana ya se acercó al límite.</td><td class="num">Horas de Pablo + plan Claude (~USD 100–200/mes durante 3 meses)</td></tr>
+<tr><td><b>B · Externo</b></td><td>Freelancer o agencia en Chile, entre $25.000 y $45.000 por hora</td><td class="num">$5,6M–$15,7M</td></tr>
+</tbody></table></div>
+<p>Supabase y Vercel ya se pagan. La app no agrega costo fijo de servidor mientras el uso sea similar al de hoy.</p>
+</section>
+
+<section id="riesgos">
+<h2>Riesgos</h2>
+<div class="tbl"><table>
+<thead><tr><th>Riesgo</th><th>Prob.</th><th>Impacto</th><th>Cómo se reduce</th></tr></thead>
+<tbody>
+<tr><td>Apple rechaza la app por ser "una web envuelta" (guía 4.2)</td><td><span class="pill p-hi">Alta</span></td><td><span class="pill p-hi">Alto</span></td><td>Push nativo, Face ID, enlaces profundos, vibración, pantalla sin conexión; nota para el revisor que explique el uso y una cuenta demo con datos.</td></tr>
+<tr><td>Apple exige cobrar los planes con su sistema (guía 3.1.1)</td><td><span class="pill p-md">Media</span></td><td><span class="pill p-hi">Alto</span></td><td>La app solo inicia sesión en cuentas existentes; sin precios, registro ni enlaces de pago en iPhone.</td></tr>
+<tr><td>No llegar al 1 de diciembre con lo legal</td><td><span class="pill p-hi">Alta</span></td><td><span class="pill p-hi">Alto</span></td><td>El trabajo legal parte en la semana 1 y no depende de la app. Lo mínimo (política, canal de derechos, contratos) primero.</td></tr>
+<tr><td>Rutas abiertas, incluida la de enviar notificaciones</td><td><span class="pill p-hi">Alta</span></td><td><span class="pill p-hi">Alto</span></td><td>Fase 0 antes de cualquier pantalla nueva.</td></tr>
+<tr><td>Datos de salud en negocios de kinesiología (datos sensibles)</td><td><span class="pill p-md">Media</span></td><td><span class="pill p-hi">Alto</span></td><td>Evaluación de impacto; notas clínicas fuera de avisos y exportaciones; acceso solo del profesional tratante y del admin.</td></tr>
+<tr><td>Datos personales visibles con el celular bloqueado</td><td><span class="pill p-md">Media</span></td><td><span class="pill p-md">Medio</span></td><td>Textos sin nombre, teléfono ni montos (ver tabla de notificaciones).</td></tr>
+<tr><td>Dependencia de Pablo (cuentas, despliegue, SQL de producción)</td><td><span class="pill p-hi">Alta</span></td><td><span class="pill p-md">Medio</span></td><td>Definir quién es titular de las cuentas de tiendas; acordar días de despliegue.</td></tr>
+<tr><td>El equipo niega el permiso de notificaciones o se satura</td><td><span class="pill p-md">Media</span></td><td><span class="pill p-md">Medio</span></td><td>Pantalla previa que explica el porqué; preferencias y horario de silencio.</td></tr>
+<tr><td>Sin internet en el local</td><td><span class="pill p-md">Media</span></td><td><span class="pill p-md">Medio</span></td><td>Mensaje claro; el POS no cobra sin conexión (evita ventas duplicadas).</td></tr>
+<tr><td>La disposición móvil rompe algo en la web</td><td><span class="pill p-lo">Baja</span></td><td><span class="pill p-hi">Alto</span></td><td>Solo se activa dentro de la app; pruebas en <code>rebooking-pruebas</code> antes de producción.</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="ley">
+<h2>Ley 21.719: qué exige y qué hacemos</h2>
+<div class="callout crit">
+<p>Esta sección resume la ley para planificar. <b>No reemplaza la revisión de un abogado</b>, que debe validar los textos finales, los plazos exactos y las bases de licitud.</p>
+</div>
+<h3>Lo esencial</h3>
+<ul>
+  <li>Modifica la Ley 19.628. Se publicó en diciembre de 2024 y <b>rige desde el 1 de diciembre de 2026</b>.</li>
+  <li>Crea la <b>Agencia de Protección de Datos Personales</b>, que fiscaliza y sanciona.</li>
+  <li><b>Principios:</b> licitud y lealtad, finalidad, proporcionalidad, calidad, responsabilidad, seguridad, transparencia y confidencialidad.</li>
+  <li><b>Bases para tratar datos:</b> consentimiento (libre, informado, específico y revocable), ejecución de un contrato, obligación legal, interés legítimo y otras que define la ley.</li>
+  <li><b>Derechos de las personas:</b> acceso, rectificación, supresión, oposición, portabilidad y bloqueo, además de no quedar sujeto a decisiones solo automatizadas. Hay plazos de respuesta: el abogado debe confirmarlos y quedan escritos en el procedimiento.</li>
+  <li><b>Datos sensibles</b> (salud, biométricos y otros): reglas más estrictas. Afecta a los negocios de kinesiología.</li>
+  <li><b>Niños, niñas y adolescentes:</b> reglas especiales de consentimiento según la edad.</li>
+  <li><b>Seguridad y brechas:</b> medidas apropiadas y aviso a la Agencia sin demora indebida. En ciertos casos también a las personas afectadas (por ejemplo datos sensibles, de menores o financieros).</li>
+  <li><b>Encargados</b> (quien trata datos por cuenta de otro) con contrato escrito. <b>Transferencias internacionales</b> solo con garantías adecuadas.</li>
+  <li><b>Sanciones</b> en UTM: leves hasta 5.000, graves hasta 10.000, gravísimas hasta 20.000 (más de $1.300 millones). Para empresas grandes reincidentes, porcentajes de los ingresos anuales.</li>
+  <li><b>Modelo de prevención de infracciones</b> (con delegado de protección de datos): voluntario, sirve como atenuante.</li>
+</ul>
+<h3>Quién es responsable de qué en re-booking</h3>
+<div class="tbl"><table>
+<thead><tr><th>Datos</th><th>Responsable</th><th>Papel de re-booking</th></tr></thead>
+<tbody>
+<tr><td>Clientes finales de cada negocio (nombre, celular, correo, citas, notas, fotos, documentos)</td><td>Cada negocio</td><td><b>Encargado</b>: los trata por cuenta del negocio y según sus instrucciones</td></tr>
+<tr><td>Equipo de cada negocio (perfil, PIN, comisiones, liquidaciones)</td><td>Cada negocio (empleador)</td><td>Encargado</td></tr>
+<tr><td>Cuenta del negocio, facturación de la suscripción, uso de la plataforma</td><td><b>re-booking</b></td><td>Responsable</td></tr>
+<tr><td>Dispositivos y notificaciones de la app (token, preferencias)</td><td><b>re-booking</b></td><td>Responsable</td></tr>
+</tbody></table></div>
+<h3>Lista de cumplimiento antes del 1 de diciembre</h3>
+<ul class="checks">
+  <li><b>Registro de tratamientos:</b> qué datos, para qué, base legal, quién accede, dónde se guardan y cuánto tiempo.</li>
+  <li><b>Política de privacidad pública</b> en la web y dentro de la app (hoy no existe).</li>
+  <li><b>Términos actualizados</b> con un <b>contrato de encargo</b> que los negocios aceptan al usar re-booking.</li>
+  <li><b>Lista pública de subencargados:</b> Supabase, Vercel, Resend, Mercado Pago, TUU, Google (Firebase) y Apple, con su país y garantías de transferencia.</li>
+  <li><b>Canal de derechos:</b> correo y formulario, procedimiento interno con plazos, y herramientas para exportar y suprimir datos de un cliente.</li>
+  <li><b>Reserva online:</b> aviso de privacidad en el formulario; casilla separada y sin marcar para promociones.</li>
+  <li><b>Mensajes de retención y marketing</b> (WhatsApp y correo): base legal clara y forma simple de darse de baja.</li>
+  <li><b>Kinesiología:</b> evaluación de impacto; consentimiento para datos de salud; coordinar con la Ley 20.584 (ficha clínica).</li>
+  <li><b>Seguridad:</b> cerrar rutas abiertas, PIN con hash, permisos por negocio en la base de datos, registro de accesos, segundo factor para administradores.</li>
+  <li><b>Protocolo de brechas:</b> quién detecta, quién decide, plantilla de aviso a la Agencia y a los afectados.</li>
+  <li><b>Plazos de conservación:</b> por ejemplo, borrar o anonimizar clientes sin actividad después de un plazo que defina el negocio.</li>
+  <li><b>Capacitación breve al equipo:</b> no compartir PIN, no sacar fotos de la pantalla y qué hacer si se pierde un celular.</li>
+</ul>
+</section>
+
+<section id="datos">
+<h2>Política de datos (estructura)</h2>
+<p>Borrador de contenido para que el abogado lo convierta en texto final.</p>
+<div class="tbl"><table>
+<thead><tr><th>Categoría</th><th>Ejemplos</th><th>Para qué</th><th>Base</th><th>Conservación sugerida</th></tr></thead>
+<tbody>
+<tr><td>Identificación del equipo</td><td>Nombre, correo, rol, PIN (con hash)</td><td>Acceso y control de caja</td><td>Contrato</td><td>Mientras la cuenta esté activa + 6 meses</td></tr>
+<tr><td>Clientes finales</td><td>Nombre, celular, correo, cómo nos conoció</td><td>Agendar, recordar, cobrar</td><td>Contrato (cita) / consentimiento (promociones)</td><td>Definido por el negocio; sugerido 24 meses sin actividad</td></tr>
+<tr><td>Historial y notas</td><td>Citas, servicios, notas, fotos, documentos</td><td>Atención y seguimiento</td><td>Contrato; <b>consentimiento explícito si es salud</b></td><td>Según el negocio; salud según Ley 20.584</td></tr>
+<tr><td>Ventas y caja</td><td>Montos, método de pago, quién emitió</td><td>Contabilidad y control</td><td>Obligación legal / contrato</td><td>6 años (tributario)</td></tr>
+<tr><td>Remuneraciones</td><td>RUT, sueldo, AFP, salud, liquidaciones</td><td>Pagar sueldos</td><td>Obligación legal</td><td>Según normativa laboral y previsional</td></tr>
+<tr><td>Dispositivo y avisos</td><td>Token de notificación, modelo, preferencias</td><td>Enviar notificaciones</td><td>Contrato / consentimiento del permiso</td><td>Hasta cerrar sesión o eliminar la cuenta</td></tr>
+</tbody></table></div>
+<p>Lo que <b>no</b> se recolecta: ubicación, contactos del teléfono, micrófono, rastreo publicitario ni datos de tarjeta (los procesan Mercado Pago y TUU). Tampoco se venden ni se ceden datos a terceros para publicidad.</p>
+</section>
+
+<section id="permisos">
+<h2>Permisos del celular</h2>
+<p>Solo se piden en el momento en que se necesitan, con una pantalla previa que explica para qué.</p>
+<div class="tbl"><table>
+<thead><tr><th>Permiso</th><th>Cuándo se pide</th><th>Texto al usuario</th><th>Obligatorio</th></tr></thead>
+<tbody>
+<tr><td>Notificaciones (iOS; Android 13+)</td><td>Después del primer inicio de sesión</td><td>"Te avisamos cuando te agenden, cuando aprueben un descuento por planilla y cuando tu administrador envíe un aviso."</td><td>No</td></tr>
+<tr><td>Face ID / huella</td><td>Al activar "Desbloquear con Face ID" en Mi perfil</td><td>"Usamos Face ID para abrir re-booking sin escribir tu clave. Tu rostro no sale del teléfono."</td><td>No</td></tr>
+<tr><td>Cámara</td><td>Al tomar una foto de un cliente o un documento</td><td>"Para guardar fotos en la ficha del cliente."</td><td>No</td></tr>
+<tr><td>Fotos</td><td>Se usa el selector del sistema, que no requiere permiso general</td><td>—</td><td>No</td></tr>
+<tr><td>Ubicación, contactos, micrófono, rastreo (ATT)</td><td>Nunca</td><td>—</td><td>—</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="terminos">
+<h2>Términos y condiciones</h2>
+<p>Los términos actuales (<code>/terminos</code>) tienen 9 secciones cortas. Se reescriben con esta estructura:</p>
+<ol>
+  <li>Partes, definiciones y aceptación (web y app).</li>
+  <li>Descripción del servicio y de la app móvil; qué no incluye la app (registro y pagos).</li>
+  <li>Cuentas, roles y PIN: el negocio responde por su equipo; el PIN es personal e intransferible.</li>
+  <li>Planes, pagos y suspensión por mora (se mantiene lo actual).</li>
+  <li><b>Contrato de encargo de datos</b> (anexo): instrucciones del negocio, confidencialidad, seguridad, subencargados, aviso de brechas, devolución y borrado al terminar.</li>
+  <li>Notificaciones: tipos, preferencias y que no sustituyen la revisión de la agenda.</li>
+  <li>Uso aceptable: no usar la plataforma para spam ni para datos que el negocio no tenga derecho a tratar.</li>
+  <li>Disponibilidad, mantenciones y soporte.</li>
+  <li>Responsabilidad y sus límites; las herramientas de apoyo, como Remuneraciones, no reemplazan al contador.</li>
+  <li>Propiedad intelectual.</li>
+  <li>Término del servicio, exportación de datos (formato y plazo) y eliminación.</li>
+  <li>Cambios a los términos con aviso previo.</li>
+  <li>Ley aplicable (Chile), tribunales y contacto.</li>
+</ol>
+</section>
+
+<section id="tiendas">
+<h2>Requisitos de las tiendas</h2>
+<div class="cols">
+  <div class="card"><h3>Apple App Store</h3><ul>
+    <li>Cuenta de organización (empresa y D-U-N-S).</li>
+    <li>Etiquetas de privacidad ("App Privacy") coherentes con la política.</li>
+    <li>URL de política de privacidad.</li>
+    <li><b>Eliminar la cuenta desde la app</b> (guía 5.1.1).</li>
+    <li>Funcionalidad propia de app, no solo una web (guía 4.2).</li>
+    <li>Sin compras ni enlaces de pago dentro de la app (3.1.1).</li>
+    <li>Cuenta demo con datos para el revisor.</li>
+    <li>No hace falta "Iniciar sesión con Apple" porque no hay inicio con Google o Facebook.</li>
+  </ul></div>
+  <div class="card"><h3>Google Play</h3><ul>
+    <li>Cuenta de organización (evita los 12 testers por 14 días).</li>
+    <li>Formulario "Seguridad de los datos".</li>
+    <li>URL de política de privacidad.</li>
+    <li>Eliminar la cuenta desde la app <b>y</b> desde una página web.</li>
+    <li>Permiso <code>POST_NOTIFICATIONS</code> en Android 13 o superior.</li>
+    <li>Nivel de API actualizado según la exigencia vigente de Google.</li>
+  </ul></div>
+</div>
+</section>
+
+<section id="decisiones">
+<h2>Decisiones pendientes</h2>
+<ol>
+  <li><b>¿A nombre de quién quedan las apps en las tiendas?</b> Debe ser la empresa dueña de re-booking, no Estudio Levels. Define también quién firma como responsable ante la ley.</li>
+  <li><b>¿Quién abre las cuentas</b> de Apple y Google y tramita el D-U-N-S? Conviene empezar esta semana.</li>
+  <li><b>Abogado:</b> a quién se le pide la cotización para la política, los términos, el contrato de encargo y la evaluación de impacto.</li>
+  <li><b>¿Recepción usa la app</b> o solo profesionales y administradores?</li>
+  <li><b>¿Se nombra un delegado de protección de datos</b> (interno o externo)?</li>
+  <li><b>Escenario de desarrollo:</b> A (Pablo + Claude Code) o B (externo).</li>
+</ol>
+<div class="callout">
+<p><b>Siguiente paso sugerido:</b> aprobar la Fase 0 (seguridad, sin riesgo para los clientes) y en paralelo abrir las cuentas de tiendas y pedir la cotización al abogado. Nada de esto depende de que Pablo termine de desplegar el paquete de octubre.</p>
+</div>
+</section>
+
+<footer>
+<p>Plan preparado con Claude Code sobre el código de <code>nicoperezj1/git-estudio-levels</code> (rama <code>claude/hopeful-mayer-jtqlh4</code>). Los costos y plazos son estimaciones. Las referencias a la Ley 21.719 y a las reglas de Apple y Google deben confirmarse con un abogado y con las guías vigentes al momento de publicar.</p>
+</footer>
+</main>
+</div>
