@@ -101,7 +101,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
   return (
     <Panel
       title={`Gastos fijos y cierre · ${monthName}`}
-      subtitle="Ingresa los gastos fijos de este mes (desde cero cada mes). Se suman a los egresos del cierre y los informes."
+      subtitle="Se ingresan desde cero cada mes y se suman a los egresos."
       action={
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${closed ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}>
           {closed ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />} {closed ? "Mes cerrado" : "Mes abierto"}
@@ -117,7 +117,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-brand-gray">Total gastos fijos: <span className="text-lg font-bold text-brand-dark tabular-nums">{formatCurrency(total)}</span></p>
+            <p className="text-sm text-brand-gray">Total gastos fijos: <span className="text-base font-bold text-brand-dark tabular-nums">{formatCurrency(total)}</span></p>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setOpen(!open)} className={ghostButton}>
                 {open ? "Ocultar detalle" : closed ? "Ver gastos fijos" : "Editar gastos fijos"}
@@ -130,7 +130,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
 
           {open && (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {items.map((i) => (
                   <div key={i.key}>
                     <label className="mb-1.5 block text-xs font-semibold text-brand-gray">{i.label}</label>
