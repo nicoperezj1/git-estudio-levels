@@ -173,3 +173,5 @@
 
 
 > **Lección (3 oct.): embeds ambiguos en PostgREST.** `inventory_movements` tiene DOS llaves hacia `profiles` (`barber_id` y `approved_by`, migración 016), así que `barber:profiles(name)` daba error y `GET /api/inventario/movements` devolvía lista vacía ("Movimientos recientes" siempre vacío). Se arregló con `barber:profiles!barber_id(name)`. Al pedir un embed, si la tabla tiene más de una llave a la misma tabla, indicar la columna (`!columna`).
+
+> **Cómo dar instrucciones a Nico (regla fija, 3 oct.):** siempre en pasos numerados y completos: en qué ventana (terminal libre `barberia %` vs. la del servidor `npm run dev`), qué botón tocar y dónde está, el texto exacto a pegar en un bloque de código, y qué debe aparecer si salió bien. Nunca dejar "baja la rama y prueba" sin los pasos; para el SQL siempre: `pbcopy < ruta` en la terminal, abrir SQL Editor en Supabase de `rebooking-pruebas`, pegar con `Cmd + V`, **Run**, y qué tabla/filas deben salir. Comando para bajar la rama: `git fetch https://github.com/nicoperezj1/git-estudio-levels claude/hopeful-mayer-jtqlh4 && git checkout -B claude/hopeful-mayer-jtqlh4 FETCH_HEAD`.
