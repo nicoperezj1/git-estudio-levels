@@ -109,6 +109,7 @@ export default function FinanzasPage() {
   const [fMethod, setFMethod] = useState("");
   const [fAssigned, setFAssigned] = useState("");
   const [fCreator, setFCreator] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   // Punto 5: null = creando una transaccion nueva; con id = editando una existente
@@ -357,7 +358,7 @@ export default function FinanzasPage() {
         />
       </div>
 
-      {/* Filters */}
+      {/* Una sola fila: tipo, periodo y filtros (plegados). */}
       <div className="flex flex-wrap items-center gap-3">
         <Segmented
           value={filter}
@@ -368,70 +369,74 @@ export default function FinanzasPage() {
             { value: "expense", label: "Egresos" },
           ]}
         />
-        {/* Item 38: atajos de rango en vez de tener que escribir fechas a mano cada vez. */}
-        <Segmented
-          size="sm"
-          value={quickRange as any}
-          onChange={(k) => {
-            const r = QUICK_RANGES.find((x) => x.key === k);
-            if (r) applyQuickRange(r.key, r.days);
-          }}
-          options={QUICK_RANGES.map((r) => ({ value: r.key, label: r.label }))}
-        />
-        <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray">
-          <span className="text-xs font-semibold">Corresponde al mes</span>
+
+        {/* Periodo: un solo selector (rangos rapidos, mes al que corresponde o fechas a mano). */}
+        <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2 text-sm text-brand-gray">
+          <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
           <select
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
+            value={monthFilter ? `month:${monthFilter}` : quickRange === "custom" ? "custom" : `range:${quickRange}`}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v.startsWith("month:")) { setMonthFilter(v.slice(6)); return; }
+              setMonthFilter("");
+              if (v === "custom") { setQuickRange("custom"); return; }
+              const r = QUICK_RANGES.find((x) => x.key === v.slice(6));
+              if (r) applyQuickRange(r.key, r.days);
+            }}
             className="bg-transparent text-sm text-brand-dark outline-none"
           >
-            <option value="">Usar fechas</option>
-            {monthOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <optgroup label="Período">
+              {QUICK_RANGES.map((r) => <option key={r.key} value={`range:${r.key}`}>{r.label}</option>)}
+              <option value="custom">Fechas a elegir…</option>
+            </optgroup>
+            <optgroup label="Corresponde al mes">
+              {monthOptions().map((o) => <option key={o.value} value={`month:${o.value}`}>{o.label}</option>)}
+            </optgroup>
           </select>
         </div>
-        <div className={`flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray ${monthFilter ? "opacity-50" : ""}`}>
-          <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => { setQuickRange("custom"); setDateFrom(e.target.value); }}
-            className="bg-transparent text-sm text-brand-dark outline-none"
-          />
-          <span>→</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => { setQuickRange("custom"); setDateTo(e.target.value); }}
-            className="bg-transparent text-sm text-brand-dark outline-none"
-          />
-        </div>
-      </div>
+        {!monthFilter && quickRange === "custom" && (
+          <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2 text-sm text-brand-gray">
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-sm text-brand-dark outline-none" />
+            <span>→</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-sm text-brand-dark outline-none" />
+          </div>
+        )}
 
-      {/* Filtros de la lista (minimalistas): profesional, metodo de pago, a quien corresponde y quien emitio. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {([
-          { label: "Profesional", value: fBarber, set: setFBarber, options: barberOptions.map(([id, name]) => ({ value: id, label: name })) },
-          { label: "Método de pago", value: fMethod, set: setFMethod, options: methodOptions.map((m) => ({ value: m, label: paymentMethodLabels[m] || m })) },
-          { label: "Corresponde a", value: fAssigned, set: setFAssigned, options: [
-            { value: "professional", label: assignedToLabels.professional }, { value: "reception", label: assignedToLabels.reception },
-            { value: "business", label: assignedToLabels.business }, { value: "none", label: "Sin especificar" },
-          ] },
-          { label: "Emitido por", value: fCreator, set: setFCreator, options: [...creatorOptions.map((n) => ({ value: n, label: n })), { value: "none", label: "Sin dato" }] },
-        ]).map((f) => (
-          <label key={f.label} className={`flex items-center gap-2 rounded-xl border bg-white px-3 py-1.5 text-xs ${f.value ? "border-brand-blue/50 text-brand-blue" : "border-gray-100 text-brand-gray"}`}>
-            <span className="font-semibold">{f.label}</span>
-            <select value={f.value} onChange={(e) => f.set(e.target.value)} className="max-w-[150px] bg-transparent text-xs text-brand-dark outline-none">
-              <option value="">Todos</option>
-              {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </label>
-        ))}
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${hasFilters ? "border-brand-blue/50 text-brand-blue" : "border-gray-100 bg-white text-brand-gray hover:text-brand-dark"}`}
+        >
+          Filtros{hasFilters ? ` (${[fBarber, fMethod, fAssigned, fCreator].filter(Boolean).length})` : ""}
+        </button>
         {hasFilters && (
-          <button type="button" onClick={clearFilters} className="px-2 py-1.5 text-xs font-semibold text-brand-blue hover:underline">
-            Limpiar filtros
+          <button type="button" onClick={clearFilters} className="text-xs font-semibold text-brand-blue hover:underline">
+            Limpiar
           </button>
         )}
       </div>
+
+      {showFilters && (
+        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-gray-100 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+          {([
+            { label: "Profesional", value: fBarber, set: setFBarber, options: barberOptions.map(([id, name]) => ({ value: id, label: name })) },
+            { label: "Método de pago", value: fMethod, set: setFMethod, options: methodOptions.map((m) => ({ value: m, label: paymentMethodLabels[m] || m })) },
+            { label: "Corresponde a", value: fAssigned, set: setFAssigned, options: [
+              { value: "professional", label: assignedToLabels.professional }, { value: "reception", label: assignedToLabels.reception },
+              { value: "business", label: assignedToLabels.business }, { value: "none", label: "Sin especificar" },
+            ] },
+            { label: "Emitido por", value: fCreator, set: setFCreator, options: [...creatorOptions.map((n) => ({ value: n, label: n })), { value: "none", label: "Sin dato" }] },
+          ]).map((f) => (
+            <div key={f.label}>
+              <label className="mb-1 block text-[11px] font-semibold text-brand-gray">{f.label}</label>
+              <select value={f.value} onChange={(e) => f.set(e.target.value)} className={`${inputClass} !py-2 text-sm`}>
+                <option value="">Todos</option>
+                {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       <Panel flush title="Movimientos" subtitle={loading ? undefined : `${visible.length} registro${visible.length === 1 ? "" : "s"}${hasFilters ? ` de ${transactions.length}` : ""}`}>
