@@ -15,11 +15,31 @@
 
 > **Plan vigente:** `docs/PLAN-OCTUBRE.md` (fases, decisiones tomadas con Nico y plan de vuelta atrás de cada una).
 
-> **Dónde quedamos (3 de oct.):**
-> - Plan de octubre aprobado por Nico en `docs/PLAN-OCTUBRE.md`. **No se ha escrito código de ninguna fase todavía.**
-> - Próximo paso: **Fase 0** (Pablo aplica el parche `0013` y crea un sitio de prueba en Vercel conectado a `rebooking-pruebas`) y luego **Fase 1**, empezando por el error de Métricas de clientes (`src/app/api/clientes/metricas/route.ts` solo lee los primeros 1.000 clientes por el límite de Supabase; los nuevos nunca se cuentan).
+> **Dónde quedamos (3 de oct., noche):**
+> - **Regla de oro de esta sesión: NO volver a preguntarle a Nico lo que ya está decidido.** Las decisiones están en `docs/PLAN-OCTUBRE.md` sección 1 y el orden de trabajo es el del plan (Fase 0 → 1 → 2...). Nico ya respondió muchas preguntas; si algo está en el plan, se hace, no se pregunta. Preguntar solo lo que de verdad no está escrito. Hablarle simple, corto, sin tecnicismos; avanzar programando, no explicando.
+> - **Hecho en código (Fase 1), todo en la rama, con `tsc` limpio:**
+>   - Métricas de clientes: lee todos los clientes por páginas (antes solo los primeros 1.000).
+>   - Puntos de fidelidad al cobrar: usan la regla del negocio de la venta (`pos/checkout`).
+>   - Cómo nos conoció: se sumaron "Facebook" y "Referido de un amigo/conocido" (Clientes, Métricas, PDF del cierre) y el selector aparece también al crear cliente desde el POS. Sin SQL.
+>   - Mi Agenda: el admin que atiende clientes sale primero y seleccionado.
+>   - Orden de servicios: el arrastrar ya existía; ahora la reserva "por hora" (`public/services`) respeta `sort_order`, y `/api/services/reorder` exige sesión y negocio.
+> - **Fase 1 que FALTA** (seguir en este orden): nombre de encargado de recepción + ocultar campos que no le aplican; calendario en celular (un toque abre Agendar/Bloquear, "Atrás" y tocar fuera solo cierran, líneas de hora sutiles); calendario 7 días con varios profesionales permite agendar con clic; fidelidad configurable (puntos y recompensas por negocio; proteger `loyalty/earn` y `redeem`). Después **Fase 2 (finanzas)**.
+> - **Fase 0 pendiente con Pablo:** parche `0013`, sitio de prueba en Vercel. Claves expuestas (`MP_WEBHOOK_SECRET`, token `APP_USR`) por regenerar: urgente y no necesita código.
 > - Nico prueba en su computador (`localhost`). Aún **no tiene acceso de admin** a Supabase, Vercel ni al GitHub de Pablo: los cambios se le entregan como zip a Pablo.
-> - **Para probar en local hace falta un `.env.local`** con las llaves de Supabase (ver `.env.example`). Deben ser las del proyecto de **pruebas** (`rebooking-pruebas`), **nunca** las de producción. Las entrega Pablo por privado, nunca por el chat.
+
+## Entorno de pruebas (ya armado, no volver a preguntar)
+- Base de pruebas: Supabase `rebooking-pruebas` (ref `ucwrdmwtlesayjxmlbve`). El `.env.local` de Nico ya apunta ahí. **Nunca** producción.
+- Script `scripts/seed-pruebas.mjs` (no va en los zips a Pablo): se niega a correr si la URL no es la de pruebas. `--dry` simula; `--crear-negocio` crea el negocio si el admin no tiene. Re-ejecutable.
+- Negocio de pruebas "Estudio Levels (pruebas)", id `0235d97a-6658-4a1c-be69-8c1341ac50ce`, plan **Pro**, 8 profesionales. Si la pantalla muestra "límite de profesionales (3)" o candados PRO, correr en el SQL Editor **de pruebas**: `update tenants set plan='pro', max_professionals=8 where id='0235d97a-6658-4a1c-be69-8c1341ac50ce';`
+- Usuarios de prueba (clave de todos: `Prueba2026!`; el admin conserva su clave de siempre):
+  - Admin `nicoperezj1@gmail.com` PIN 3333
+  - Recepción David Muñoz `nicoperezj1+recepcion@gmail.com` PIN 1234
+  - Arriendo $16.000/día, Matías Soto `nicoperezj1+arriendo@gmail.com` PIN 1111
+  - Comisión 48%, Camila Rojas `nicoperezj1+comision48@gmail.com` PIN 2222
+  - Comisión 40%: Diego Fuentes `nicoperezj1+diego@gmail.com` PIN 4444; Valentina Paredes `nicoperezj1+valentina@gmail.com` PIN 5555
+  - 20 clientes `clienteNN@prueba.test` con orígenes variados y 20 citas (pasadas, hoy y próximas).
+- Cómo trabaja Nico en su Mac (carpeta `~/barberia`): el servidor corre en **una ventana de Terminal** (`npm run dev`); los demás comandos van en **otra ventana/pestaña** (`Cmd+T`), nunca en la del servidor. Para traer lo nuevo: `git fetch https://github.com/nicoperezj1/git-estudio-levels claude/hopeful-mayer-jtqlh4` y `git checkout -B claude/hopeful-mayer-jtqlh4 FETCH_HEAD`. Si sale "Cannot find the middleware module": detener el servidor, `rm -rf .next`, volver a `npm run dev`. Pegar comandos largos a veces mete caracteres raros (`[200~`): escribirlos a mano o pegar de a una línea.
+- El hook del repo pide hacer `git push` a la rama de trabajo al terminar; se hace (solo a `claude/hopeful-mayer-jtqlh4`).
 
 ## Reglas de trabajo
 - Responder en español, informal, claro, directo y sin jerga.

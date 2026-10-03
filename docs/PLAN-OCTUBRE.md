@@ -51,6 +51,8 @@ Plan acordado con Nicolás el 3 de octubre de 2026. Ordena todos los pedidos de 
 
 ## 3. Fase 1: arreglos rápidos (bajo riesgo)
 
+> **Estado (3 oct., noche):** HECHO: Métricas de clientes, "Cómo nos conoció" (+POS), Mi Agenda (admin primero), orden de servicios (reserva por hora + proteger reorder), puntos usan la regla del negocio. FALTA: nombre de encargado/recepcionista, calendario celular, 7 días con clic, fidelidad configurable. Detalle en `docs/CONTEXTO.md`.
+
 | Cambio | Detalle |
 |---|---|
 | **Métricas de clientes (error)** | La consulta solo lee los primeros 1.000 clientes (límite de Supabase), que son los importados; los nuevos nunca se cuentan. Contar por origen en la base, sin límite, y separar "registro anterior" de clientes nuevos. |
