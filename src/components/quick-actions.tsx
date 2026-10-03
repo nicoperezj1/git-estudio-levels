@@ -20,7 +20,7 @@ export function QuickActions({ userRole }: { userRole?: string }) {
   const actions = isBarber ? allActions.filter((a) => a.barberAllowed) : allActions;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 lg:hidden">
+    <div className="fixed right-6 z-50 lg:hidden" style={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))" }}>
       {/* Action buttons */}
       {open && (
         <div className="absolute bottom-16 right-0 space-y-2 animate-fade-in">

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabase, createAdminSupabase } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/layout/sidebar";
+import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { ToastWrapper } from "@/components/providers/toast-wrapper";
 import { AuthWrapper } from "@/components/providers/auth-wrapper";
 import { SuspendedGate } from "@/components/layout/suspended-gate";
@@ -60,7 +61,7 @@ export default async function DashboardLayout({
       >
         <div className="flex h-screen dark:bg-gray-950">
           <Sidebar userName={profile?.name || user.email || ""} userRole={profile?.role || "barber"} tenantName={tenantName} isSoloBusiness={isSoloBusiness} />
-          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 pt-[4.5rem] lg:pt-0">
+          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 pt-[4.5rem] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pt-0 lg:pb-0">
             <TenantOverrideBanner />
             <TrialBanner />
             <ErrorBoundary>
@@ -70,6 +71,7 @@ export default async function DashboardLayout({
             </ErrorBoundary>
             {!isSuspended && <PushNotificationPrompt />}
             {!isSuspended && <QuickActions userRole={profile?.role || "barber"} />}
+            {!isSuspended && <MobileTabBar role={profile?.role || "barber"} />}
             {!isSuspended && <CommandPalette />}
           </main>
         </div>

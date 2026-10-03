@@ -61,7 +61,7 @@ export function PushNotificationPrompt() {
   if (!show || permission !== "default") return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-sm animate-slide-in">
+    <div className="fixed bottom-24 left-4 lg:bottom-4 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-sm animate-slide-in">
       <p className="font-medium text-gray-900 text-sm mb-1">Activar notificaciones?</p>
       <p className="text-xs text-gray-500 mb-3">Recibe alertas cuando llega un cliente o se agenda una cita.</p>
       <div className="flex gap-2">

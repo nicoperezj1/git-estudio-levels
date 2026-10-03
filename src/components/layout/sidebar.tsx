@@ -286,6 +286,13 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     }
   }, []);
 
+  // El botón "Más" de la barra inferior (celular) abre este mismo menú.
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener("rb:open-menu", open);
+    return () => window.removeEventListener("rb:open-menu", open);
+  }, []);
+
   const toggleCollapse = () => {
     const next = !collapsed;
     setCollapsed(next);
