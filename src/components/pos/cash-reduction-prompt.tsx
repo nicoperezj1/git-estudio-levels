@@ -16,9 +16,15 @@ export function CashReductionPrompt({ trigger, tenantId }: { trigger: number; te
 
   useEffect(() => {
     if (!trigger) return;
-    fetch(`/api/caja${tenantId ? `?tenantId=${tenantId}` : ""}`)
+    // Con un problema de caja sin resolver el efectivo del sistema no es confiable: no se pide reducir.
+    fetch("/api/problemas?summary=1")
       .then((r) => r.json())
+      .then((p) => {
+        if (p?.open > 0) return null;
+        return fetch(`/api/caja${tenantId ? `?tenantId=${tenantId}` : ""}`).then((r) => r.json());
+      })
       .then((d) => {
+        if (!d) return;
         const cap = Number(d?.summary?.cashCap);
         const expected = Number(d?.summary?.expectedCash);
         if (cap > 0 && expected > cap) setAmount(Math.round(expected - cap));

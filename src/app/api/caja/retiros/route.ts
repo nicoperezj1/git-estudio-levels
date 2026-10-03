@@ -12,6 +12,17 @@ export async function POST(req: NextRequest) {
   const { userId, tenantId } = await getCurrentUserRoleAndTenant();
   if (!userId || !tenantId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  // Con un problema de caja SIN resolver el efectivo del sistema no es confiable: no se pide reducir nada hasta que
+  // el administrador declare el efectivo real (ahi la reduccion se calcula sobre el monto verdadero).
+  {
+    const sb = createAdminSupabase();
+    const { data: open } = await sb.from("problem_reports").select("id").eq("tenant_id", tenantId).eq("status", "open")
+      .in("context", ["caja", "standby", "reduccion_efectivo"]).limit(1);
+    if (open && open.length > 0) {
+      return NextResponse.json({ error: "Hay un problema de caja sin resolver: el administrador debe declarar el efectivo real antes de reducir." }, { status: 409 });
+    }
+  }
+
   // Mismo calculo de la caja de hoy que usa la pantalla Caja (una sola fuente de verdad).
   const r = await cajaGET(new NextRequest(new URL(`/api/caja?tenantId=${tenantId}`, req.url)));
   const state = await r.json().catch(() => null);
