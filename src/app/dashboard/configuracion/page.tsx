@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { BookingRuleCard } from "@/components/settings/booking-rule-card";
+
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toast";
@@ -990,6 +992,9 @@ export default function ConfiguracionPage() {
           </label>
         </div>
       )}
+
+      {/* Preferencias de reserva (Fase 6): regla de "Primer profesional disponible". Solo administrador. */}
+      {isAdmin && <BookingRuleCard />}
 
       {/* Caja y Standby (Fase 5). Solo administrador. */}
       {isAdmin && cajaSec && (

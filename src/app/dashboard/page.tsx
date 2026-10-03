@@ -16,6 +16,7 @@ import { SuperAdminDashboard } from "@/components/dashboard/superadmin-dashboard
 import { BirthdaysCard } from "@/components/dashboard/birthdays-card";
 import { SupplyRequestsCard } from "@/components/dashboard/supply-requests-card";
 import { ProblemReportsCard } from "@/components/dashboard/problem-reports-card";
+import { BookingRuleCard } from "@/components/dashboard/booking-rule-card";
 import Link from "next/link";
 
 interface DashboardData {
@@ -234,6 +235,7 @@ export default function DashboardPage() {
 
       {/* Cumpleanos del mes (solo admin; no se muestra si no hay) */}
       {isAtLeast("admin") && <ProblemReportsCard />}
+      {isAtLeast("admin") && <BookingRuleCard />}
       {isAtLeast("admin") && <SupplyRequestsCard tenantId={tenant?.id} />}
       {isAtLeast("admin") && <BirthdaysCard tenantId={tenant?.id} />}
 
