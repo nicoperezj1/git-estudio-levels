@@ -166,7 +166,7 @@ export default function InventarioPage() {
       sku: productForm.sku || null,
       barcode: productForm.barcode || null,
       cost: parseFloat(productForm.cost),
-      price: parseFloat(productForm.price),
+      price: productForm.productType === "supply" ? 0 : parseFloat(productForm.price),
       stock: parseInt(productForm.stock),
       min_stock: parseInt(productForm.min_stock),
       tenantId: activeTenantId || undefined,
@@ -313,7 +313,7 @@ export default function InventarioPage() {
                 </td>
                 <td className="p-4 text-gray-500">{p.sku}</td>
                 <td className="p-4 text-right">{formatCurrency(Number(p.cost))}</td>
-                <td className="p-4 text-right">{formatCurrency(Number(p.price))}</td>
+                <td className="p-4 text-right">{(p.product_type || "sale") === "supply" ? <span className="text-gray-300">—</span> : formatCurrency(Number(p.price))}</td>
                 <td className="p-4 text-center">{p.stock}</td>
                 <td className="p-4 text-center">{p.min_stock}</td>
                 <td className="p-4 text-center">
@@ -522,19 +522,22 @@ export default function InventarioPage() {
                   {effectiveRole !== "receptionist" && <option value="__new">+ Nueva categoría…</option>}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              {/* Un insumo no se vende: solo tiene costo (lo que pagas por el). El precio es solo para productos de venta. */}
+              <div className={`grid gap-4 ${productForm.productType === "sale" ? "grid-cols-2" : "grid-cols-1"}`}>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Costo</label>
                   <input type="number" required min="0" step="1" value={productForm.cost}
                     onChange={(e) => setProductForm({ ...productForm, cost: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2" />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio</label>
-                  <input type="number" required min="0" step="1" value={productForm.price}
-                    onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2" />
-                </div>
+                {productForm.productType === "sale" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Precio</label>
+                    <input type="number" required min="0" step="1" value={productForm.price}
+                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2" />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -572,7 +575,7 @@ export default function InventarioPage() {
                 <button type="button" onClick={() => setShowProductModal(false)}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
                 <button type="submit"
-                  disabled={!productForm.name || !productForm.price || !productForm.cost || !productForm.stock || !productForm.min_stock}
+                  disabled={!productForm.name || (productForm.productType === "sale" && !productForm.price) || !productForm.cost || !productForm.stock || !productForm.min_stock}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
               </div>
             </form>
