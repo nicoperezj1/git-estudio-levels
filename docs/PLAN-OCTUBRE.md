@@ -196,3 +196,6 @@ Basado en la plantilla Excel de Nicolás (`Plantilla_Liquidacion_Sueldo_Chile.xl
 - Actualizar Next.js 14.1.3 (advertencia de seguridad), después de las fases de dinero.
 - Pixel de Meta por negocio (conversado, sin fecha).
 - Limitar las columnas de `GET /api/barberos/[id]` (hoy devuelve el PIN a quien tiene acceso).
+
+## Paquete a producción (3 oct.)
+Carpeta `entrega-produccion/` (LEEME-PABLO.md + SQL-PRODUCCION.sql = migraciones 086–099 sin la 096). Remuneraciones (Fase 7) queda **guardada pero oculta** (menú solo super_admin, SQL 096 aparte) hasta probarla con Nico: pendiente correr 096, cargar parámetros Previred/SII y comparar septiembre con su Excel.

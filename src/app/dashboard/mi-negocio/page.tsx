@@ -10,7 +10,8 @@ const ITEMS = [
   { href: "/dashboard/arriendo", title: "Arriendo", desc: "Días trabajados y cobro de los profesionales que arriendan.", icon: KeyRound },
   { href: "/dashboard/servicios", title: "Servicios", desc: "Tu carta de servicios, categorías y el orden en que se ve al reservar.", icon: Tag },
   { href: "/dashboard/proveedores", title: "Proveedores", desc: "Tus proveedores y las cotizaciones por WhatsApp.", icon: Truck },
-  { href: "/dashboard/remuneraciones", title: "Remuneraciones", desc: "Liquidaciones de sueldo de tus trabajadores con contrato.", icon: FileText },
+  // Remuneraciones oculta a los negocios hasta terminar las pruebas (se reactiva descomentando)
+  // { href: "/dashboard/remuneraciones", title: "Remuneraciones", desc: "Liquidaciones de sueldo de tus trabajadores con contrato.", icon: FileText },
 ];
 
 export default function MiNegocioPage() {
