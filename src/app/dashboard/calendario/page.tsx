@@ -392,6 +392,8 @@ export default function CalendarioPage() {
       .catch(() => setSlotCap(1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantLoading, tenant?.id]);
+  // Ancho minimo de cada dia en la vista de 1/3/7 dias: con cupos hace falta mas para que quepan lado a lado.
+  const colMin = slotCap > 1 ? 120 + slotCap * 60 : 110;
   const laneLayout = (list: any[]): Record<string, { lane: number; cols: number }> => {
     const toMin = (t: string) => { const m = t?.match(/(\d{2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0; };
     const items = list.map((a) => ({ id: a.id as string, s: toMin(a.start_time), e: toMin(a.end_time) })).sort((a, b) => a.s - b.s || a.e - b.e);
@@ -405,7 +407,9 @@ export default function CalendarioPage() {
         if (lane === -1) { lane = laneEnds.length; laneEnds.push(it.e); } else laneEnds[lane] = it.e;
         out[it.id] = { lane, cols: 1 };
       }
-      for (const it of cluster) out[it.id].cols = laneEnds.length;
+      // Con cupos por bloque cada cita ocupa 1/cupo del ancho aunque este sola: asi queda a la vista
+      // el espacio donde cae el siguiente cliente (y se puede tocar para agendarlo).
+      for (const it of cluster) out[it.id].cols = Math.max(slotCap, laneEnds.length);
       cluster = [];
     };
     for (const it of items) {
@@ -1265,7 +1269,7 @@ export default function CalendarioPage() {
           (2 a 4 personas), TODOS agrupados: cada profesional con sus dias juntos. */}
       {view === "calendario" && multiDay && (loading ? <Spinner /> : (
         <div className={`overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm ${mobileGrid ? "block" : "hidden md:block"}`}>
-          <div style={{ minWidth: Math.max(800, 56 + multiPros.length * rangeDates.length * 110) }}>
+          <div style={{ minWidth: Math.max(800, 56 + multiPros.length * rangeDates.length * colMin) }}>
             {multiPros.length > 1 && (
               <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
                 <div className="w-14 flex-shrink-0 border-r border-gray-100" />
@@ -1290,7 +1294,7 @@ export default function CalendarioPage() {
                   const label = new Date(d + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" });
                   const lastOfGroup = multiPros.length > 1 && di === rangeDates.length - 1;
                   return (
-                    <div key={`${pro.id}-${d}`} className={`flex-1 p-2 text-center min-w-[110px] ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-100"} ${isColTodayHeader ? "bg-blue-50" : ""}`}>
+                    <div key={`${pro.id}-${d}`} className={`flex-1 p-2 text-center ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-100"} ${isColTodayHeader ? "bg-blue-50" : ""}`} style={{ minWidth: colMin }}>
                       <p className={`text-[11px] font-medium truncate mt-0.5 ${isColTodayHeader ? "text-blue-700" : "text-gray-700"}`}>{label}</p>
                     </div>
                   );
@@ -1309,6 +1313,7 @@ export default function CalendarioPage() {
                 rangeDates.map((d, di) => {
                   const dayAppts = appointments.filter((a: any) => a.date === d && a.barber_id === pro.id);
                   const dayBlocks = rangeBlocks.filter((bl) => bl.date === d && bl.barber_id === pro.id);
+                  const dayLanes = slotCap > 1 ? laneLayout(dayAppts) : null;
                   const isColToday = d === todayInChile();
                   const lastOfGroup = multiPros.length > 1 && di === rangeDates.length - 1;
                   // Con un solo profesional se mantiene el azul de siempre; con varios, un color por profesional.
@@ -1316,7 +1321,8 @@ export default function CalendarioPage() {
                   return (
                     <div
                       key={`${pro.id}-${d}`}
-                      className={`flex-1 relative min-w-[110px] ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-100"}`}
+                      className={`flex-1 relative ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-100"}`}
+                      style={{ minWidth: colMin }}
                       onClick={(e) => {
                         // Un clic (o toque) en un espacio vacio abre Agendar/Bloquear para ESE profesional,
                         // ESE dia y a la hora tocada. Las citas y bloqueos tienen su propio clic.
@@ -1381,7 +1387,15 @@ export default function CalendarioPage() {
                             key={appt.id}
                             onClick={() => openApptDetails(appt.id)}
                             className={`absolute left-1 right-1 rounded-lg border-l-[3px] shadow-sm ${color.bg} ${color.border} ${color.text} px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10`}
-                            style={getBlockStyle(appt)}
+                            style={(() => {
+                              const base: any = getBlockStyle(appt);
+                              const l = dayLanes?.[appt.id];
+                              if (l && l.cols > 1) {
+                                const w = 100 / l.cols;
+                                return { ...base, left: `calc(${w * (l.lane % l.cols)}% + 2px)`, width: `calc(${w}% - 4px)`, right: "auto" };
+                              }
+                              return base;
+                            })()}
                           >
                             <p className="flex items-center gap-1 text-[11px] font-bold">
                               <span className="truncate">{appt.client?.name || "Cliente"}</span>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { newClientAppointmentIds } from "@/lib/new-client";
-import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
+import { isSlotFull, exceededAfterInsert, getSlotCapacity } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
 
 export async function GET(req: NextRequest) {
@@ -79,8 +79,9 @@ export async function POST(req: NextRequest) {
 
   // Check conflicts (con "cupos por bloque", solo kinesiologia, se admiten varias citas hasta el cupo)
   if (await isSlotFull(supabase, barberId, resolvedTenantId, date, start, end)) {
+    const cap = await getSlotCapacity(supabase, resolvedTenantId);
     return NextResponse.json(
-      { error: "El profesional tiene una cita en ese horario" },
+      { error: cap > 1 ? `Horario lleno: ya hay ${cap} clientes (cupo máximo)` : "El profesional tiene una cita en ese horario" },
       { status: 409 }
     );
   }
