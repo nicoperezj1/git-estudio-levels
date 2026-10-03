@@ -66,9 +66,9 @@ interface CartItem {
   type: "service" | "product";
 }
 
-// Modo Standby (Fase 5): el MISMO Punto de Venta, pero con el profesional ya identificado por su PIN. El
-// cobro es igual (cliente, cupon, descuento, puntos, propina, pago dividido, caja, ingresos, metricas…); la unica
-// diferencia es como entra el dinero: no se activa la maquina de tarjeta, el profesional registra el pago.
+// Modo Standby (Fase 5): el MISMO Punto de Venta, pero con el profesional ya identificado por su PIN y con el control
+// del efectivo en caja (dinero en caja, reportar problema, reduccion de efectivo). El cobro es igual (cliente, cupon,
+// puntos, propina, pago dividido, tarjeta en la maquina, caja, ingresos, metricas…).
 export interface StandbyCtx { barber: { id: string; name: string }; onExit: () => void }
 
 export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
@@ -485,7 +485,6 @@ export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
       // Charge every card portion (debit or credit) on the MP terminal, one at a time.
       // This was the missing piece: a split payment never touched the terminal at all,
       // so a debit portion in a split never activated the machine.
-      if (standby) { await processCheckout(); return; }
       const cardSplits = splitPayments
         .map((p, idx) => ({ ...p, idx }))
         .filter((p) => (p.method === "debit_card" || p.method === "credit_card") && parseInt(p.amount) > 0);
@@ -511,7 +510,7 @@ export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
 
     const isCardPayment = paymentMethod === "debit_card" || paymentMethod === "credit_card";
 
-    if (isCardPayment && !standby) {
+    if (isCardPayment) {
       const approved = await chargeCardAmount(total, cart.map((c) => c.name).join(", ").slice(0, 50), paymentMethod as "debit_card" | "credit_card");
       if (approved) await processCheckout();
       return;
@@ -1186,7 +1185,7 @@ export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
           {/* MP Terminal indicator — shows for a single card payment AND for a split
               payment that includes a debit/credit portion (each portion is charged on
               the terminal, one at a time, before the sale is recorded). */}
-          {selectedBarber && !standby && (
+          {selectedBarber && (
             (!splitMode && (paymentMethod === "debit_card" || paymentMethod === "credit_card")) ||
             (splitMode && splitPayments.some((p) => (p.method === "debit_card" || p.method === "credit_card") && parseInt(p.amount) > 0))
           ) && (

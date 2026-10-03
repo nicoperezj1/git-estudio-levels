@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { EmptyIcons } from "@/components/ui/empty-state";
 import PosScreen from "@/components/pos/pos-screen";
+import { StandbyAdmin } from "@/components/standby/standby-admin";
 
 // Standby nuevo (Fase 5): el profesional entra con su PIN y ve el MISMO Punto de Venta (servicios y
 // productos, cliente, cupon, descuento, puntos, propina, pago dividido…). Todo lo que cobra queda igual
@@ -13,6 +14,7 @@ import PosScreen from "@/components/pos/pos-screen";
 export default function StandbyV2() {
   const { tenant } = useTenant();
   const [barber, setBarber] = useState<{ id: string; name: string } | null>(null);
+  const [admin, setAdmin] = useState<{ id: string; name: string } | null>(null);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
 
@@ -22,10 +24,15 @@ export default function StandbyV2() {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinInput }),
     });
     const data = await res.json().catch(() => ({}));
-    if (data.valid) setBarber(data.barber);
+    if (data.valid) { setBarber(data.barber); return; }
+    // No es un profesional: ¿es el codigo del administrador? (revision de caja)
+    const r2 = await fetch("/api/pos/verify-pin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinInput }) });
+    const a = await r2.json().catch(() => ({}));
+    if (a.valid && a.adminId) setAdmin({ id: a.adminId, name: a.adminName });
     else setPinError("Código incorrecto");
   };
 
+  if (admin) return <StandbyAdmin admin={admin} pin={pinInput} onExit={() => { setAdmin(null); setPinInput(""); }} />;
   if (barber) return <PosScreen standby={{ barber, onExit: () => { setBarber(null); setPinInput(""); } }} />;
 
   return (

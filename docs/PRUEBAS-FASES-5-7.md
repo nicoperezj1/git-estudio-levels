@@ -6,6 +6,7 @@ Probar SOLO en `rebooking-pruebas`. Antes de cada SQL: respaldo (en pruebas no h
 ## Orden de los SQL (todos aditivos y re-ejecutables, cada uno termina con una consulta de verificación)
 1. `093_cupos_por_bloque.sql` (ya corrida en pruebas)
 2. `094_standby_caja.sql` — debe devolver 3 filas
+   `097_ajustes_caja.sql` — debe devolver 1 fila (control de efectivo del Standby)
 3. `095_mi_negocio_reservas.sql` — debe devolver 2 filas
 4. `096_remuneraciones.sql` — debe devolver 3 filas
 
@@ -20,6 +21,12 @@ Probar SOLO en `rebooking-pruebas`. Antes de cada SQL: respaldo (en pruebas no h
 6. Caja > **Apagar caja**: se oculta todo; se enciende con el PIN de recepción (1234).
 7. Apagar "Standby nuevo": vuelve el Standby de siempre.
 8. Seguridad: sin sesión, `/api/pos/checkout`, `/api/pos/verify-pin`, `/api/caja/reopen` responden 401.
+
+### Control del efectivo (Standby)
+A. Caja abierta con $10.000. Profesional 1 (PIN 2222) entra: sale "Dinero en caja $10.000" → "Sí, coincide" → vende $10.000 en efectivo → cierra sesión.
+B. Profesional 2 (PIN 4444) entra: ve $20.000 → vende $10.000 en efectivo (imaginar que se guardó el efectivo) → cierra sesión.
+C. Profesional 3 (PIN 5555) entra: ve $30.000 pero hay $20.000 → "No coincide: reportar problema" → escribe contexto, marca el consentimiento, "Reportar y continuar" → puede vender normal. El aviso rojo aparece en el Standby y en el Dashboard del admin.
+D. El admin entra al Standby con su código (3333): ve el reporte, escribe el efectivo real (ej. 20.000) y la glosa → "Confirmar y quitar el reporte". Desde ahí el Standby muestra el monto real, el aviso rojo desaparece y en Caja aparece el "Ajuste de caja".
 
 ## Fase 6 — Mi negocio y reservas
 1. Menú **Mi negocio**: Vacaciones, Comisiones, Arriendo, Servicios, Proveedores, Remuneraciones.

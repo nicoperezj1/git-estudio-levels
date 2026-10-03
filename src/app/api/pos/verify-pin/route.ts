@@ -50,5 +50,5 @@ export async function POST(req: NextRequest) {
   }
 
   attempts.delete(userId);
-  return NextResponse.json({ valid: true, adminName: admin.name });
+  return NextResponse.json({ valid: true, adminName: admin.name, adminId: admin.id });
 }

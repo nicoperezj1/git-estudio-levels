@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { Panel } from "@/components/ui/premium";
 import { useToast } from "@/components/ui/toast";
 
-interface Report { id: string; reported_by_name: string | null; context: string; note: string; created_at: string }
+interface Report { id: string; reported_by_name: string | null; context: string; note: string; created_at: string; shown_cash?: number | null }
 
-const CONTEXT_LABEL: Record<string, string> = { standby: "Standby", reduccion_efectivo: "Reducción de efectivo", otro: "Otro" };
+const CONTEXT_LABEL: Record<string, string> = { caja: "Caja", standby: "Standby", reduccion_efectivo: "Reducción de efectivo", otro: "Otro" };
 
 // Problemas que reportaron los profesionales o recepcion (ej. "faltan $10.000"). Quedan aqui hasta que
 // el administrador los marca como resueltos. Si no hay ninguno, no ocupa espacio en el Dashboard.
@@ -33,9 +33,14 @@ export function ProblemReportsCard() {
                 {r.reported_by_name || "Equipo"} · {CONTEXT_LABEL[r.context] || r.context} ·{" "}
                 {new Date(r.created_at).toLocaleString("es-CL", { timeZone: "America/Santiago", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </p>
-              <button onClick={() => resolve(r.id)} className="text-xs font-semibold text-emerald-600 hover:underline">Resuelto</button>
+              {r.context === "otro" ? (
+                <button onClick={() => resolve(r.id)} className="text-xs font-semibold text-emerald-600 hover:underline">Resuelto</button>
+              ) : (
+                <span className="text-[11px] font-semibold text-red-500">Se resuelve en Standby</span>
+              )}
             </div>
             <p className="mt-1 text-sm text-brand-dark whitespace-pre-wrap">{r.note}</p>
+            {r.shown_cash != null && <p className="mt-0.5 text-[11px] text-brand-gray">La caja mostraba ${Number(r.shown_cash).toLocaleString("es-CL")}. Para resolver con el efectivo real, entra a Standby con tu código.</p>}
           </div>
         ))}
       </div>

@@ -22,6 +22,7 @@ interface CajaData {
     expectedCash: number;
     rentalCashToBarber?: number;
     withdrawalsTotal?: number;
+    adjustmentsTotal?: number;
     cashCap?: number | null;
     transactionCount: number;
   };
@@ -617,6 +618,11 @@ export default function CajaPage() {
               <p className="text-xl font-bold text-blue-600">{formatCurrency(data.summary.expectedCash)}</p>
             </div>
           </div>
+          {!!data.summary.adjustmentsTotal && data.summary.adjustmentsTotal !== 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+              Ajuste de caja del administrador: {data.summary.adjustmentsTotal > 0 ? "+" : "-"}{formatCurrency(Math.abs(data.summary.adjustmentsTotal))} (efectivo real declarado tras revisar un reporte); ya está incluido en el esperado.
+            </div>
+          )}
           {!!data.summary.withdrawalsTotal && data.summary.withdrawalsTotal > 0 && (
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-800">
               Se retiraron {formatCurrency(data.summary.withdrawalsTotal)} a la caja fuerte (reducción de efectivo); ya están descontados del esperado.

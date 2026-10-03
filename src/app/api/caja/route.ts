@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, resolveTenantForRequest, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { todayInChile, chileDayBoundsUtc } from "@/lib/utils";
 import { tenantHasFeature } from "@/lib/plan-features";
-import { getWithdrawals, getCashCap } from "@/lib/cash-withdrawals";
+import { getWithdrawals, getCashCap, getAdjustments } from "@/lib/cash-withdrawals";
 
 // GET: Current day's cash register status + transactions
 export async function GET(req: NextRequest) {
@@ -117,7 +117,9 @@ export async function GET(req: NextRequest) {
   const specific = !!tenantId && tenantId !== "ALL";
   const wd = specific ? await getWithdrawals(supabase, tenantId as string, date) : { total: 0, rows: [] };
   const cashCap = specific ? await getCashCap(supabase, tenantId as string) : null;
-  const expectedCash = openingAmount + cashIncome - cashExpense - wd.total;
+  // Ajustes de caja: lo que el administrador declaro como efectivo real al revisar un reporte (puede sumar o restar).
+  const adj = specific ? await getAdjustments(supabase, tenantId as string, date) : { total: 0, rows: [] };
+  const expectedCash = openingAmount + cashIncome - cashExpense - wd.total + adj.total;
 
   return NextResponse.json({
     register: register || null,
@@ -132,11 +134,13 @@ export async function GET(req: NextRequest) {
       expectedCash,
       rentalCashToBarber, // cash pocketed by rental barbers, NOT in the salon till
       withdrawalsTotal: wd.total,
+      adjustmentsTotal: adj.total,
       cashCap, // tope de efectivo del negocio (null = sin tope)
       transactionCount: (transactions || []).length,
     },
     transactions: transactions || [],
     withdrawals: wd.rows,
+    adjustments: adj.rows,
   });
 }
 
@@ -273,7 +277,8 @@ export async function PATCH(req: NextRequest) {
     .reduce((sum: number, t: any) => sum + Number(cashAmountOf(t)), 0);
 
   const closeWd = await getWithdrawals(supabase, tenantId, today);
-  const expectedAmount = Number(register.opening_amount) + cashIncome - cashExpense - closeWd.total;
+  const closeAdj = await getAdjustments(supabase, tenantId, today);
+  const expectedAmount = Number(register.opening_amount) + cashIncome - cashExpense - closeWd.total + closeAdj.total;
   const difference = (closingAmount || 0) - expectedAmount;
 
   const { data, error } = await supabase
