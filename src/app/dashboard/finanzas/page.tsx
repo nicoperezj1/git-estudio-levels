@@ -37,6 +37,7 @@ const paymentMethodLabels: Record<string, string> = {
   debit_card: "Debito",
   credit_card: "Credito",
   transfer: "Transferencia",
+  mixed: "Mixto",
 };
 
 // Punto 5 (Pablo): "a quien corresponde" el movimiento, para saber donde repercute.
@@ -103,6 +104,11 @@ export default function FinanzasPage() {
   const [dateTo, setDateTo] = useState(() => todayInChile());
   // "" = filtrar por fechas; "YYYY-MM" = solo lo que CORRESPONDE a ese mes (fecha contable).
   const [monthFilter, setMonthFilter] = useState("");
+  // Filtros sobre lo que ya esta cargado (""= todos). Los cuadros de arriba y la exportacion usan lo filtrado.
+  const [fBarber, setFBarber] = useState("");
+  const [fMethod, setFMethod] = useState("");
+  const [fAssigned, setFAssigned] = useState("");
+  const [fCreator, setFCreator] = useState("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   // Punto 5: null = creando una transaccion nueva; con id = editando una existente
@@ -167,10 +173,23 @@ export default function FinanzasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, dateFrom, dateTo, monthFilter, tenantLoading, tenant?.id]);
 
-  const totalIncome = transactions
+  const visible = transactions.filter((t) =>
+    (!fBarber || t.barber_id === fBarber) &&
+    (!fMethod || t.payment_method === fMethod) &&
+    (!fAssigned || (fAssigned === "none" ? !t.assigned_to : t.assigned_to === fAssigned)) &&
+    (!fCreator || (fCreator === "none" ? !t.created_by_name : t.created_by_name === fCreator))
+  );
+  const hasFilters = !!(fBarber || fMethod || fAssigned || fCreator);
+  const clearFilters = () => { setFBarber(""); setFMethod(""); setFAssigned(""); setFCreator(""); };
+  // Opciones: solo lo que aparece en los movimientos cargados.
+  const barberOptions = Array.from(new Map(transactions.filter((t) => t.barber_id && t.barber?.name).map((t) => [t.barber_id as string, t.barber!.name])).entries());
+  const methodOptions = Array.from(new Set(transactions.map((t) => t.payment_method)));
+  const creatorOptions = Array.from(new Set(transactions.map((t) => t.created_by_name).filter(Boolean))) as string[];
+
+  const totalIncome = visible
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + Number(t.total), 0);
-  const totalExpenses = transactions
+  const totalExpenses = visible
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + Number(t.total), 0);
   const balance = totalIncome - totalExpenses;
@@ -186,7 +205,7 @@ export default function FinanzasPage() {
   const exportCsv = () => {
     const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const head = ["Hora", "Fecha", "Tipo", "Descripción", "Profesional / Corresponde a", "Emitido por", "Cliente", "Método de pago", "Monto", "Corresponde al mes"];
-    const rows = transactions.map((t) => {
+    const rows = visible.map((t) => {
       const d = new Date(t.created_at);
       return [
         d.toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" }),
@@ -297,7 +316,7 @@ export default function FinanzasPage() {
         subtitle="Todos los movimientos del negocio, en el periodo que elijas."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={exportCsv} disabled={transactions.length === 0} className={ghostButton}>
+            <button onClick={exportCsv} disabled={visible.length === 0} className={ghostButton}>
               Exportar a Excel
             </button>
             <button
@@ -388,8 +407,34 @@ export default function FinanzasPage() {
         </div>
       </div>
 
+      {/* Filtros de la lista (minimalistas): profesional, metodo de pago, a quien corresponde y quien emitio. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {([
+          { label: "Profesional", value: fBarber, set: setFBarber, options: barberOptions.map(([id, name]) => ({ value: id, label: name })) },
+          { label: "Método de pago", value: fMethod, set: setFMethod, options: methodOptions.map((m) => ({ value: m, label: paymentMethodLabels[m] || m })) },
+          { label: "Corresponde a", value: fAssigned, set: setFAssigned, options: [
+            { value: "professional", label: assignedToLabels.professional }, { value: "reception", label: assignedToLabels.reception },
+            { value: "business", label: assignedToLabels.business }, { value: "none", label: "Sin especificar" },
+          ] },
+          { label: "Emitido por", value: fCreator, set: setFCreator, options: [...creatorOptions.map((n) => ({ value: n, label: n })), { value: "none", label: "Sin dato" }] },
+        ]).map((f) => (
+          <label key={f.label} className={`flex items-center gap-2 rounded-xl border bg-white px-3 py-1.5 text-xs ${f.value ? "border-brand-blue/50 text-brand-blue" : "border-gray-100 text-brand-gray"}`}>
+            <span className="font-semibold">{f.label}</span>
+            <select value={f.value} onChange={(e) => f.set(e.target.value)} className="max-w-[150px] bg-transparent text-xs text-brand-dark outline-none">
+              <option value="">Todos</option>
+              {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+        ))}
+        {hasFilters && (
+          <button type="button" onClick={clearFilters} className="px-2 py-1.5 text-xs font-semibold text-brand-blue hover:underline">
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
       {/* Table */}
-      <Panel flush title="Movimientos" subtitle={loading ? undefined : `${transactions.length} registro${transactions.length === 1 ? "" : "s"}`}>
+      <Panel flush title="Movimientos" subtitle={loading ? undefined : `${visible.length} registro${visible.length === 1 ? "" : "s"}${hasFilters ? ` de ${transactions.length}` : ""}`}>
         <div className={ts.wrap}>
           <table className={ts.table}>
             <thead className={ts.thead}>
@@ -409,14 +454,14 @@ export default function FinanzasPage() {
             <tbody className={ts.tbody}>
               {loading ? (
                 <tr><td colSpan={isAdmin ? 10 : 9}><Spinner /></td></tr>
-              ) : transactions.length === 0 ? (
+              ) : visible.length === 0 ? (
                 <tr>
                   <td colSpan={isAdmin ? 10 : 9} className="px-5 py-12 text-center text-sm text-brand-gray">
                     No hay transacciones en este periodo
                   </td>
                 </tr>
               ) : (
-                transactions.map((t) => (
+                visible.map((t) => (
                   <tr key={t.id} className={ts.tr}>
                     <td className={`${tdc} whitespace-nowrap tabular-nums text-brand-gray`}>{new Date(t.created_at).toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" })}</td>
                     <td className={`${tdc} whitespace-nowrap tabular-nums text-brand-gray`}>
