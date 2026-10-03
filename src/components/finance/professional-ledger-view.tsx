@@ -201,6 +201,13 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
                     <span>{copy.pending}: <b className={`tabular-nums ${p.pending > 0 ? "text-amber-600" : "text-brand-dark"}`}>{formatCurrency(p.pending)}</b></span>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`/api/profesionales/libro/recibo?barberId=${p.barberId}&mode=${mode}&month=${month}&year=${year}${tq}`}
+                      target="_blank" rel="noopener"
+                      className={`${ghostButton} !px-3 !py-1.5 text-xs`}
+                    >
+                      Recibo PDF
+                    </a>
                     <button onClick={() => setOpenId(open ? null : p.barberId)} className={`${ghostButton} !px-3 !py-1.5 text-xs`}>
                       Detalle <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
                     </button>
