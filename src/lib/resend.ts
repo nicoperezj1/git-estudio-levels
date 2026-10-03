@@ -560,3 +560,73 @@ export async function sendBarberNewAppointment(params: SendBarberNewAppointmentP
     return { success: false, error: error.message };
   }
 }
+
+// ==================== SOLICITUD DE INSUMOS (para el administrador) ====================
+// Recepcion levanta la solicitud y esto le llega por correo al administrador (o al correo que el admin eligio).
+const escHtml = (v: unknown) =>
+  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+interface SendSupplyRequestParams {
+  to: string;
+  businessName: string;
+  requestedBy: string;
+  date: Date;
+  items: Array<{ name: string; currentStock: number | null; toBuy: number; isOther?: boolean }>;
+  notes?: string | null;
+}
+
+export async function sendSupplyRequestEmail(params: SendSupplyRequestParams) {
+  const { to, businessName, requestedBy, date, items, notes } = params;
+  const fecha = date.toLocaleDateString("es-CL", { timeZone: "America/Santiago", weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const rows = items.map((i) => `
+        <tr>
+          <td style="padding: 10px 8px; border-bottom: 1px solid #F3F4F6; color: #1F2937; font-size: 14px;">${escHtml(i.name)}${i.isOther ? ' <span style="color:#9CA3AF;font-size:11px;">(otro producto)</span>' : ""}</td>
+          <td style="padding: 10px 8px; border-bottom: 1px solid #F3F4F6; color: #6B7280; font-size: 14px; text-align: center;">${i.currentStock === null ? "-" : escHtml(i.currentStock)}</td>
+          <td style="padding: 10px 8px; border-bottom: 1px solid #F3F4F6; color: #0F8B8D; font-size: 14px; font-weight: 700; text-align: center;">${escHtml(i.toBuy)}</td>
+        </tr>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #F5F7FA; margin: 0; padding: 20px;">
+  <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+    <div style="background: linear-gradient(135deg, #0F8B8D, #2EC4B6); padding: 28px 24px;">
+      <h1 style="color: white; margin: 0; font-size: 20px;">Solicitud de insumos</h1>
+      <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">${escHtml(businessName)} · ${escHtml(fecha)}</p>
+    </div>
+    <div style="padding: 24px;">
+      <p style="color: #6B7280; font-size: 13px; margin: 0 0 16px;">Solicitada por <strong style="color:#1F2937;">${escHtml(requestedBy)}</strong></p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Insumo</th>
+            <th style="text-align: center; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Existencias</th>
+            <th style="text-align: center; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">A comprar</th>
+          </tr>
+        </thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+      ${notes ? `<p style="color:#6B7280;font-size:13px;margin:16px 0 0;"><strong style="color:#1F2937;">Nota:</strong> ${escHtml(notes)}</p>` : ""}
+    </div>
+    <div style="border-top: 1px solid #F3F4F6; padding: 14px 24px; text-align: center;">
+      <p style="color: #9CA3AF; font-size: 11px; margin: 0;">re-booking · Esta solicitud también queda en tu Dashboard hasta que la borres.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const resend = getResendClient();
+    await resend.emails.send({
+      from: process.env.EMAIL_FROM || "re-booking <no-reply@re-booking.cl>",
+      to,
+      subject: `Solicitud de insumos · ${businessName}`,
+      html,
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending supply request email:", error);
+    return { success: false, error: error.message };
+  }
+}

@@ -91,6 +91,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission> = {
       "/dashboard/caja",
       "/dashboard/barberos",
       "/dashboard/inventario",
+      "/dashboard/solicitud",
     ],
     features: [
       "pos", "calendar_all", "clients_all", "standby", "reception",

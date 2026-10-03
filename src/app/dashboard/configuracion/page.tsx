@@ -120,6 +120,35 @@ export default function ConfiguracionPage() {
     }
   };
 
+  // Correo al que llegan las solicitudes de insumos (vacio = el correo del administrador).
+  const [supplyEmail, setSupplyEmail] = useState({ value: "", fallback: "", loaded: false, migrationMissing: false });
+  const [savingSupplyEmail, setSavingSupplyEmail] = useState(false);
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/settings/supply-email?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((d) => setSupplyEmail({ value: d?.email || "", fallback: d?.fallback || "", loaded: !d?.error, migrationMissing: !!d?.migrationMissing }))
+      .catch(() => {});
+  }, [tenantId]);
+  const saveSupplyEmail = async () => {
+    if (!tenantId || savingSupplyEmail) return;
+    setSavingSupplyEmail(true);
+    try {
+      const res = await fetch("/api/settings/supply-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId, email: supplyEmail.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "No se pudo guardar");
+      showToast("Correo para solicitudes de insumos guardado", "success");
+    } catch (e: any) {
+      showToast(e?.message || "No se pudo guardar", "error");
+    } finally {
+      setSavingSupplyEmail(false);
+    }
+  };
+
   // Deposit/abono settings
   const [depositEnabled, setDepositEnabled] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(30);
@@ -900,6 +929,37 @@ export default function ConfiguracionPage() {
               </span>
             </span>
           </label>
+        </div>
+      )}
+
+      {/* Solicitud de insumos: a que correo llega. Solo administrador. */}
+      {isAdmin && supplyEmail.loaded && (
+        <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-3">
+          <div>
+            <h2 className="font-bold text-brand-dark">Solicitud de insumos</h2>
+            <p className="text-xs text-brand-gray">Correo al que le llega a quien administra lo que recepción pide comprar</p>
+          </div>
+          {supplyEmail.migrationMissing ? (
+            <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">Falta una actualización de la base de datos (migración 092) para poder elegir el correo.</p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="email"
+                value={supplyEmail.value}
+                onChange={(e) => setSupplyEmail({ ...supplyEmail, value: e.target.value })}
+                placeholder={supplyEmail.fallback || "correo@ejemplo.com"}
+                className="w-full max-w-sm rounded-xl border border-gray-200 px-3 py-2 text-sm"
+              />
+              <button
+                onClick={saveSupplyEmail}
+                disabled={savingSupplyEmail}
+                className="rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {savingSupplyEmail ? "Guardando…" : "Guardar"}
+              </button>
+              <p className="w-full text-[11px] text-brand-gray">Si lo dejas vacío, se usa el correo del administrador{supplyEmail.fallback ? ` (${supplyEmail.fallback})` : ""}.</p>
+            </div>
+          )}
         </div>
       )}
 

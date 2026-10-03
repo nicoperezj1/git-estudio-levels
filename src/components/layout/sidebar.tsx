@@ -61,6 +61,7 @@ const sections: NavSection[] = [
       },
       { name: "Agenda", href: "/dashboard/agenda", icon: Calendar, minRole: "receptionist" },
       { name: "Punto de Venta", href: "/dashboard/pos", icon: ShoppingCart, minRole: "receptionist" },
+      { name: "Solicitud de insumos", href: "/dashboard/solicitud", icon: ClipboardList, minRole: "receptionist", feature: "inventory" },
       { name: "Caja", href: "/dashboard/caja", icon: Wallet, minRole: "admin", feature: "cash_register" },
     ],
   },
@@ -198,7 +199,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
       "/dashboard/boletas", "/dashboard/cupones", "/dashboard/configuracion",
       // Nico's request: receptionist also gets Caja, Profesionales (schedules only) and
       // Inventario (read-only, changes gated behind the admin PIN).
-      "/dashboard/caja", "/dashboard/barberos", "/dashboard/inventario",
+      "/dashboard/caja", "/dashboard/barberos", "/dashboard/inventario", "/dashboard/solicitud",
       // Cada usuario (tambien recepcion) puede entrar a Mi Perfil a elegir su propio tema.
       "/dashboard/mi-perfil",
     ],
