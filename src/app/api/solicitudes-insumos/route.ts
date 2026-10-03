@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       items.push({ product_id: null, name, current_stock: Number.isFinite(cur) && cur >= 0 ? Math.round(cur) : null, to_buy: toBuy });
     }
   }
-  if (items.length === 0) return NextResponse.json({ error: "Indica la cantidad a comprar de al menos un producto." }, { status: 400 });
+  if (items.length === 0) return NextResponse.json({ error: "Indica la cantidad a solicitar de al menos un producto." }, { status: 400 });
 
   const notes = String(body?.notes || "").trim().slice(0, 300) || null;
   const { data: me } = await supabase.from("profiles").select("name").eq("id", caller.userId).maybeSingle();
