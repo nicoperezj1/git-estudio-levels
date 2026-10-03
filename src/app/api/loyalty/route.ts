@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, isManagerLevel, resolveTenantForRequest } from "@/lib/supabase/server";
+import { tenantHasFeature } from "@/lib/plan-features";
 
 // GET: Loyalty overview (config, rewards, client lookup)
 export async function GET(req: NextRequest) {
@@ -57,4 +58,37 @@ export async function GET(req: NextRequest) {
     client: clientData,
     topClients: topClients || [],
   });
+}
+
+// PUT: el negocio define cuantos CLP hay que gastar para ganar 1 punto (antes fijo en 1.000).
+// Solo admin/recepcion, y siempre sobre el negocio de la sesion (nunca el que mande el cuerpo).
+export async function PUT(req: NextRequest) {
+  const { ok } = await isManagerLevel();
+  if (!ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
+  const { searchParams } = new URL(req.url);
+  const { tenantId, denied } = await resolveTenantForRequest(searchParams.get("tenantId"));
+  if (denied || !tenantId || tenantId === "ALL") {
+    return NextResponse.json({ error: "No se pudo determinar el negocio" }, { status: 400 });
+  }
+  if (!(await tenantHasFeature(tenantId, "loyalty"))) {
+    return NextResponse.json({ error: "El sistema de fidelizacion no esta incluido en tu plan actual." }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const value = Math.round(Number(body?.points_per_clp));
+  if (!Number.isFinite(value) || value < 1 || value > 1000000) {
+    return NextResponse.json({ error: "Ingresa un monto entre $1 y $1.000.000" }, { status: 400 });
+  }
+
+  const supabase = createAdminSupabase();
+  const { data: existing } = await supabase
+    .from("loyalty_config").select("id").eq("tenant_id", tenantId).eq("active", true).limit(1).maybeSingle();
+
+  const { error } = existing
+    ? await supabase.from("loyalty_config").update({ points_per_clp: value }).eq("id", existing.id)
+    : await supabase.from("loyalty_config").insert({ points_per_clp: value, active: true, tenant_id: tenantId });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ success: true, points_per_clp: value });
 }

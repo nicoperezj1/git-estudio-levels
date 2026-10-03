@@ -33,6 +33,8 @@ export default function FidelidadPage() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [topClients, setTopClients] = useState<TopClient[]>([]);
   const [config, setConfig] = useState({ points_per_clp: 1000 });
+  const [ppcInput, setPpcInput] = useState("1000");
+  const [savingPpc, setSavingPpc] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchClient, setSearchClient] = useState("");
   const [clientData, setClientData] = useState<ClientLookup | null>(null);
@@ -58,6 +60,7 @@ export default function FidelidadPage() {
     setRewards(data.rewards || []);
     setTopClients(data.topClients || []);
     setConfig(data.config || { points_per_clp: 1000 });
+    setPpcInput(String((data.config || { points_per_clp: 1000 }).points_per_clp));
     setLoading(false);
   };
 
@@ -66,6 +69,28 @@ export default function FidelidadPage() {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantLoading, tenant?.id]);
+
+  const savePointsPerClp = async () => {
+    const t = getActiveTenantId();
+    setSavingPpc(true);
+    try {
+      const res = await fetch(`/api/loyalty${t ? `?tenantId=${t}` : ""}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ points_per_clp: Number(ppcInput) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "No se pudo guardar", "error");
+      } else {
+        setConfig({ points_per_clp: data.points_per_clp });
+        setPpcInput(String(data.points_per_clp));
+        showToast("Puntos por compra actualizados", "success");
+      }
+    } finally {
+      setSavingPpc(false);
+    }
+  };
 
   const lookupClient = async () => {
     if (!searchClient) return;
@@ -121,6 +146,21 @@ export default function FidelidadPage() {
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Programa de Fidelidad</h1>
         <p className="text-gray-500 text-sm">1 punto por cada ${config.points_per_clp.toLocaleString("es-CL")} gastados</p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+        <h3 className="font-bold text-gray-800 mb-1">Puntos por compra</h3>
+        <p className="text-xs text-gray-500 mb-3">Cuánto debe gastar el cliente para ganar 1 punto. Cada negocio elige el suyo; aplica a las ventas nuevas.</p>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-gray-600">1 punto por cada $</span>
+          <input type="number" min={1} step={1} value={ppcInput} onChange={(e) => setPpcInput(e.target.value)}
+            className="w-28 border rounded-lg px-3 py-2 text-sm" />
+          <button onClick={savePointsPerClp}
+            disabled={savingPpc || !ppcInput || Number(ppcInput) === config.points_per_clp}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50">
+            {savingPpc ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

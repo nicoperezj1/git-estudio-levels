@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, isManagerLevel } from "@/lib/supabase/server";
 
 // POST: Client earns points from a transaction
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes no pedia sesion (permitia sumar puntos inventados a cualquier cliente).
+  // Hoy ninguna pantalla la llama (el cobro suma los puntos por su cuenta), asi que cerrarla no rompe nada.
+  const caller = await isManagerLevel();
+  if (!caller.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { clientId, transactionId, amount } = body;
@@ -18,6 +23,10 @@ export async function POST(req: NextRequest) {
     .select("tenant_id")
     .eq("id", clientId)
     .single();
+
+  if (caller.role !== "super_admin" && clientRow?.tenant_id !== caller.tenantId) {
+    return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
 
   let configQuery = supabase.from("loyalty_config").select("points_per_clp").eq("active", true);
   if (clientRow?.tenant_id) configQuery = configQuery.eq("tenant_id", clientRow.tenant_id);
