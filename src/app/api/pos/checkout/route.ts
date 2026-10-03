@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes cualquiera (sin sesion) podia registrar ventas. Ahora hace falta sesion y el
+  // profesional de la venta debe ser del mismo negocio de quien cobra. Los montos NO se tocan aca.
+  const { userId, role: callerRole, tenantId: callerTenant } = await getCurrentUserRoleAndTenant();
+  if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { items, clientId, barberId, paymentMethod, payments, couponCode, discount, subtotal, total, redeemedPoints, appointmentId } = body;
   // payments: optional array [{method: "cash", amount: 10000}, {method: "debit_card", amount: 7000}]
   // If not provided, falls back to single paymentMethod for full total
+
+  // Negocio del profesional (se valida ANTES de usar cupones o crear nada).
+  const { data: barberProfile } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
+  const tenantId = barberProfile?.tenant_id || null;
+  if (!barberProfile) return NextResponse.json({ error: "Profesional no encontrado" }, { status: 400 });
+  if (callerRole !== "super_admin" && tenantId !== callerTenant) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
   // Validate coupon
   let couponId: string | null = null;
@@ -30,9 +43,6 @@ export async function POST(req: NextRequest) {
     : (paymentMethod || "cash");
 
   // Create transaction
-  // Get tenant_id from barber's profile
-  const { data: barberProfile } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
-  const tenantId = barberProfile?.tenant_id || null;
 
   const { data: tx, error } = await supabase
     .from("transactions")

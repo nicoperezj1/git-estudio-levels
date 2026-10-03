@@ -1,19 +1,31 @@
 import { NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
 
 // POST: Reopen a closed cash register for today (exceptional case)
 export async function POST() {
+  // SEGURIDAD: antes no pedia sesion y reabria la caja de cualquier negocio. Ahora solo
+  // administracion/recepcion, y solo la caja de su propio negocio.
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (role !== "admin" && role !== "super_admin" && role !== "receptionist") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+  if (role !== "super_admin" && !tenantId) {
+    return NextResponse.json({ error: "No se pudo identificar el negocio" }, { status: 403 });
+  }
+
   const supabase = createAdminSupabase();
   const today = todayInChile();
 
-  // Find today's closed register
-  const { data: register } = await supabase
+  // Find today's closed register (de su negocio)
+  let regQuery = supabase
     .from("cash_register")
     .select("id, status")
     .eq("date", today)
-    .eq("status", "closed")
-    .single();
+    .eq("status", "closed");
+  if (role !== "super_admin") regQuery = regQuery.eq("tenant_id", tenantId as string);
+  const { data: register } = await regQuery.maybeSingle();
 
   if (!register) {
     return NextResponse.json({ error: "No hay caja cerrada para hoy" }, { status: 404 });
