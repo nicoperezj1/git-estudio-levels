@@ -149,7 +149,8 @@ export default function POSPage() {
     ]).then(([servicesData, productsData, clientsData, barbersData, tuuSettings]) => {
       const svcList: Service[] = Array.isArray(servicesData) ? servicesData : [];
       setServices(svcList);
-      setProducts(Array.isArray(productsData) ? productsData : []);
+      // Los insumos (uso del negocio, migracion 092) no se venden: no aparecen en el POS. Sin tipo = Venta, como siempre.
+      setProducts(Array.isArray(productsData) ? productsData.filter((p: any) => (p.product_type || "sale") !== "supply") : []);
       setClients(Array.isArray(clientsData?.clients) ? clientsData.clients : Array.isArray(clientsData) ? clientsData : []);
       setBarbers(Array.isArray(barbersData) ? barbersData : []);
       if (tuuSettings?.card_payment_provider === "tuu") setCardProvider("tuu");

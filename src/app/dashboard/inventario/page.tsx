@@ -7,6 +7,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { Spinner } from "@/components/ui/spinner";
 import { useLedgerEnabled } from "@/components/finance/professional-ledger-view";
+import { BASE_PRODUCT_CATEGORIES, PRODUCT_TYPE_LABELS } from "@/lib/product-categories";
 
 interface Product {
   id: string;
@@ -16,6 +17,8 @@ interface Product {
   price: number;
   stock: number;
   min_stock: number;
+  product_type?: "sale" | "supply" | null;
+  category?: string | null;
   sales_commission_type?: "percent" | "fixed" | null;
   sales_commission_value?: number | null;
 }
@@ -43,9 +46,25 @@ export default function InventarioPage() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [productForm, setProductForm] = useState({
-    name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false,
+    name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false, productType: "sale", category: "",
   });
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  // Filtro por tipo y categorias (base + propias del negocio).
+  const [typeFilter, setTypeFilter] = useState<"all" | "sale" | "supply">("all");
+  const [categories, setCategories] = useState<string[]>([...BASE_PRODUCT_CATEGORIES]);
+  const loadCategories = () => {
+    const t = getActiveTenantId();
+    fetch(`/api/product-categories${t ? `?tenantId=${t}` : ""}`).then((r) => r.json()).then((d) => { if (Array.isArray(d.categories)) setCategories(d.categories); }).catch(() => {});
+  };
+  const addCategory = async () => {
+    const name = (prompt("Nombre de la nueva categoría:") || "").trim();
+    if (!name) return;
+    const res = await fetch("/api/product-categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, tenantId: getActiveTenantId() || undefined }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(data.error || "No se pudo agregar la categoría", "error"); return; }
+    setCategories((c) => (c.some((x) => x.toLowerCase() === name.toLowerCase()) ? c : [...c, name]));
+    setProductForm((f) => ({ ...f, category: name }));
+  };
   const [movementForm, setMovementForm] = useState({
     product_id: "", type: "in", quantity: "", notes: "",
   });
@@ -131,10 +150,13 @@ export default function InventarioPage() {
   useEffect(() => {
     if (tenantLoading) return;
     fetchData();
+    loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantLoading, tenant?.id]);
 
   const lowStockProducts = products.filter((p) => p.stock <= p.min_stock);
+  // Sin tipo (producto de antes o columna aun no creada) = Venta, como siempre.
+  const shownProducts = products.filter((p) => typeFilter === "all" || (p.product_type || "sale") === typeFilter);
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +170,8 @@ export default function InventarioPage() {
       stock: parseInt(productForm.stock),
       min_stock: parseInt(productForm.min_stock),
       tenantId: activeTenantId || undefined,
+      product_type: productForm.productType,
+      category: productForm.category || null,
       // Comision por venta: solo se manda si se eligio una, o para borrar una que ya tenia.
       ...(productForm.comType
         ? { sales_commission_type: productForm.comType, sales_commission_value: parseFloat(productForm.comValue) || 0 }
@@ -181,7 +205,7 @@ export default function InventarioPage() {
     }
     setShowProductModal(false);
     setEditingProductId(null);
-    setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false });
+    setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false, productType: "sale", category: "" });
     fetchData();
   };
 
@@ -226,7 +250,7 @@ export default function InventarioPage() {
             Registrar Movimiento
           </button>
           <button
-            onClick={() => guard(() => { setEditingProductId(null); setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false }); setShowProductModal(true); })}
+            onClick={() => guard(() => { setEditingProductId(null); setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false, productType: "sale", category: "" }); setShowProductModal(true); })}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
           >
             Nuevo Producto
@@ -250,11 +274,22 @@ export default function InventarioPage() {
 
       {/* Products Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <h3 className="font-bold text-gray-800 p-4 border-b">Productos</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b p-4">
+          <h3 className="font-bold text-gray-800">Productos</h3>
+          <div className="flex gap-1 rounded-xl bg-gray-100 p-1 text-xs font-medium">
+            {([["all", "Todos"], ["sale", "Venta"], ["supply", "Insumos"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setTypeFilter(v)}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${typeFilter === v ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="text-left p-4 font-medium text-gray-600">Producto</th>
+              <th className="text-left p-4 font-medium text-gray-600">Tipo</th>
               <th className="text-left p-4 font-medium text-gray-600">SKU</th>
               <th className="text-right p-4 font-medium text-gray-600">Costo</th>
               <th className="text-right p-4 font-medium text-gray-600">Precio</th>
@@ -266,10 +301,16 @@ export default function InventarioPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={7}><Spinner /></td></tr>
-            ) : products.map((p) => (
+              <tr><td colSpan={9}><Spinner /></td></tr>
+            ) : shownProducts.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50">
                 <td className="p-4 font-medium">{p.name}</td>
+                <td className="p-4">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${(p.product_type || "sale") === "supply" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                    {PRODUCT_TYPE_LABELS[(p.product_type || "sale") as "sale" | "supply"]}
+                  </span>
+                  {p.category && <span className="ml-1.5 text-xs text-gray-500">{p.category}</span>}
+                </td>
                 <td className="p-4 text-gray-500">{p.sku}</td>
                 <td className="p-4 text-right">{formatCurrency(Number(p.cost))}</td>
                 <td className="p-4 text-right">{formatCurrency(Number(p.price))}</td>
@@ -287,7 +328,7 @@ export default function InventarioPage() {
                 <td className="p-4 text-center">
                   <div className="flex gap-1 justify-center">
                     <button onClick={() => guard(() => {
-                      setProductForm({ name: p.name, sku: p.sku || "", barcode: (p as any).barcode || "", cost: String(p.cost), price: String(p.price), stock: String(p.stock), min_stock: String(p.min_stock), comType: p.sales_commission_type || "", comValue: p.sales_commission_value ? String(Number(p.sales_commission_value)) : "", hadCom: !!p.sales_commission_type });
+                      setProductForm({ name: p.name, sku: p.sku || "", barcode: (p as any).barcode || "", cost: String(p.cost), price: String(p.price), stock: String(p.stock), min_stock: String(p.min_stock), comType: p.sales_commission_type || "", comValue: p.sales_commission_value ? String(Number(p.sales_commission_value)) : "", hadCom: !!p.sales_commission_type, productType: (p.product_type as "sale" | "supply") || "sale", category: p.category || "" });
                       setEditingProductId(p.id);
                       setShowProductModal(true);
                     })} className="px-3 py-1 text-xs border rounded-lg hover:bg-gray-100">
@@ -457,6 +498,30 @@ export default function InventarioPage() {
                   placeholder="Escanea o ingresa manualmente"
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de producto</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["sale", "supply"] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setProductForm({ ...productForm, productType: t })}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium ${productForm.productType === t ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                      {PRODUCT_TYPE_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {productForm.productType === "sale" ? "Aparece en el Punto de Venta para venderlo." : "No se vende: es de uso del negocio y se pide en la Solicitud de insumos."}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                <select value={productForm.category}
+                  onChange={(e) => { if (e.target.value === "__new") addCategory(); else setProductForm({ ...productForm, category: e.target.value }); }}
+                  className="w-full border rounded-lg px-3 py-2">
+                  <option value="">Sin categoría</option>
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {effectiveRole !== "receptionist" && <option value="__new">+ Nueva categoría…</option>}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Costo</label>
@@ -485,7 +550,7 @@ export default function InventarioPage() {
                     className="w-full border rounded-lg px-3 py-2" />
                 </div>
               </div>
-              {ledgerOn && (
+              {ledgerOn && productForm.productType === "sale" && (
                 <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Comisión por venta</label>
                   <p className="mb-2 text-xs text-gray-500">Lo que gana el profesional que vende este producto. Es la misma para todo el negocio.</p>

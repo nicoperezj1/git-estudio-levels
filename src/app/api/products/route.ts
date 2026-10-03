@@ -60,12 +60,14 @@ export async function POST(req: NextRequest) {
   const comType = body.sales_commission_type === "percent" || body.sales_commission_type === "fixed" ? body.sales_commission_type : null;
   const comValue = Math.max(0, Number(body.sales_commission_value) || 0);
   const base: Record<string, any> = { name, description, sku, price, cost, stock, min_stock: min_stock || 5, tenant_id: resolvedTenantId };
-  let { data, error } = await supabase
-    .from("products")
-    .insert(comType ? { ...base, sales_commission_type: comType, sales_commission_value: comValue } : base)
-    .select()
-    .single();
-  if (error && comType && /sales_commission/.test(error.message)) {
+  // Tipo (Venta / Insumo) y categoria (migracion 092): se mandan solo si vienen bien formados.
+  const optional: Record<string, any> = {};
+  if (comType) { optional.sales_commission_type = comType; optional.sales_commission_value = comValue; }
+  if (body.product_type === "supply" || body.product_type === "sale") optional.product_type = body.product_type;
+  if (typeof body.category === "string" && body.category.trim()) optional.category = body.category.trim().slice(0, 40);
+  let { data, error } = await supabase.from("products").insert({ ...base, ...optional }).select().single();
+  // Si alguna columna nueva aun no existe, el producto se guarda igual sin ella.
+  if (error && Object.keys(optional).length > 0 && /sales_commission|product_type|category/.test(error.message)) {
     ({ data, error } = await supabase.from("products").insert(base).select().single());
   }
 

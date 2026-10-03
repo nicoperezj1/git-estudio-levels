@@ -34,9 +34,10 @@ export async function PATCH(
     .select()
     .single();
 
-  // "Comision por venta" es una columna nueva (migracion 091): si aun no existe, no se pierde el resto de los cambios.
-  if (error && /sales_commission/.test(error.message)) {
-    const { sales_commission_type: _t, sales_commission_value: _v, ...rest } = body;
+  // Columnas nuevas (comision por venta: migracion 091; tipo y categoria: 092): si aun no existen, no se pierde el
+  // resto de los cambios.
+  if (error && /sales_commission|product_type|category/.test(error.message)) {
+    const { sales_commission_type: _t, sales_commission_value: _v, product_type: _p, category: _c, ...rest } = body;
     ({ data, error } = await supabase.from("products").update(rest).eq("id", params.id).select().single());
   }
 
