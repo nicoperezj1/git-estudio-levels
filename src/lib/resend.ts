@@ -601,7 +601,7 @@ export async function sendSupplyRequestEmail(params: SendSupplyRequestParams) {
           <tr>
             <th style="text-align: left; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Insumo</th>
             <th style="text-align: center; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Existencias</th>
-            <th style="text-align: center; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">A comprar</th>
+            <th style="text-align: center; padding: 8px; color: #9CA3AF; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">A solicitar</th>
           </tr>
         </thead>
         <tbody>${rows}

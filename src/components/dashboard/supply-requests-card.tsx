@@ -32,7 +32,7 @@ export function SupplyRequestsCard({ tenantId }: { tenantId?: string }) {
 
   if (reqs.length === 0) return null;
   return (
-    <Panel title="Solicitudes de insumos" subtitle="Recepción pidió comprar esto. Se queda aquí hasta que la borres.">
+    <Panel title="Solicitudes de insumos" subtitle="Recepción solicitó estos insumos. Se quedan aquí hasta que los borres.">
       <div className="space-y-3">
         {reqs.map((r) => (
           <div key={r.id} className="rounded-xl bg-brand-light/60 p-3">

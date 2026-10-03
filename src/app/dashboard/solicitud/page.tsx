@@ -70,22 +70,22 @@ export default function SolicitudPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-8 animate-fade-in">
-      <PageHeader title="Solicitud de insumos" subtitle={`Indica cuánto hay que comprar. ${today.charAt(0).toUpperCase()}${today.slice(1)}.`} />
+      <PageHeader title="Solicitud de insumos" subtitle={`Indica qué insumos necesitas y cuánto. ${today.charAt(0).toUpperCase()}${today.slice(1)}.`} />
 
-      <Panel title="Insumos" subtitle="Existencias actuales y cantidad a comprar">
+      <Panel title="Insumos" subtitle="Existencias actuales y cantidad a solicitar">
         {loading ? (
           <Spinner />
         ) : supplies.length === 0 ? (
           <p className="py-6 text-center text-sm text-brand-gray">Todavía no hay insumos. El administrador los marca como "Insumo" en Inventario, o puedes agregarlos abajo como otro producto.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            <div className="grid grid-cols-[1fr_90px_110px] items-center gap-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-gray">
-              <span>Insumo</span><span className="text-center">Existencias</span><span className="text-center">A comprar</span>
+            <div className="grid grid-cols-[1fr_90px_130px] items-center gap-3 pb-2 text-[11px] font-semibold uppercase leading-tight tracking-wide text-brand-gray">
+              <span>Insumo</span><span className="text-center">Existencias</span><span className="text-center">Cantidad a solicitar</span>
             </div>
             {supplies.map((s) => {
               const low = s.stock <= s.min_stock;
               return (
-                <div key={s.id} className="grid grid-cols-[1fr_90px_110px] items-center gap-3 py-2.5">
+                <div key={s.id} className="grid grid-cols-[1fr_90px_130px] items-center gap-3 py-2.5">
                   <span className="min-w-0 text-sm text-brand-dark">
                     <span className="block truncate">{s.name}</span>
                     {s.category && <span className="text-[11px] text-brand-gray">{s.category}</span>}
@@ -109,7 +109,7 @@ export default function SolicitudPage() {
             <div key={i} className="grid grid-cols-[1fr_80px_80px_32px] items-center gap-2">
               <input type="text" placeholder="Nombre del producto" value={o.name} onChange={(e) => setOthers(others.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} className={`${inputClass} !py-1.5`} />
               <input type="number" min={0} placeholder="Hay" value={o.stock} onChange={(e) => setOthers(others.map((x, k) => (k === i ? { ...x, stock: e.target.value } : x)))} className={`${inputClass} !py-1.5 text-center`} aria-label="Existencias" />
-              <input type="number" min={1} placeholder="Comprar" value={o.qty} onChange={(e) => setOthers(others.map((x, k) => (k === i ? { ...x, qty: e.target.value } : x)))} className={`${inputClass} !py-1.5 text-center`} aria-label="Cantidad a comprar" />
+              <input type="number" min={1} placeholder="Solicitar" value={o.qty} onChange={(e) => setOthers(others.map((x, k) => (k === i ? { ...x, qty: e.target.value } : x)))} className={`${inputClass} !py-1.5 text-center`} aria-label="Cantidad a solicitar" />
               <button type="button" onClick={() => setOthers(others.filter((_, k) => k !== i))} aria-label="Quitar" className="flex h-8 w-8 items-center justify-center rounded-lg text-brand-gray hover:bg-red-50 hover:text-red-500">
                 <X className="h-4 w-4" />
               </button>
