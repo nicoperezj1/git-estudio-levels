@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS professional_settlements (
   UNIQUE (tenant_id, barber_id, month, mode)
 );
 ALTER TABLE professional_settlements ADD COLUMN IF NOT EXISTS days_override INTEGER;
+-- Arriendo: los dias concretos elegidos en el calendario del mes (['2026-09-01', ...]). NULL = no se uso el calendario.
+ALTER TABLE professional_settlements ADD COLUMN IF NOT EXISTS worked_dates JSONB;
 ALTER TABLE professional_settlements ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS professional_settlement_log (

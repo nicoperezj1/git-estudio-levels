@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown, Coins, Wallet, Hourglass, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Coins, Wallet, Hourglass, Plus } from "lucide-react";
 import { formatCurrency, todayInChile } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -54,8 +54,7 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
   const [payFor, setPayFor] = useState<ProMonth | null>(null);
   const [payForm, setPayForm] = useState({ amount: "", note: "" });
   const [payLog, setPayLog] = useState<Array<{ old_amount: number | null; new_amount: number; note: string | null; user_name: string | null; created_at: string }>>([]);
-  const [daysFor, setDaysFor] = useState<ProMonth | null>(null);
-  const [daysValue, setDaysValue] = useState("");
+  const [calFor, setCalFor] = useState<ProMonth | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -131,19 +130,18 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
     } finally { setBusy(false); }
   };
 
-  const saveDays = async () => {
-    if (!daysFor) return;
+  // Arriendo: guarda los dias trabajados. `body` = { days } (solo la cantidad), { dates } (calendario) o {} (automatico).
+  const patchDays = async (p: ProMonth, body: { days?: number; dates?: string[] }) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/profesionales/libro/liquidacion?x=1${tq}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barberId: daysFor.barberId, month, year, days: daysValue === "" ? null : Number(daysValue) }),
+        body: JSON.stringify({ barberId: p.barberId, month, year, ...body }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showToast(data.error || "No se pudo guardar", "error"); return; }
-      showToast("Días actualizados", "success");
-      setDaysFor(null);
+      if (!res.ok) { showToast(data.error || "No se pudo guardar", "error"); return false; }
       await load();
+      return true;
     } finally { setBusy(false); }
   };
 
@@ -195,6 +193,34 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
                   </div>
                 </div>
 
+                {mode === "rental" && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand-light/70 px-3 py-2.5">
+                    <div>
+                      <p className="text-xs font-semibold text-brand-dark">Días trabajados</p>
+                      <p className="text-[11px] text-brand-gray">
+                        {p.daysSource === "calendar" ? "Elegidos en el calendario" : p.daysSource === "manual" ? `Corregido a mano (automático: ${p.autoDays ?? 0})` : "Automático (citas completadas)"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isAdmin && (
+                        <button type="button" disabled={busy || (p.daysWorked ?? 0) <= 0} onClick={() => patchDays(p, { days: Math.max(0, (p.daysWorked ?? 0) - 1) })}
+                          aria-label="Un día menos" className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-brand-dark hover:border-brand-blue disabled:opacity-40">−</button>
+                      )}
+                      <span className="min-w-[2ch] text-center text-xl font-extrabold tabular-nums text-brand-dark">{p.daysWorked ?? 0}</span>
+                      {isAdmin && (
+                        <button type="button" disabled={busy || (p.daysWorked ?? 0) >= 31} onClick={() => patchDays(p, { days: (p.daysWorked ?? 0) + 1 })}
+                          aria-label="Un día más" className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-brand-dark hover:border-brand-blue disabled:opacity-40">+</button>
+                      )}
+                      <span className="text-xs text-brand-gray">× {formatCurrency(p.dailyRate ?? 0)} = <b className="text-brand-dark">{formatCurrency(p.base)}</b></span>
+                      {isAdmin && (
+                        <button type="button" onClick={() => setCalFor(p)} className={`${ghostButton} !px-3 !py-1.5 text-xs`}>
+                          <CalendarDays className="h-3.5 w-3.5" /> Calendario
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-sm">
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-brand-gray">
                     <span>{copy.paid}: <b className="tabular-nums text-brand-dark">{formatCurrency(p.paid)}</b></span>
@@ -229,9 +255,6 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
                     <div className="flex items-baseline justify-between gap-3 py-2.5 text-sm">
                       <span className="text-brand-dark">
                         {p.baseLabel}
-                        {mode === "rental" && isAdmin && (
-                          <button onClick={() => { setDaysFor(p); setDaysValue(String(p.daysWorked ?? "")); }} className="ml-2 text-xs font-semibold text-brand-blue hover:underline">editar días</button>
-                        )}
                       </span>
                       <span className="font-semibold tabular-nums text-brand-dark">{formatCurrency(p.base)}</span>
                     </div>
@@ -352,21 +375,86 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
         </div>
       )}
 
-      {/* Arriendo: editar dias trabajados */}
-      {daysFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setDaysFor(null)}>
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-brand-dark">Días trabajados</h3>
-            <p className="mb-4 text-sm text-brand-gray">{daysFor.name} · automático: {daysFor.autoDays ?? 0} (citas completadas)</p>
-            <input type="number" min={0} max={31} step={1} inputMode="numeric" value={daysValue} onChange={(e) => setDaysValue(e.target.value)} className={`${inputClass} tabular-nums`} />
-            <p className="mt-1 text-[11px] text-brand-gray">Déjalo vacío para volver al cálculo automático.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setDaysFor(null)} className={ghostButton}>Cancelar</button>
-              <button onClick={saveDays} disabled={busy} className={primaryButton}>{busy ? "Guardando…" : "Guardar"}</button>
-            </div>
+      {/* Arriendo: calendario del mes para elegir los dias trabajados */}
+      {calFor && (
+        <DaysCalendarModal
+          pro={calFor} year={year} month={month} busy={busy} onClose={() => setCalFor(null)}
+          onSave={async (dates) => { if (await patchDays(calFor, { dates })) { showToast("Días actualizados", "success"); setCalFor(null); } }}
+          onAuto={async () => { if (await patchDays(calFor, {})) { showToast("Volvió al cálculo automático", "success"); setCalFor(null); } }}
+        />
+      )}
+    </div>
+  );
+}
+
+const WEEKDAYS = ["L", "M", "M", "J", "V", "S", "D"];
+
+// Calendario del mes para elegir los dias trabajados de un profesional en arriendo. Los dias libres del profesional
+// (segun su horario) salen de otro color pero se pueden elegir igual, por si hubo un cambio de dia. Un punto verde marca
+// los dias con citas completadas.
+function DaysCalendarModal({ pro, year, month, busy, onClose, onSave, onAuto }: {
+  pro: ProMonth; year: number; month: number; busy: boolean;
+  onClose: () => void; onSave: (dates: string[]) => void; onAuto: () => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(pro.workedDates ?? pro.autoDates ?? []));
+  const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7; // semana desde el lunes
+  const iso = (d: number) => `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const isOff = (d: number) => (pro.offWeekdays || []).includes(new Date(Date.UTC(year, month - 1, d)).getUTCDay());
+  const toggle = (d: number) => setSelected((prev) => { const n = new Set(prev); const k = iso(d); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const rate = pro.dailyRate ?? 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4" onClick={onClose}>
+      <div className="my-6 w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-brand-dark">Días trabajados</h3>
+        <p className="mb-4 text-sm text-brand-gray">{pro.name} · {MONTHS[month - 1]} {year}</p>
+
+        <div className="grid grid-cols-7 gap-1.5">
+          {WEEKDAYS.map((w, i) => <div key={i} className="pb-1 text-center text-[11px] font-semibold text-brand-gray">{w}</div>)}
+          {Array.from({ length: lead }, (_, i) => <div key={`b${i}`} />)}
+          {Array.from({ length: dim }, (_, i) => {
+            const d = i + 1, k = iso(d), sel = selected.has(k), off = isOff(d), appt = (pro.autoDates || []).includes(k);
+            const cls = sel
+              ? `bg-brand-blue text-white border-brand-blue ${off ? "ring-2 ring-amber-300" : ""}`
+              : off ? "bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-400"
+              : "bg-white text-brand-dark border-gray-200 hover:border-brand-blue/60";
+            return (
+              <button key={k} type="button" onClick={() => toggle(d)} aria-pressed={sel}
+                aria-label={`${d} de ${MONTHS[month - 1]}${off ? ", día libre del profesional" : ""}${sel ? ", seleccionado" : ""}`}
+                className={`relative flex h-11 items-center justify-center rounded-xl border text-sm font-semibold tabular-nums transition-colors ${cls}`}>
+                {d}
+                {appt && <span className={`absolute bottom-1 h-1 w-1 rounded-full ${sel ? "bg-white" : "bg-emerald-500"}`} />}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-brand-gray">
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-brand-blue" /> Trabajó (se cobra)</span>
+          <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-amber-200 bg-amber-50" /> Día libre del profesional (se puede elegir igual)</span>
+          <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Con citas</span>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSelected(new Set(pro.autoDates || []))} className="text-xs font-semibold text-brand-blue hover:underline">Días con citas</button>
+          <button type="button" onClick={() => setSelected(new Set(Array.from({ length: dim }, (_, i) => i + 1).filter((d) => !isOff(d)).map(iso)))} className="text-xs font-semibold text-brand-blue hover:underline">Todos sus días de trabajo</button>
+          <button type="button" onClick={() => setSelected(new Set())} className="text-xs font-semibold text-brand-blue hover:underline">Limpiar</button>
+        </div>
+
+        <div className="mt-4 flex items-baseline justify-between gap-3 rounded-xl bg-brand-light/70 px-4 py-3">
+          <span className="text-sm text-brand-dark"><b className="text-lg tabular-nums">{selected.size}</b> día{selected.size === 1 ? "" : "s"} × {formatCurrency(rate)}</span>
+          <span className="text-lg font-extrabold tabular-nums text-brand-dark">{formatCurrency(selected.size * rate)}</span>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" onClick={onAuto} disabled={busy} className="text-xs font-semibold text-brand-gray hover:text-brand-dark hover:underline">Volver a automático</button>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className={ghostButton}>Cancelar</button>
+            <button type="button" onClick={() => onSave(Array.from(selected))} disabled={busy} className={primaryButton}>{busy ? "Guardando…" : "Guardar"}</button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

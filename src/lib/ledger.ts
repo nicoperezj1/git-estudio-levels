@@ -50,6 +50,10 @@ export interface ProMonth {
   dailyRate?: number;
   daysWorked?: number;
   autoDays?: number;
+  autoDates?: string[];          // dias con citas completadas
+  workedDates?: string[] | null; // dias elegidos en el calendario (null = no se uso)
+  offWeekdays?: number[];        // dias de la semana libres del profesional (0 = domingo)
+  daysSource?: "auto" | "manual" | "calendar";
   base: number;              // comision sobre servicios, o arriendo (dias x valor)
   baseLabel: string;
   lines: LedgerLine[];
@@ -144,7 +148,12 @@ export async function computeProMonths(
   // Arriendo: dias trabajados (citas completadas, o el valor guardado en rental_records si ya existe).
   const daysByBarber = new Map<string, Set<string>>();
   const savedDays = new Map<string, number>();
+  const offByBarber = new Map<string, number[]>();
   if (mode === "rental") {
+    const { data: sched } = await supabase.from("barber_schedule").select("barber_id, day_of_week, is_working").in("barber_id", ids);
+    for (const r of sched || []) {
+      if (r.is_working === false) offByBarber.set(r.barber_id, [...(offByBarber.get(r.barber_id) || []), Number(r.day_of_week)]);
+    }
     const appts = await fetchAllRows<any>(() =>
       supabase.from("appointments").select("barber_id, date").eq("tenant_id", tenantId).eq("status", "completed").in("barber_id", ids).gte("date", first).lte("date", last)
     ).catch(() => [] as any[]);
@@ -162,8 +171,21 @@ export async function computeProMonths(
   const { data: settlements } = await supabase.from("professional_settlements").select("*")
     .eq("tenant_id", tenantId).eq("month", first).eq("mode", mode);
   const settlementByBarber = new Map<string, any>((settlements || []).map((s: any) => [s.barber_id, s]));
-  // Arriendo: la correccion hecha en el libro manda sobre el valor antiguo de rental_records.
-  for (const s of settlements || []) if (s.days_override !== null && s.days_override !== undefined) savedDays.set(s.barber_id, Number(s.days_override));
+  // Arriendo: lo hecho en el libro manda sobre el valor antiguo de rental_records. Los dias elegidos en el calendario
+  // mandan sobre el numero a secas.
+  const manualDays = new Set<string>(savedDays.keys());
+  const datesByBarber = new Map<string, string[]>();
+  const ym = first.slice(0, 7);
+  for (const s of settlements || []) {
+    if (Array.isArray(s.worked_dates)) {
+      const dates = Array.from(new Set((s.worked_dates as any[]).map(String).filter((d) => d.startsWith(ym)))).sort();
+      datesByBarber.set(s.barber_id, dates);
+      savedDays.set(s.barber_id, dates.length);
+    } else if (s.days_override !== null && s.days_override !== undefined) {
+      savedDays.set(s.barber_id, Number(s.days_override));
+      manualDays.add(s.barber_id);
+    }
+  }
 
   return pros.map((p: any): ProMonth => {
     const lines: LedgerLine[] = [];
@@ -189,11 +211,16 @@ export async function computeProMonths(
       extra = { rate, serviceSales: svc, productSales: Math.round(productSalesByBarber.get(p.id) || 0) };
     } else {
       const dailyRate = Number(p.rental_daily_rate) || 29000;
-      const autoDays = daysByBarber.get(p.id)?.size || 0;
+      const autoDates = Array.from(daysByBarber.get(p.id) || []).sort();
+      const autoDays = autoDates.length;
       const daysWorked = savedDays.has(p.id) ? (savedDays.get(p.id) as number) : autoDays;
       base = daysWorked * dailyRate;
       baseLabel = `Arriendo: ${daysWorked} día${daysWorked === 1 ? "" : "s"} × ${dailyRate.toLocaleString("es-CL")}`;
-      extra = { dailyRate, daysWorked, autoDays };
+      const workedDates = datesByBarber.has(p.id) ? (datesByBarber.get(p.id) as string[]) : null;
+      extra = {
+        dailyRate, daysWorked, autoDays, autoDates, workedDates, offWeekdays: offByBarber.get(p.id) || [],
+        daysSource: workedDates ? "calendar" : manualDays.has(p.id) ? "manual" : "auto",
+      };
     }
     const total = mode === "commission" ? base + adjustments : base - adjustments;
     const st = settlementByBarber.get(p.id);
