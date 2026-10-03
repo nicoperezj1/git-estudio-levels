@@ -217,5 +217,48 @@ for (let i = 0; i < plan.length; i++) {
   newAppts++;
 }
 console.log(`Clientes nuevos: ${newClients}. Citas nuevas: ${newAppts}.`);
+
+// 6) Ventas de las citas completadas (para tener ingresos en el cierre de septiembre) y un egreso del
+//    mes anterior registrado hoy (el caso que se reporto: antes no salia en el cierre de ese mes).
+const seedClients = must(await sb.from("clients").select("id").eq("tenant_id", tenantId).like("email", "cliente%@prueba.test"), "clientes de prueba");
+const doneAppts = seedClients.length === 0 ? [] : must(await sb.from("appointments")
+  .select("id, barber_id, client_id, start_time, appointment_services(price)")
+  .eq("tenant_id", tenantId).eq("status", "completed").in("client_id", seedClients.map((c) => c.id)), "citas completadas");
+const methods = ["cash", "debit_card", "credit_card"];
+let newSales = 0;
+for (let i = 0; i < doneAppts.length; i++) {
+  const a = doneAppts[i];
+  const marker = `seed-venta:${a.id}`;
+  const have = must(await sb.from("transactions").select("id").eq("tenant_id", tenantId).eq("notes", marker).maybeSingle(), "buscar venta");
+  if (have) continue;
+  const total = (a.appointment_services || []).reduce((t, x) => t + Number(x.price || 0), 0) || 12000;
+  const tx = must(await sb.from("transactions").insert({
+    type: "income", status: "completed", subtotal: total, total, payment_method: methods[i % 3],
+    client_id: a.client_id, barber_id: a.barber_id, tenant_id: tenantId, notes: marker, created_at: a.start_time,
+  }).select("id").single(), "venta de prueba");
+  must(await sb.from("transaction_items").insert({ transaction_id: tx.id, description: "Servicio (prueba)", quantity: 1, unit_price: total, total }), "item de venta");
+  newSales++;
+}
+console.log(`Ventas de prueba nuevas: ${newSales}.`);
+
+{
+  const [ty, tm] = today.split("-").map(Number);
+  const prev = new Date(Date.UTC(ty, tm - 2, 1));
+  const prevMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const marker = "seed-egreso-mes-anterior";
+  const have = must(await sb.from("transactions").select("id").eq("tenant_id", tenantId).eq("notes", marker).maybeSingle(), "buscar egreso");
+  if (!have) {
+    const r = await sb.from("transactions").insert({
+      type: "expense", status: "completed", subtotal: 45000, total: 45000, payment_method: "transfer",
+      tenant_id: tenantId, assigned_to: "business", notes: marker, accounting_month: prevMonth, created_by: admin.id,
+    }).select("id").single();
+    if (r.error) {
+      console.log("Egreso del mes anterior: se creara cuando apliques la migracion 090 y vuelvas a correr este comando.");
+    } else {
+      must(await sb.from("transaction_items").insert({ transaction_id: r.data.id, description: "Luz del mes anterior (prueba)", quantity: 1, unit_price: 45000, total: 45000 }), "item del egreso");
+      console.log(`Egreso de prueba creado hoy que corresponde a ${prevMonth.slice(0, 7)}.`);
+    }
+  }
+}
 console.log("\nListo. Usuarios (clave de todos: " + PASSWORD + "):");
 for (const u of [...PROS, RECEP]) console.log(`  ${u.name.padEnd(18)} ${u.email.padEnd(38)} PIN ${u.pin}`);
