@@ -3,6 +3,7 @@
 // Uso (desde la carpeta del proyecto, con .env.local apuntando a PRUEBAS):
 //   node scripts/seed-pruebas.mjs --dry   # muestra que crearia, sin tocar nada
 //   node scripts/seed-pruebas.mjs         # crea los datos
+//   node scripts/seed-pruebas.mjs --crear-negocio   # igual, y si el admin no tiene negocio, crea uno de pruebas
 //
 // SEGURIDAD: se niega a correr si NEXT_PUBLIC_SUPABASE_URL no es el proyecto de pruebas.
 // Es re-ejecutable: no duplica usuarios ni clientes que ya existan.
@@ -15,6 +16,7 @@ const PRUEBAS_REF = "ucwrdmwtlesayjxmlbve";
 const ADMIN_EMAIL = "nicoperezj1@gmail.com";
 const PASSWORD = "Prueba2026!"; // clave de los usuarios de prueba (solo en pruebas)
 const DRY = process.argv.includes("--dry");
+const CREATE_TENANT = process.argv.includes("--crear-negocio");
 
 // ---------- .env.local ----------
 function loadEnv() {
@@ -131,8 +133,23 @@ const must = (r, what) => { if (r.error) { console.error(`Error en ${what}: ${r.
 // 1) Admin y negocio
 const admin = must(await sb.from("profiles").select("id, tenant_id, role").ilike("email", ADMIN_EMAIL).maybeSingle(), "buscar admin");
 if (!admin) { console.error(`No encuentro el perfil ${ADMIN_EMAIL} en la base de pruebas.`); process.exit(1); }
-if (!admin.tenant_id) { console.error("El admin no tiene negocio (tenant_id). Termina el onboarding en la app primero."); process.exit(1); }
-const tenantId = admin.tenant_id;
+if (!admin.tenant_id && !CREATE_TENANT) {
+  console.error("El admin no tiene negocio (tenant_id). Corre de nuevo con --crear-negocio para crear uno de pruebas.");
+  process.exit(1);
+}
+let tenantId = admin.tenant_id;
+if (!tenantId) {
+  // Igual que /api/auth/signup-business: negocio en prueba, admin vinculado y tenant_settings.
+  const t = must(await sb.from("tenants").insert({
+    name: "Estudio Levels (pruebas)", slug: `levels-pruebas-${Date.now().toString(36).slice(-4)}`,
+    admin_email: ADMIN_EMAIL, admin_name: "Nicolás", plan: "starter", status: "trial",
+    trial_ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+  }).select("id").single(), "crear negocio");
+  tenantId = t.id;
+  must(await sb.from("profiles").update({ tenant_id: tenantId, role: "admin" }).eq("id", admin.id), "vincular admin al negocio");
+  must(await sb.from("tenant_settings").insert({ tenant_id: tenantId }), "tenant_settings");
+  console.log("Negocio de pruebas creado y vinculado al admin.");
+}
 must(await sb.from("profiles").update({ personal_pin: "3333" }).eq("id", admin.id), "PIN del admin");
 console.log(`Negocio: ${tenantId}. PIN del admin = 3333.`);
 
