@@ -51,7 +51,7 @@ Plan acordado con Nicolás el 3 de octubre de 2026. Ordena todos los pedidos de 
 
 ## 3. Fase 1: arreglos rápidos (bajo riesgo)
 
-> **Estado (3 oct., madrugada):** Fases 1, 2, 3, 4 y 5 COMPLETAS EN CÓDIGO (la 5 sin probar). Fase 2 y Fase 4 probadas y cerradas por Nico (único pendiente de Fase 4: el correo de solicitud de insumos no llega; Resend lo acepta, hay que revisar con Pablo el registro Emails de Resend, dominio verificado y spam). Pendientes de probar en pantalla: Fase 1 (parte) y Fase 3. Siguiente: Fase 5 (riesgo ALTO). Detalle en `docs/CONTEXTO.md`.
+> **Estado (3 oct., madrugada):** Fases 1 a 6 COMPLETAS EN CÓDIGO (la 5 y la 6 sin probar). Fase 2 y Fase 4 probadas y cerradas por Nico (único pendiente de Fase 4: el correo de solicitud de insumos no llega; Resend lo acepta, hay que revisar con Pablo el registro Emails de Resend, dominio verificado y spam). Pendientes de probar en pantalla: Fase 1 (parte) y Fase 3. Siguiente: Fase 5 (riesgo ALTO). Detalle en `docs/CONTEXTO.md`.
 
 | Cambio | Detalle |
 |---|---|
