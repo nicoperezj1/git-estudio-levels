@@ -44,8 +44,15 @@ export async function PUT(req: NextRequest) {
     health_system: health, isapre_plan_uf: health === "isapre" ? num(f.isapre_plan_uf) : null,
     colacion: Math.round(num(f.colacion)), movilizacion: Math.round(num(f.movilizacion)),
     gratification_mode: gmode, updated_at: new Date().toISOString(),
+    rut: String(f.rut || "").trim().slice(0, 20) || null, position: String(f.position || "").trim().slice(0, 60) || null,
+    cost_center: String(f.cost_center || "").trim().slice(0, 60) || null,
   };
-  const { error } = await supabase.from("employee_files").upsert(row, { onConflict: "tenant_id,barber_id" });
+  let { error } = await supabase.from("employee_files").upsert(row, { onConflict: "tenant_id,barber_id" });
+  if (error && /rut|position|cost_center/i.test(error.message)) {
+    // 096 vieja (sin RUT/cargo): se guarda sin esos campos.
+    const { rut, position, cost_center, ...legacy } = row as any;
+    ({ error } = await supabase.from("employee_files").upsert(legacy, { onConflict: "tenant_id,barber_id" }));
+  }
   if (error) return NextResponse.json({ error: "Falta aplicar la migración 096 en la base de datos." }, { status: 409 });
   await supabase.from("profiles").update({ has_labor_contract: true }).eq("id", body.barberId); // ignora si 094 no esta
   return NextResponse.json({ success: true });

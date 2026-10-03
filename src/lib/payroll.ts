@@ -36,7 +36,10 @@ export interface PayrollParams {
 }
 
 export interface ExtraHaber { label: string; amount: number; imponible: boolean; tributable: boolean }
-export interface ExtraDiscount { label: string; amount: number }
+// `legal` = descuento legal que NO cuenta para el tope de 15% (pension alimenticia / retencion judicial,
+// cuota sindical, etc.), como en la plantilla Excel (columna Tipo = Legal).
+export interface ExtraDiscount { label: string; amount: number; legal?: boolean }
+export interface PaymentInfo { method: string; date: string; bank: string; reference: string; voucher: string; notes: string }
 
 export interface PayslipInput {
   contract: ContractType;
@@ -58,6 +61,7 @@ export interface PayslipInput {
   payrollDiscounts: number;     // descuento por planilla (cuenta para el 15%)
   otherDiscounts: ExtraDiscount[];
   taxOverride?: number | null;  // impuesto escrito a mano (si se quiere corregir el calculo)
+  payment?: PaymentInfo;        // forma de pago y constancia (seccion 6 de la plantilla)
 }
 
 export interface PayslipResult {
@@ -159,7 +163,8 @@ export function computePayslip(i: PayslipInput, p: PayrollParams): PayslipResult
   const taxOverridden = i.taxOverride != null && Number.isFinite(Number(i.taxOverride));
   const tax = taxOverridden ? r(pos(Number(i.taxOverride))) : taxAuto;
 
-  const otherDiscountsTotal = r(pos(i.payrollDiscounts) + i.otherDiscounts.reduce((s, d) => s + pos(d.amount), 0));
+  // Para el tope de 15% solo cuentan planilla y los otros descuentos NO legales (la quincena y los legales no).
+  const otherDiscountsTotal = r(pos(i.payrollDiscounts) + i.otherDiscounts.filter((d) => !d.legal).reduce((s, d) => s + pos(d.amount), 0));
   const advances = r(pos(i.advances));
 
   const haberes: PayslipResult["lines"]["haberes"] = [
@@ -182,7 +187,7 @@ export function computePayslip(i: PayslipInput, p: PayrollParams): PayslipResult
     ...(tax ? [{ label: taxOverridden ? "Impuesto único (corregido a mano)" : "Impuesto único", amount: tax, kind: "tax" as const }] : []),
     ...(advances ? [{ label: "Quincena / anticipos", amount: advances, kind: "advance" as const }] : []),
     ...(pos(i.payrollDiscounts) ? [{ label: "Descuento por planilla", amount: r(i.payrollDiscounts), kind: "other" as const }] : []),
-    ...i.otherDiscounts.filter((d) => pos(d.amount)).map((d) => ({ label: d.label, amount: r(d.amount), kind: "other" as const })),
+    ...i.otherDiscounts.filter((d) => pos(d.amount)).map((d) => ({ label: d.label, amount: r(d.amount), kind: (d.legal ? "legal" : "other") as "legal" | "other" })),
   ];
   const totalDescuentos = descuentos.reduce((s, d) => s + d.amount, 0);
   const net = totalHaberes - totalDescuentos;

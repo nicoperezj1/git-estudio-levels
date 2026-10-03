@@ -3,7 +3,7 @@
 import type { createAdminSupabase } from "@/lib/supabase/server";
 import { computeProMonths } from "@/lib/ledger";
 import { monthEnd } from "@/lib/accounting";
-import { suggestSemanaCorrida, type PayrollParams, type PayslipInput, type ContractType } from "@/lib/payroll";
+import { suggestSemanaCorrida, type PayrollParams, type PayslipInput, type ContractType, type PaymentInfo } from "@/lib/payroll";
 
 type Admin = ReturnType<typeof createAdminSupabase>;
 
@@ -57,7 +57,10 @@ export function sanitizeParams(raw: any): PayrollParams {
 export interface FileRow {
   contract_type: ContractType; hire_date: string | null; weekly_hours: number; base_salary: number; afp_name: string | null; afp_rate: number;
   health_system: "fonasa" | "isapre"; isapre_plan_uf: number | null; colacion: number; movilizacion: number; gratification_mode: "auto" | "manual" | "none";
+  rut?: string | null; position?: string | null; cost_center?: string | null;
 }
+
+export const EMPTY_PAYMENT: PaymentInfo = { method: "transfer", date: "", bank: "", reference: "", voucher: "", notes: "" };
 
 const sundaysIn = (first: string): number => {
   const last = monthEnd(first);
@@ -101,6 +104,7 @@ export function defaultInputs(file: FileRow, auto: { commissions: number; advanc
     afpRate: Number(file.afp_rate),
     health: { system: file.health_system, planUf: file.isapre_plan_uf != null ? Number(file.isapre_plan_uf) : undefined },
     advances: auto.advances, payrollDiscounts: auto.payrollDiscounts, otherDiscounts: [], taxOverride: null,
+    payment: { ...EMPTY_PAYMENT },
     holidays: 0,
     suggestedSemanaCorrida: suggestSemanaCorrida(auto.commissions, businessDays - hireDay, sundays),
   };
@@ -125,8 +129,14 @@ export function sanitizeInputs(raw: any, base: PayslipInput): PayslipInput {
     advances: pos(raw?.advances, base.advances),
     payrollDiscounts: pos(raw?.payrollDiscounts, base.payrollDiscounts),
     otherDiscounts: (Array.isArray(raw?.otherDiscounts) ? raw.otherDiscounts : []).slice(0, 20).map((d: any) => ({
-      label: String(d?.label || "Descuento").slice(0, 60), amount: pos(d?.amount, 0),
+      label: String(d?.label || "Descuento").slice(0, 60), amount: pos(d?.amount, 0), legal: !!d?.legal,
     })),
+    payment: {
+      method: String(raw?.payment?.method || "transfer").slice(0, 30),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(String(raw?.payment?.date || "")) ? String(raw.payment.date) : "",
+      bank: String(raw?.payment?.bank || "").slice(0, 60), reference: String(raw?.payment?.reference || "").slice(0, 60),
+      voucher: String(raw?.payment?.voucher || "").slice(0, 40), notes: String(raw?.payment?.notes || "").slice(0, 300),
+    },
     taxOverride: raw?.taxOverride === null || raw?.taxOverride === "" || raw?.taxOverride === undefined ? null : pos(raw.taxOverride, 0),
   };
 }

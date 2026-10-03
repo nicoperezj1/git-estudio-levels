@@ -58,5 +58,10 @@ CREATE TABLE IF NOT EXISTS payslips (
 CREATE INDEX IF NOT EXISTS idx_payslips_month ON payslips(tenant_id, month);
 ALTER TABLE payslips ENABLE ROW LEVEL SECURITY;
 
+-- Identificacion del trabajador (seccion 2 de la plantilla): RUT, cargo y centro de costo.
+ALTER TABLE employee_files ADD COLUMN IF NOT EXISTS rut TEXT;
+ALTER TABLE employee_files ADD COLUMN IF NOT EXISTS position TEXT;
+ALTER TABLE employee_files ADD COLUMN IF NOT EXISTS cost_center TEXT;
+
 -- Verificacion (Supabase muestra solo el ultimo resultado): debe devolver 3 filas.
 SELECT table_name FROM information_schema.tables WHERE table_name IN ('employee_files', 'payroll_params', 'payslips');

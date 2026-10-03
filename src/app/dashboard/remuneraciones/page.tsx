@@ -211,7 +211,27 @@ function Editor({ barberId, month, onClose, goTo }: { barberId: string; month: s
               </div>
 
               <ListEditor title="Otros haberes (bonos)" items={inputs.extraHaberes} onChange={(extraHaberes) => set({ extraHaberes })} haber />
-              <ListEditor title="Otros descuentos" items={inputs.otherDiscounts} onChange={(otherDiscounts) => set({ otherDiscounts })} />
+              <ListEditor title="Otros descuentos" items={inputs.otherDiscounts} onChange={(otherDiscounts) => set({ otherDiscounts })}
+                presets={[{ label: "Préstamo empresa" }, { label: "Cuota sindical / caja / convenio", legal: true }, { label: "Pensión / retención judicial", legal: true }]} />
+
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-gray">Pago y constancia</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <label className="block"><span className="block text-[11px] text-brand-gray">Forma de pago</span>
+                    <select value={inputs.payment?.method || "transfer"} onChange={(e) => set({ payment: { ...(inputs.payment as any), method: e.target.value } })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                      <option value="transfer">Transferencia</option><option value="cash">Efectivo</option><option value="check">Cheque</option><option value="other">Otro</option></select></label>
+                  <label className="block"><span className="block text-[11px] text-brand-gray">Fecha de pago</span>
+                    <input type="date" value={inputs.payment?.date || ""} onChange={(e) => set({ payment: { ...(inputs.payment as any), date: e.target.value } })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
+                  <label className="block"><span className="block text-[11px] text-brand-gray">Banco / medio</span>
+                    <input value={inputs.payment?.bank || ""} onChange={(e) => set({ payment: { ...(inputs.payment as any), bank: e.target.value } })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+                  <label className="block"><span className="block text-[11px] text-brand-gray">N° comprobante</span>
+                    <input value={inputs.payment?.voucher || ""} onChange={(e) => set({ payment: { ...(inputs.payment as any), voucher: e.target.value } })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+                  <label className="block sm:col-span-2"><span className="block text-[11px] text-brand-gray">Cuenta / referencia</span>
+                    <input value={inputs.payment?.reference || ""} onChange={(e) => set({ payment: { ...(inputs.payment as any), reference: e.target.value } })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+                  <label className="block sm:col-span-2"><span className="block text-[11px] text-brand-gray">Observaciones</span>
+                    <input value={inputs.payment?.notes || ""} onChange={(e) => set({ payment: { ...(inputs.payment as any), notes: e.target.value } })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+                </div>
+              </div>
             </fieldset>
 
             {/* Resultado */}
@@ -267,18 +287,28 @@ function Editor({ barberId, month, onClose, goTo }: { barberId: string; month: s
   );
 }
 
-function ListEditor({ title, items, onChange, haber }: { title: string; items: any[]; onChange: (x: any[]) => void; haber?: boolean }) {
+function ListEditor({ title, items, onChange, haber, presets }: { title: string; items: any[]; onChange: (x: any[]) => void; haber?: boolean; presets?: Array<{ label: string; legal?: boolean }> }) {
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wide text-brand-gray">{title}</p>
-        <button type="button" onClick={() => onChange([...items, haber ? { label: "", amount: 0, imponible: true, tributable: true } : { label: "", amount: 0 }])} className="text-xs font-semibold text-brand-blue hover:underline">+ Agregar</button>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          {(presets || []).map((pr) => (
+            <button key={pr.label} type="button" onClick={() => onChange([...items, { label: pr.label, amount: 0, legal: !!pr.legal }])} className="text-xs font-semibold text-brand-blue hover:underline">+ {pr.label}</button>
+          ))}
+          <button type="button" onClick={() => onChange([...items, haber ? { label: "", amount: 0, imponible: true, tributable: true } : { label: "", amount: 0, legal: false }])} className="text-xs font-semibold text-brand-blue hover:underline">+ {presets ? "Otro" : "Agregar"}</button>
+        </div>
       </div>
       <div className="space-y-2">
         {items.map((it, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2">
             <input value={it.label} placeholder="Nombre" onChange={(e) => onChange(items.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} className="min-w-[8rem] flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" />
             <input type="number" min={0} value={it.amount} onChange={(e) => onChange(items.map((x, k) => (k === i ? { ...x, amount: Math.max(0, Number(e.target.value) || 0) } : x)))} className="w-28 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" />
+            {!haber && presets && (
+              <label className="flex items-center gap-1 text-[11px] text-brand-gray" title="Los descuentos legales (pensión alimenticia, cuota sindical) no cuentan para el tope de 15%">
+                <input type="checkbox" checked={!!it.legal} onChange={(e) => onChange(items.map((x, k) => (k === i ? { ...x, legal: e.target.checked } : x)))} />Legal
+              </label>
+            )}
             {haber && (
               <>
                 <label className="flex items-center gap-1 text-[11px] text-brand-gray"><input type="checkbox" checked={it.imponible} onChange={(e) => onChange(items.map((x, k) => (k === i ? { ...x, imponible: e.target.checked } : x)))} />Imponible</label>
@@ -295,7 +325,7 @@ function ListEditor({ title, items, onChange, haber }: { title: string; items: a
 
 /* ------------------------------- Fichas -------------------------------- */
 
-const EMPTY_FILE = { contract_type: "indefinido", hire_date: "", weekly_hours: 44, base_salary: 0, afp_name: "", afp_rate: 0, health_system: "fonasa", isapre_plan_uf: 0, colacion: 0, movilizacion: 0, gratification_mode: "auto" };
+const EMPTY_FILE = { rut: "", position: "", cost_center: "", contract_type: "indefinido", hire_date: "", weekly_hours: 44, base_salary: 0, afp_name: "", afp_rate: 0, health_system: "fonasa", isapre_plan_uf: 0, colacion: 0, movilizacion: 0, gratification_mode: "auto" };
 
 function Fichas() {
   const { showToast } = useToast();
@@ -331,7 +361,7 @@ function Fichas() {
             <div><p className="font-medium text-brand-dark">{p.name}</p><p className="text-xs text-brand-gray">{p.file ? `Contrato ${p.file.contract_type.replace("_", " ")} · base ${formatCurrency(Number(p.file.base_salary))}` : "Sin ficha laboral"}</p></div>
             <div className="flex items-center gap-3">
               {p.file && <button onClick={() => remove(p.id, p.name)} className="text-xs text-red-500 hover:underline">Quitar</button>}
-              <button onClick={() => setEdit({ id: p.id, name: p.name, file: p.file ? { ...p.file, hire_date: p.file.hire_date || "", isapre_plan_uf: p.file.isapre_plan_uf ?? 0, afp_name: p.file.afp_name || "" } : { ...EMPTY_FILE } })} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50">{p.file ? "Editar" : "Crear ficha"}</button>
+              <button onClick={() => setEdit({ id: p.id, name: p.name, file: p.file ? { ...p.file, rut: p.file.rut || "", position: p.file.position || "", cost_center: p.file.cost_center || "", hire_date: p.file.hire_date || "", isapre_plan_uf: p.file.isapre_plan_uf ?? 0, afp_name: p.file.afp_name || "" } : { ...EMPTY_FILE } })} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50">{p.file ? "Editar" : "Crear ficha"}</button>
             </div>
           </li>
         ))}
@@ -342,6 +372,13 @@ function Fichas() {
           <div className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-5 shadow-xl">
             <h2 className="font-bold text-brand-dark">Ficha laboral · {edit.name}</h2>
             <div className="grid grid-cols-2 gap-3">
+              <label className="block"><span className="block text-[11px] text-brand-gray">RUT</span>
+                <input value={f.rut} onChange={(e) => setF({ rut: e.target.value })} placeholder="12.345.678-9" className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+              <label className="block"><span className="block text-[11px] text-brand-gray">Cargo</span>
+                <input value={f.position} onChange={(e) => setF({ position: e.target.value })} placeholder="Ej: Barbero" className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+              <label className="block"><span className="block text-[11px] text-brand-gray">Centro de costo (opcional)</span>
+                <input value={f.cost_center} onChange={(e) => setF({ cost_center: e.target.value })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm" /></label>
+              <span />
               <label className="block"><span className="block text-[11px] text-brand-gray">Contrato</span>
                 <select value={f.contract_type} onChange={(e) => setF({ contract_type: e.target.value })} className="mt-0.5 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm"><option value="indefinido">Indefinido</option><option value="plazo_fijo">Plazo fijo</option><option value="obra">Por obra o faena</option></select></label>
               <label className="block"><span className="block text-[11px] text-brand-gray">Fecha de ingreso</span>

@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
   const [{ data: slip }, { data: pro }, { data: file }, { data: tenant }] = await Promise.all([
     supabase.from("payslips").select("*").eq("tenant_id", c.tenantId).eq("barber_id", barberId).eq("month", first).maybeSingle(),
     supabase.from("profiles").select("name").eq("id", barberId).eq("tenant_id", c.tenantId).maybeSingle(),
-    supabase.from("employee_files").select("contract_type").eq("tenant_id", c.tenantId).eq("barber_id", barberId).maybeSingle(),
-    supabase.from("tenants").select("name, logo_url").eq("id", c.tenantId).maybeSingle(),
+    supabase.from("employee_files").select("*").eq("tenant_id", c.tenantId).eq("barber_id", barberId).maybeSingle(),
+    supabase.from("tenants").select("name, logo_url, rut_empresa, address").eq("id", c.tenantId).maybeSingle(),
   ]);
   if (!slip || !pro) return NextResponse.json({ error: "Guarda la liquidación antes de bajar el PDF." }, { status: 404 });
 
@@ -33,6 +33,13 @@ export async function GET(req: NextRequest) {
     businessName: (tenant as any)?.name || "re-booking", logo, workerName: (pro as any).name, monthLabel: monthLabelEs(first),
     result: slip.result, contractLabel: CONTRACTS[(file as any)?.contract_type] || "Indefinido", status: slip.status,
     issuedAt: slip.issued_at ? new Date(slip.issued_at) : undefined,
+    employer: { rut: (tenant as any)?.rut_empresa, address: (tenant as any)?.address },
+    worker: {
+      rut: (file as any)?.rut, position: (file as any)?.position, costCenter: (file as any)?.cost_center, hireDate: (file as any)?.hire_date,
+      afp: (file as any)?.afp_name ? `${(file as any).afp_name} (${(file as any).afp_rate}%)` : null,
+      health: (file as any)?.health_system === "isapre" ? `Isapre (plan ${(file as any).isapre_plan_uf} UF)` : "Fonasa",
+    },
+    payment: slip.inputs?.payment,
   });
   const slug = String((pro as any).name).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return new NextResponse(Buffer.from(bytes), {
