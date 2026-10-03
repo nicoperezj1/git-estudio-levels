@@ -1,6 +1,6 @@
 # Contexto: re-booking (Estudio Levels)
 
-Última actualización: 2 de octubre de 2026. Léelo al empezar una sesión nueva. Reemplaza a los dos contextos anteriores (cobros y suscripciones, y calendario/POS/seguridad).
+Última actualización: 3 de octubre de 2026. Léelo al empezar una sesión nueva. Reemplaza a los dos contextos anteriores (cobros y suscripciones, y calendario/POS/seguridad).
 
 > **Producción es la referencia, no esta copia.** El repo oficial es `pdencina/barberia`, rama `main` (público; se puede clonar solo para leer). Esta rama se actualiza trayendo ese `main` (`git fetch https://github.com/pdencina/barberia main` y merge). **Antes de cualquier tarea, comparar con producción**, porque Pablo también cambia código y esta copia puede quedar atrás. Revisado el 2 de oct. contra `main` (`f7931c2`): producción **ya incluye** los parches 0011 y 0012, la corrección de seguridad de `/api/barberos` (`d01bef1`, 26-sep), el arreglo de Suspense (`ef85865`) y la migración 073 (el registro ya no toma el rol de los metadatos). **No incluye aún** el parche 0013 (Nuevo = primera cita + el cobro completa la cita) ni la migración 088 ni los parches de seguridad de la carpeta `entregas/`.
 
@@ -14,6 +14,12 @@
 - **Cómo correr en local:** `cd ~/barberia && npm install && npm run dev` y abrir http://localhost:3000. Hay que estar dentro de la carpeta del proyecto; si no, `npm` no encuentra el `package.json`.
 
 > **Plan vigente:** `docs/PLAN-OCTUBRE.md` (fases, decisiones tomadas con Nico y plan de vuelta atrás de cada una).
+
+> **Dónde quedamos (3 de oct.):**
+> - Plan de octubre aprobado por Nico en `docs/PLAN-OCTUBRE.md`. **No se ha escrito código de ninguna fase todavía.**
+> - Próximo paso: **Fase 0** (Pablo aplica el parche `0013` y crea un sitio de prueba en Vercel conectado a `rebooking-pruebas`) y luego **Fase 1**, empezando por el error de Métricas de clientes (`src/app/api/clientes/metricas/route.ts` solo lee los primeros 1.000 clientes por el límite de Supabase; los nuevos nunca se cuentan).
+> - Nico prueba en su computador (`localhost`). Aún **no tiene acceso de admin** a Supabase, Vercel ni al GitHub de Pablo: los cambios se le entregan como zip a Pablo.
+> - **Para probar en local hace falta un `.env.local`** con las llaves de Supabase (ver `.env.example`). Deben ser las del proyecto de **pruebas** (`rebooking-pruebas`), **nunca** las de producción. Las entrega Pablo por privado, nunca por el chat.
 
 ## Reglas de trabajo
 - Responder en español, informal, claro, directo y sin jerga.
