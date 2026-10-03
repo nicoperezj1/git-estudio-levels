@@ -62,6 +62,9 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 - Opcional si Nico lo pide: SQL para dar "Emitido por" a 4 ventas de prueba antiguas (datos irrecuperables, solo cosmético); plan Isapre en $ vs UF.
 - Fase 0 con Pablo: sitio de prueba en Vercel conectado a `rebooking-pruebas`; parche `0013` ya incluido en la rama.
 
+## 7a. Avances del 3 oct. (noche), sin probar por Nico todavía
+Pasos de prueba en `docs/PRUEBAS-3-OCT-NOCHE.md`. (1) Seguridad de rutas cerrada (push, ajustes, wallet, clientes, fotos, recompensas). (2) `pos/checkout` con verificación de totales en **modo comparación** (`src/lib/checkout-check.ts`; anota en auditoría `checkout_check`, filtro "Ventas a revisar", no cambia el cobro; pruebas: `npx tsx scripts/test-checkout-check.ts`). (3) Borradores legales en `docs/legal/` y `/privacidad` oculta tras `LEGAL_PAGES_ENABLED=1`. (4) Móvil: `MobileTabBar` (barra inferior por rol; "Más" abre el menú). Nada de esto está en la rama `octubre` de Pablo: hay que volver a subirla y avisarle. Siguiente sugerido: Fase 2 del plan móvil (centro de notificaciones: tablas `notifications`/`notification_preferences`, avisos del admin al equipo, aviso de planilla) y los hallazgos A de `docs/legal/REVISION-TECNICA.md`.
+
 ## 7b. Próximo proyecto: app móvil (propuesta, sin aprobar)
 Plan completo en `docs/PLAN-APP-MOVIL.html` (también publicado como página): Capacitor sobre la misma app Next.js, disposición móvil por rol, centro de notificaciones (`notifications`, `notification_preferences`, `device_tokens`, FCM + web-push), Fase 0 de seguridad (cerrar `/api/push/send`, que hoy no pide sesión) y cumplimiento de la Ley 21.719 antes del 1 dic. 2026 (política de privacidad que hoy no existe, contrato de encargo, canal de derechos). Decisiones pendientes al final del plan.
 
