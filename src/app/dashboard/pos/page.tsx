@@ -9,6 +9,7 @@ import {
   Banknote, CreditCard, ArrowLeftRight, ArrowRight, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { SaleCelebration } from "@/components/pos/sale-celebration";
+import { CashReductionPrompt } from "@/components/pos/cash-reduction-prompt";
 import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
 import { useLedgerEnabled } from "@/components/finance/professional-ledger-view";
 
@@ -113,6 +114,8 @@ export default function POSPage() {
   const [currentChargeAmount, setCurrentChargeAmount] = useState(0);
   const [cancelCurrentCharge, setCancelCurrentCharge] = useState<(() => void) | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  // Sube con cada venta registrada: dispara el aviso de reduccion de efectivo si la caja pasa el tope.
+  const [saleCounter, setSaleCounter] = useState(0);
   const [successAmount, setSuccessAmount] = useState(0);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -555,7 +558,7 @@ export default function POSPage() {
           setTipInput("");
           setShowTipModal(true);
         } else {
-          setShowSuccessModal(true);
+          setShowSuccessModal(true); setSaleCounter((n) => n + 1);
           setTimeout(() => setShowSuccessModal(false), 4000);
         }
       }
@@ -580,7 +583,7 @@ export default function POSPage() {
     }
     setShowTipModal(false);
     setLastTransactionId(null);
-    setShowSuccessModal(true);
+    setShowSuccessModal(true); setSaleCounter((n) => n + 1);
     setTimeout(() => setShowSuccessModal(false), 4000);
   };
 
@@ -1318,6 +1321,7 @@ export default function POSPage() {
 
       {/* Success Celebration Modal (Nico, 29-sep: mas estilo — confeti en abanico, check animado, monto que sube) */}
       {showSuccessModal && <SaleCelebration amount={successAmount} onClose={() => setShowSuccessModal(false)} />}
+      <CashReductionPrompt trigger={saleCounter} tenantId={tenant?.id} />
 
       {/* MercadoPago Payment Modal */}
       {mpPaymentStatus !== "idle" && (
