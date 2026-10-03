@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTenant } from "@/lib/tenant-context";
 import { EmptyIcons } from "@/components/ui/empty-state";
 import PosScreen from "@/components/pos/pos-screen";
@@ -32,7 +32,7 @@ export default function StandbyV2() {
     else setPinError("Código incorrecto");
   };
 
-  if (admin) return <StandbyAdmin admin={admin} pin={pinInput} onExit={() => { setAdmin(null); setPinInput(""); }} />;
+  if (admin) return <AdminShell admin={admin} pin={pinInput} onExit={() => { setAdmin(null); setPinInput(""); }} />;
   if (barber) return <PosScreen standby={{ barber, onExit: () => { setBarber(null); setPinInput(""); } }} />;
 
   return (
@@ -66,6 +66,37 @@ export default function StandbyV2() {
         </button>
         {pinError && <p className="text-red-500 text-sm mt-2">{pinError}</p>}
       </div>
+    </div>
+  );
+}
+
+// El administrador tambien puede cobrar desde Standby (en algunos negocios atiende clientes): entra SIEMPRE en la
+// vista de vender y, en otra pestana, puede pasar a la revision de caja para resolver los reportes con su codigo.
+function AdminShell({ admin, pin, onExit }: { admin: { id: string; name: string }; pin: string; onExit: () => void }) {
+  const [tab, setTab] = useState<"vender" | "revision">("vender");
+  const [open, setOpen] = useState(0);
+  useEffect(() => {
+    const load = () => fetch("/api/problemas?summary=1").then((r) => r.json()).then((d) => setOpen(Number(d?.open) || 0)).catch(() => {});
+    load();
+    const t = setInterval(load, 20000);
+    return () => clearInterval(t);
+  }, [tab]);
+  return (
+    <div>
+      <div className="mx-auto flex max-w-lg items-center gap-1 px-4 pt-3">
+        <div className="flex flex-1 gap-1 rounded-xl bg-gray-100 p-1 text-sm">
+          <button onClick={() => setTab("vender")} className={`flex-1 rounded-lg py-2 font-medium transition-all ${tab === "vender" ? "bg-white text-brand-dark shadow-sm" : "text-gray-500"}`}>Vender</button>
+          <button onClick={() => setTab("revision")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 font-medium transition-all ${tab === "revision" ? "bg-white text-brand-dark shadow-sm" : "text-gray-500"}`}>
+            Revisión de caja
+            {open > 0 && <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">{open}</span>}
+          </button>
+        </div>
+      </div>
+      {/* La venta queda montada (no se pierde el carrito al cambiar de pestaña). */}
+      <div className={tab === "vender" ? "" : "hidden"}>
+        <PosScreen standby={{ barber: admin, onExit, onReview: () => setTab("revision") }} />
+      </div>
+      {tab === "revision" && <StandbyAdmin admin={admin} pin={pin} onExit={onExit} />}
     </div>
   );
 }

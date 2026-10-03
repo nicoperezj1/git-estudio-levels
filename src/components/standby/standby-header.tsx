@@ -13,7 +13,7 @@ interface OpenProblem { open: number; latest: { reported_by_name: string | null;
 //  - Si no coincide: Reportar problema (contexto + consentimiento). Se puede seguir vendiendo; el reporte queda en
 //    ROJO para todos hasta que el administrador lo resuelva con su codigo y declare el efectivo real.
 //  - Descuento por planilla y Cerrar sesion.
-export function StandbyHeader({ barber, products, saleCounter, onExit }: { barber: { id: string; name: string }; products: Product[]; saleCounter: number; onExit: () => void }) {
+export function StandbyHeader({ barber, products, saleCounter, onExit, onReview }: { barber: { id: string; name: string }; products: Product[]; saleCounter: number; onExit: () => void; onReview?: () => void }) {
   const { showToast } = useToast();
   const { tenant } = useTenant();
   const [cash, setCash] = useState<number | null>(null);
@@ -38,6 +38,7 @@ export function StandbyHeader({ barber, products, saleCounter, onExit }: { barbe
   }, [tenant?.id]);
   useEffect(() => { load(); }, [load, saleCounter]);
   useEffect(() => { const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
+  useEffect(() => { window.addEventListener("standby-refresh", load); return () => window.removeEventListener("standby-refresh", load); }, [load]);
 
   const openReport = () => { setShownAtReport(cash); setNote(""); setConsent(false); setReportOpen(true); };
 
@@ -75,7 +76,11 @@ export function StandbyHeader({ barber, products, saleCounter, onExit }: { barbe
         <div className="mb-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
           <p className="font-semibold">⚠ Hay un problema de caja sin resolver ({problem.open})</p>
           {problem.latest && <p className="mt-0.5 text-xs">{problem.latest.reported_by_name || "Equipo"}: “{problem.latest.note}”</p>}
-          <p className="mt-0.5 text-[11px] text-red-500">El administrador lo resuelve con su código en Standby, declarando el efectivo real.</p>
+          {onReview ? (
+            <button onClick={onReview} className="mt-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Resolver ahora (revisión de caja)</button>
+          ) : (
+            <p className="mt-0.5 text-[11px] text-red-500">El administrador lo resuelve con su código en Standby, declarando el efectivo real.</p>
+          )}
         </div>
       )}
 

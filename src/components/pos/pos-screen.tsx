@@ -69,7 +69,7 @@ interface CartItem {
 // Modo Standby (Fase 5): el MISMO Punto de Venta, pero con el profesional ya identificado por su PIN y con el control
 // del efectivo en caja (dinero en caja, reportar problema, reduccion de efectivo). El cobro es igual (cliente, cupon,
 // puntos, propina, pago dividido, tarjeta en la maquina, caja, ingresos, metricas…).
-export interface StandbyCtx { barber: { id: string; name: string }; onExit: () => void }
+export interface StandbyCtx { barber: { id: string; name: string }; onExit: () => void; onReview?: () => void }
 
 export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
   const [services, setServices] = useState<Service[]>([]);
@@ -608,7 +608,7 @@ export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
       {/* Left: Items */}
       <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
         {standby ? (
-          <StandbyHeader barber={standby.barber} products={products} saleCounter={saleCounter} onExit={standby.onExit} />
+          <StandbyHeader barber={standby.barber} products={products} saleCounter={saleCounter} onExit={standby.onExit} onReview={standby.onReview} />
         ) : (
           <ReceptionistGreeting className="mb-2" />
         )}

@@ -39,6 +39,7 @@ export function StandbyAdmin({ admin, pin, onExit }: { admin: { id: string; name
       if (!res.ok) throw new Error(d?.error || "No se pudo guardar");
       setDone({ adjustment: d.adjustment, resolved: d.resolved });
       setDeclared(""); setNote(""); load();
+      window.dispatchEvent(new Event("standby-refresh")); // la pestaña de vender actualiza su caja y quita el aviso rojo
     } catch (e: any) { showToast(e?.message || "No se pudo guardar", "error"); } finally { setSaving(false); }
   };
 
