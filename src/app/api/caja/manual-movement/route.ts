@@ -43,24 +43,28 @@ export async function POST(req: NextRequest) {
   const tipNum = parseInt(tip) || 0;
 
   // Create the transaction (marked in notes/audit as a manual entry so it's traceable).
-  const { data: tx, error } = await supabase
-    .from("transactions")
-    .insert({
-      type: "income",
-      status: "completed",
-      subtotal: amountNum,
-      discount: 0,
-      total: amountNum,
-      tip_amount: tipNum,
-      payment_method: method,
-      barber_id: barberId || null,
-      tenant_id: tenantId,
-      notes: notes ? `[Manual] ${notes}` : "[Manual] Registro manual de caja",
-    })
-    .select()
-    .single();
+  const txRow: Record<string, any> = {
+    type: "income",
+    status: "completed",
+    subtotal: amountNum,
+    discount: 0,
+    total: amountNum,
+    tip_amount: tipNum,
+    payment_method: method,
+    barber_id: barberId || null,
+    tenant_id: tenantId,
+    notes: notes ? `[Manual] ${notes}` : "[Manual] Registro manual de caja",
+    created_by: admin.id, // quien lo registro (el administrador que puso su PIN)
+    origin: "manual",
+  };
+  let { data: tx, error } = await supabase.from("transactions").insert(txRow).select().single();
+  if (error && /origin|created_by/i.test(error.message)) {
+    // Migraciones 090/097 aun no aplicadas: se guarda igual, sin esos datos.
+    const { created_by: _c, origin: _o, ...legacy } = txRow;
+    ({ data: tx, error } = await supabase.from("transactions").insert(legacy).select().single());
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !tx) return NextResponse.json({ error: error?.message || "No se pudo registrar" }, { status: 500 });
 
   await supabase.from("transaction_items").insert({
     transaction_id: tx.id,

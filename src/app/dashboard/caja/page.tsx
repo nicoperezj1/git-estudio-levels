@@ -760,12 +760,14 @@ export default function CajaPage() {
               const cashLike = t.payment_method === "cash" || (t.payment_method === "mixed" && Number(t.cashAmount) > 0);
               const cash = Number(t.cashAmount ?? t.total);
               const delta = !cashLike ? 0 : t.type === "income" ? (t.barberTakesCash ? 0 : cash) : -cash;
-              const originKey = t.origin === "standby" ? "standby" : t.origin === "pos" ? "pos" : "otro";
+              // Origen: lo guardado en la venta; en movimientos antiguos se deduce: egresos = Finanzas, "[Manual]" = manual.
+              const originKey = t.origin === "standby" ? "standby" : t.origin === "pos" ? "pos" : t.origin === "manual" || String(t.notes || "").startsWith("[Manual]") ? "manual"
+                : t.type === "expense" ? "finanzas" : "otro";
               rows.push({
                 key: t.id, kind: "tx", tx: t, at: new Date(t.created_at).getTime(),
                 label: t.services || t.notes || (t.type === "income" ? "Venta" : "Gasto"), amount: Number(t.total), sign: t.type === "income" ? "+" : "-",
                 method: paymentLabels[t.payment_method] || t.payment_method, by: t.issuedByName || null,
-                origin: originKey === "standby" ? "Standby" : originKey === "pos" ? "Punto de venta" : "Sin dato", originKey,
+                origin: originKey === "standby" ? "Standby" : originKey === "pos" ? "Punto de venta" : originKey === "manual" ? "Manual" : originKey === "finanzas" ? "Finanzas" : "Sin dato", originKey,
                 barber: t.barberName || null, barberId: t.barber_id || null, tip: Number(t.tip_amount || 0), cashDelta: delta,
               });
             }
@@ -795,7 +797,7 @@ export default function CajaPage() {
             const barbersWithMovements = Array.from(
               new Map(data.transactions.filter((t) => t.barberName).map((t) => [t.barber_id, t.barberName])).entries()
             ) as [string, string][];
-            const colors: Record<string, string> = { standby: "bg-indigo-50 text-indigo-700", pos: "bg-sky-50 text-sky-700", ajustes: "bg-amber-50 text-amber-700", caja: "bg-gray-100 text-gray-600", otro: "bg-gray-100 text-gray-500" };
+            const colors: Record<string, string> = { standby: "bg-indigo-50 text-indigo-700", pos: "bg-sky-50 text-sky-700", manual: "bg-violet-50 text-violet-700", finanzas: "bg-rose-50 text-rose-700", ajustes: "bg-amber-50 text-amber-700", caja: "bg-gray-100 text-gray-600", otro: "bg-gray-100 text-gray-500" };
 
             return (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
@@ -810,6 +812,8 @@ export default function CajaPage() {
                       <option value="all">Todo origen</option>
                       <option value="standby">Standby</option>
                       <option value="pos">Punto de venta</option>
+                      <option value="manual">Manual</option>
+                      <option value="finanzas">Finanzas (egresos)</option>
                       <option value="ajustes">Retiros y ajustes</option>
                     </select>
                     {barbersWithMovements.length > 0 && (
