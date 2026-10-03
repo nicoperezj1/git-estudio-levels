@@ -4,7 +4,7 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 
 ## 1. Quién es quién y cómo hablar
 - **Nico** (Nicolás, `nicoperezj1`, barberiaestudiolevels@gmail.com) es el dueño de Estudio Levels. No programa: prueba en su Mac en `localhost:3000` y decide.
-- **Pablo** (`pdencina`) es el desarrollador. Dueño del repo oficial `pdencina/barberia` (`main` = producción), de Vercel y del Supabase de producción. Corre el SQL a mano y despliega. **Nico no tiene acceso de escritura a nada de Pablo.**
+- **Pablo** (`pdencina`) es el desarrollador. Dueño del repo oficial `pdencina/barberia` (`main` = producción), de Vercel y del Supabase de producción. Corre el SQL a mano y despliega. Desde el 3 oct. Nico es **colaborador** de `pdencina/barberia` (puede subir ramas; nunca a `main`).
 - Hablarle en **español, informal, simple y corto**. Avanzar programando, no explicando. **No preguntar lo que ya está decidido** (ver el plan).
 - **Siempre pasos numerados y detallados** ("qué pego, dónde, qué debe salir"). Nico se molestó cuando mandé instrucciones sin detalle. Decir en qué ventana va cada comando.
 - Pronombres neutros si no se conocen.
@@ -25,9 +25,9 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 - Carpeta local de Nico en la Mac: **`~/barberia`**. OJO: su `origin` apunta al repo de **Pablo**, no al de Nico. Por eso siempre se usa la URL completa:
   - Traer: `git fetch https://github.com/nicoperezj1/git-estudio-levels.git claude/hopeful-mayer-jtqlh4 && git checkout -B claude/hopeful-mayer-jtqlh4 FETCH_HEAD`
   - Subir (solo si Nico lo pide o el flujo lo exige): `git push https://github.com/nicoperezj1/git-estudio-levels.git claude/hopeful-mayer-jtqlh4`
-  - Nunca subir a `pdencina/barberia` (no hay permiso; el intento fue rechazado).
+  - Entrega a Pablo: `git push https://github.com/pdencina/barberia.git claude/hopeful-mayer-jtqlh4:octubre` (rama `octubre` en su repo). **Nunca** subir a `main` de Pablo; él revisa, respalda, corre el SQL y mergea.
 - **Producción** = `pdencina/barberia` `main`. Antes de cualquier tarea grande, comparar: `git fetch https://github.com/pdencina/barberia main`. Al 3 oct. el `main` (`f7931c2`) es ancestro de la rama (0 commits de atraso), así que el merge es limpio. Si Pablo cambió algo, traerlo y mergear.
-- **Entrega a producción:** Pablo trae la rama de Nico (`git fetch <url nico> <rama>` → `git checkout -b octubre FETCH_HEAD` → push a su repo → merge a `main`). Guía para él: `entrega-produccion/LEEME-PABLO.md`. SQL: `entrega-produccion/SQL-PRODUCCION.sql` (migraciones 086–099 **sin la 096**). SQL antes que el código. Lo que se agregue a la rama después de que Pablo hizo su `fetch` hay que avisárselo.
+- **Entrega a producción:** Nico sube la rama a `pdencina/barberia` como `octubre` (comando arriba; el repo de Nico es privado y Pablo no lo ve). Pablo revisa, respalda, corre el SQL y mergea a `main`. Guía para él: `entrega-produccion/LEEME-PABLO.md`. SQL: `entrega-produccion/SQL-PRODUCCION.sql` (migraciones 086–099 **sin la 096**). SQL antes que el código. Si se agrega algo después, se vuelve a correr el mismo `git push ...:octubre` y se le avisa.
 - **Prohibido dañar producción:** 4 negocios reales, ~2.700 clientes. Nada destructivo, nada de datos de prueba hacia allá.
 
 ## 4. Entorno de pruebas
