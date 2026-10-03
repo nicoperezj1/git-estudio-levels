@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { Spinner } from "@/components/ui/spinner";
+import { useLedgerEnabled } from "@/components/finance/professional-ledger-view";
 
 interface Product {
   id: string;
@@ -15,6 +16,8 @@ interface Product {
   price: number;
   stock: number;
   min_stock: number;
+  sales_commission_type?: "percent" | "fixed" | null;
+  sales_commission_value?: number | null;
 }
 
 interface Movement {
@@ -40,7 +43,7 @@ export default function InventarioPage() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [productForm, setProductForm] = useState({
-    name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "",
+    name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false,
   });
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [movementForm, setMovementForm] = useState({
@@ -51,6 +54,8 @@ export default function InventarioPage() {
   const { showToast } = useToast();
   const { tenant, loading: tenantLoading } = useTenant();
   const { effectiveRole } = useAuth();
+  // La comision por venta solo se muestra si el negocio usa el libro de movimientos (Configuracion).
+  const ledgerOn = !!useLedgerEnabled();
 
   // Receptionist: inventory is read-only. Any change (create/edit/delete product,
   // register movement) must be unlocked with the admin PIN first. An admin/owner sees
@@ -143,6 +148,10 @@ export default function InventarioPage() {
       stock: parseInt(productForm.stock),
       min_stock: parseInt(productForm.min_stock),
       tenantId: activeTenantId || undefined,
+      // Comision por venta: solo se manda si se eligio una, o para borrar una que ya tenia.
+      ...(productForm.comType
+        ? { sales_commission_type: productForm.comType, sales_commission_value: parseFloat(productForm.comValue) || 0 }
+        : productForm.hadCom ? { sales_commission_type: null, sales_commission_value: 0 } : {}),
     };
 
     if (editingProductId) {
@@ -172,7 +181,7 @@ export default function InventarioPage() {
     }
     setShowProductModal(false);
     setEditingProductId(null);
-    setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "" });
+    setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false });
     fetchData();
   };
 
@@ -217,7 +226,7 @@ export default function InventarioPage() {
             Registrar Movimiento
           </button>
           <button
-            onClick={() => guard(() => { setEditingProductId(null); setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "" }); setShowProductModal(true); })}
+            onClick={() => guard(() => { setEditingProductId(null); setProductForm({ name: "", sku: "", barcode: "", cost: "", price: "", stock: "", min_stock: "", comType: "", comValue: "", hadCom: false }); setShowProductModal(true); })}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
           >
             Nuevo Producto
@@ -278,7 +287,7 @@ export default function InventarioPage() {
                 <td className="p-4 text-center">
                   <div className="flex gap-1 justify-center">
                     <button onClick={() => guard(() => {
-                      setProductForm({ name: p.name, sku: p.sku || "", barcode: (p as any).barcode || "", cost: String(p.cost), price: String(p.price), stock: String(p.stock), min_stock: String(p.min_stock) });
+                      setProductForm({ name: p.name, sku: p.sku || "", barcode: (p as any).barcode || "", cost: String(p.cost), price: String(p.price), stock: String(p.stock), min_stock: String(p.min_stock), comType: p.sales_commission_type || "", comValue: p.sales_commission_value ? String(Number(p.sales_commission_value)) : "", hadCom: !!p.sales_commission_type });
                       setEditingProductId(p.id);
                       setShowProductModal(true);
                     })} className="px-3 py-1 text-xs border rounded-lg hover:bg-gray-100">
@@ -476,6 +485,24 @@ export default function InventarioPage() {
                     className="w-full border rounded-lg px-3 py-2" />
                 </div>
               </div>
+              {ledgerOn && (
+                <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Comisión por venta</label>
+                  <p className="mb-2 text-xs text-gray-500">Lo que gana el profesional que vende este producto. Es la misma para todo el negocio.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={productForm.comType} onChange={(e) => setProductForm({ ...productForm, comType: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="">Sin comisión</option>
+                      <option value="percent">% del precio</option>
+                      <option value="fixed">Monto fijo por unidad</option>
+                    </select>
+                    <input type="number" min="0" step={productForm.comType === "percent" ? "0.5" : "1"} disabled={!productForm.comType}
+                      value={productForm.comValue} onChange={(e) => setProductForm({ ...productForm, comValue: e.target.value })}
+                      placeholder={productForm.comType === "percent" ? "Ej: 10 (%)" : "Ej: 1000 ($)"}
+                      className="w-full border rounded-lg px-3 py-2 text-sm disabled:opacity-50" />
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => setShowProductModal(false)}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>

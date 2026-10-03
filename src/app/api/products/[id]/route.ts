@@ -27,12 +27,18 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("products")
     .update(body)
     .eq("id", params.id)
     .select()
     .single();
+
+  // "Comision por venta" es una columna nueva (migracion 091): si aun no existe, no se pierde el resto de los cambios.
+  if (error && /sales_commission/.test(error.message)) {
+    const { sales_commission_type: _t, sales_commission_value: _v, ...rest } = body;
+    ({ data, error } = await supabase.from("products").update(rest).eq("id", params.id).select().single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

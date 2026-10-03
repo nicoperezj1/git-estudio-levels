@@ -55,11 +55,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
+  // "Comision por venta" (migracion 091): solo si viene bien formada; si la columna aun no existe, se guarda el
+  // producto igual, sin ella.
+  const comType = body.sales_commission_type === "percent" || body.sales_commission_type === "fixed" ? body.sales_commission_type : null;
+  const comValue = Math.max(0, Number(body.sales_commission_value) || 0);
+  const base: Record<string, any> = { name, description, sku, price, cost, stock, min_stock: min_stock || 5, tenant_id: resolvedTenantId };
+  let { data, error } = await supabase
     .from("products")
-    .insert({ name, description, sku, price, cost, stock, min_stock: min_stock || 5, tenant_id: resolvedTenantId })
+    .insert(comType ? { ...base, sales_commission_type: comType, sales_commission_value: comValue } : base)
     .select()
     .single();
+  if (error && comType && /sales_commission/.test(error.message)) {
+    ({ data, error } = await supabase.from("products").insert(base).select().single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
