@@ -123,11 +123,11 @@ export async function POST(req: NextRequest) {
   // Award loyalty points if client is attached
   if (clientId && total > 0) {
     try {
-      const { data: config } = await supabase
-        .from("loyalty_config")
-        .select("points_per_clp")
-        .eq("active", true)
-        .single();
+      // Cada negocio tiene su propia regla de puntos: se usa la del negocio de esta venta,
+      // no una cualquiera (igual que en /api/loyalty/earn).
+      let configQuery = supabase.from("loyalty_config").select("points_per_clp").eq("active", true);
+      if (tenantId) configQuery = configQuery.eq("tenant_id", tenantId);
+      const { data: config } = await configQuery.maybeSingle();
 
       const pointsPerClp = config?.points_per_clp || 1000;
       const pointsEarned = Math.floor(total / pointsPerClp);
