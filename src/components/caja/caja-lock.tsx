@@ -8,8 +8,21 @@ import { useTenant } from "@/lib/tenant-context";
 // el bloqueo vive en este navegador y se enciende con el PIN, que se valida en el servidor.
 export const cajaLockKey = (tenantId?: string | null) => `caja_off_${tenantId || "x"}`;
 
-export function CajaLockGate({ children }: { children: (lock: () => void) => ReactNode }) {
+// ¿El negocio activo el bloqueo? (Configuracion > Caja y Standby). null = todavia cargando.
+export function useCajaLockEnabled(): boolean | null {
   const { tenant, loading } = useTenant();
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    fetch(`/api/settings/caja-seguridad${tenant?.id ? `?tenantId=${tenant.id}` : ""}`)
+      .then((r) => r.json()).then((d) => setOn(!!d?.cajaLock)).catch(() => setOn(false));
+  }, [loading, tenant?.id]);
+  return on;
+}
+
+export function CajaLockGate({ children }: { children: (lock: (() => void) | undefined) => ReactNode }) {
+  const { tenant, loading } = useTenant();
+  const enabled = useCajaLockEnabled();
   const key = cajaLockKey(tenant?.id);
   const [ready, setReady] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -37,7 +50,9 @@ export function CajaLockGate({ children }: { children: (lock: () => void) => Rea
     } finally { setBusy(false); }
   };
 
-  if (!ready) return null;
+  if (!ready || enabled === null) return null;
+  // Si el negocio no usa el bloqueo, todo funciona como siempre (y se ignora cualquier bloqueo viejo).
+  if (!enabled) return <>{children(undefined)}</>;
   if (locked) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">

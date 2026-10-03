@@ -6,7 +6,8 @@ Probar SOLO en `rebooking-pruebas`. Antes de cada SQL: respaldo (en pruebas no h
 ## Orden de los SQL (todos aditivos y re-ejecutables, cada uno termina con una consulta de verificación)
 1. `093_cupos_por_bloque.sql` (ya corrida en pruebas)
 2. `094_standby_caja.sql` — debe devolver 3 filas
-   `097_ajustes_caja.sql` — debe devolver 1 fila (control de efectivo del Standby)
+   `097_ajustes_caja.sql` — debe devolver 1 fila (control de efectivo del Standby; volver a correrla si se corrió antes del 3 oct. 9:45)
+   `098_caja_bloqueo.sql` — debe devolver 1 fila (interruptor Apagar caja con PIN)
 3. `095_mi_negocio_reservas.sql` — debe devolver 2 filas
 4. `096_remuneraciones.sql` — debe devolver 3 filas
 

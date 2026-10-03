@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
 import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
+import { useCajaLockEnabled } from "@/components/caja/caja-lock";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 
@@ -111,6 +112,7 @@ export default function CajaPage() {
   // Apagar caja (Fase 5): oculta montos y acciones; se enciende con el PIN de la recepcionista. Es
   // distinto de cerrar la caja del dia. El bloqueo vive en este navegador.
   const lockKey = `caja_off_${tenant?.id || "x"}`;
+  const lockEnabled = useCajaLockEnabled(); // solo si el administrador lo activo en Configuracion
   const [lockReady, setLockReady] = useState(false);
   const [locked, setLocked] = useState(false);
   const [unlockPin, setUnlockPin] = useState("");
@@ -461,9 +463,9 @@ export default function CajaPage() {
     }
   };
 
-  if (loading || !lockReady) return <Spinner />;
+  if (loading || !lockReady || lockEnabled === null) return <Spinner />;
 
-  if (locked) {
+  if (lockEnabled && locked) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
         <div className="w-full max-w-xs text-center">
@@ -497,10 +499,12 @@ export default function CajaPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Caja Diaria</h1>
           <p className="text-gray-500 text-sm">{isToday ? todayLabel : selectedDateLabel}</p>
         </div>
-        <button type="button" onClick={lockCaja}
-          className="px-3 py-2 rounded-lg text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
-          🔒 Apagar caja
-        </button>
+        {lockEnabled && (
+          <button type="button" onClick={lockCaja}
+            className="px-3 py-2 rounded-lg text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+            🔒 Apagar caja
+          </button>
+        )}
         {/* Punto Nico (25-sep): ver e historiar dias anteriores, solo Administrador. */}
         {isAdmin && (
           <div className="flex flex-wrap items-center gap-2">

@@ -8,13 +8,15 @@ export async function GET(req: NextRequest) {
   const { tenantId } = await resolveTenantForRequest(new URL(req.url).searchParams.get("tenantId"));
   if (!tenantId || tenantId === "ALL") return NextResponse.json({ standbyV2: false, cashCap: null });
   const supabase = createAdminSupabase();
-  const { data, error } = await supabase.from("tenants").select("standby_v2_enabled, cash_cap").eq("id", tenantId).maybeSingle();
+  // cajaLock viene de la migracion 098: si aun no existe, se lee lo demas sin ella (el bloqueo queda apagado).
+  let { data, error } = await supabase.from("tenants").select("standby_v2_enabled, cash_cap, caja_lock_enabled").eq("id", tenantId).maybeSingle();
+  if (error) ({ data, error } = (await supabase.from("tenants").select("standby_v2_enabled, cash_cap").eq("id", tenantId).maybeSingle()) as any);
   if (error) {
     const missing = /column .* does not exist|schema cache/i.test(error.message);
-    return NextResponse.json({ standbyV2: false, cashCap: null, migrationMissing: missing });
+    return NextResponse.json({ standbyV2: false, cashCap: null, cajaLock: false, migrationMissing: missing });
   }
   const cap = Number((data as any)?.cash_cap);
-  return NextResponse.json({ standbyV2: !!(data as any)?.standby_v2_enabled, cashCap: Number.isFinite(cap) && cap > 0 ? cap : null });
+  return NextResponse.json({ standbyV2: !!(data as any)?.standby_v2_enabled, cashCap: Number.isFinite(cap) && cap > 0 ? cap : null, cajaLock: !!(data as any)?.caja_lock_enabled });
 }
 
 export async function POST(req: NextRequest) {
@@ -28,6 +30,7 @@ export async function POST(req: NextRequest) {
 
   const update: Record<string, any> = {};
   if (typeof body.standbyV2 === "boolean") update.standby_v2_enabled = body.standbyV2;
+  if (typeof body.cajaLock === "boolean") update.caja_lock_enabled = body.cajaLock;
   if ("cashCap" in body) {
     if (body.cashCap === null || body.cashCap === "") update.cash_cap = null;
     else {
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from("tenants").update(update).eq("id", tenantId);
   if (error) {
     const missing = /column .* does not exist|schema cache/i.test(error.message);
-    return NextResponse.json({ error: missing ? "Falta aplicar la migración 094 en la base de datos." : error.message }, { status: 500 });
+    return NextResponse.json({ error: missing ? `Falta aplicar la migración ${"caja_lock_enabled" in update ? "098" : "094"} en la base de datos.` : error.message }, { status: 500 });
   }
   return NextResponse.json({ success: true });
 }

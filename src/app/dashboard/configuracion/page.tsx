@@ -123,17 +123,17 @@ export default function ConfiguracionPage() {
   };
 
   // Caja y Standby (Fase 5): Standby nuevo (apagado por defecto) y tope de efectivo antes de pedir una reduccion.
-  const [cajaSec, setCajaSec] = useState<{ standbyV2: boolean; cashCap: number | null; migrationMissing?: boolean } | null>(null);
+  const [cajaSec, setCajaSec] = useState<{ standbyV2: boolean; cashCap: number | null; cajaLock?: boolean; migrationMissing?: boolean } | null>(null);
   const [capInput, setCapInput] = useState("");
   const [savingCajaSec, setSavingCajaSec] = useState(false);
   useEffect(() => {
     if (!tenantId) return;
     fetch(`/api/settings/caja-seguridad?tenantId=${tenantId}`)
       .then((r) => r.json())
-      .then((d) => { setCajaSec({ standbyV2: !!d?.standbyV2, cashCap: d?.cashCap ?? null, migrationMissing: !!d?.migrationMissing }); setCapInput(d?.cashCap ? String(d.cashCap) : ""); })
+      .then((d) => { setCajaSec({ standbyV2: !!d?.standbyV2, cashCap: d?.cashCap ?? null, cajaLock: !!d?.cajaLock, migrationMissing: !!d?.migrationMissing }); setCapInput(d?.cashCap ? String(d.cashCap) : ""); })
       .catch(() => setCajaSec(null));
   }, [tenantId]);
-  const saveCajaSec = async (patch: { standbyV2?: boolean; cashCap?: number | null }, okMsg: string) => {
+  const saveCajaSec = async (patch: { standbyV2?: boolean; cashCap?: number | null; cajaLock?: boolean }, okMsg: string) => {
     if (!tenantId || savingCajaSec) return;
     setSavingCajaSec(true);
     try {
@@ -1010,6 +1010,15 @@ export default function ConfiguracionPage() {
             <span>
               <span className="block text-sm font-medium text-brand-dark">Standby nuevo</span>
               <span className="block text-xs text-brand-gray">Saluda al profesional y le muestra sus servicios y los productos de venta. Si lo apagas, vuelve el Standby de siempre.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" checked={!!cajaSec.cajaLock} disabled={savingCajaSec}
+              onChange={(e) => saveCajaSec({ cajaLock: e.target.checked }, e.target.checked ? "Apagar caja con PIN activado" : "Apagar caja con PIN desactivado")}
+              className="mt-1 h-4 w-4 rounded border-gray-300" />
+            <span>
+              <span className="block text-sm font-medium text-brand-dark">Apagar y encender la caja con PIN</span>
+              <span className="block text-xs text-brand-gray">La Caja y el Punto de Venta se pueden apagar (se oculta todo) y solo se encienden con el PIN de recepción o del administrador. Si lo desactivas, no aparece el botón "Apagar caja".</span>
             </span>
           </label>
           <div>
