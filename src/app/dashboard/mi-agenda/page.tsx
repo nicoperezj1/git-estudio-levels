@@ -101,7 +101,12 @@ export default function MiAgendaPage() {
     const t = getActiveTenantId();
     const q = t ? `?tenantId=${t}` : "";
     fetch(`/api/barberos${q}`).then((r) => r.json()).then((data) => {
-      const list = Array.isArray(data) ? data : [];
+      let list = Array.isArray(data) ? data : [];
+      // Un administrador que tambien atiende clientes sale PRIMERO y ya seleccionado, para
+      // ver su propia agenda sin tener que buscarse en la lista.
+      const me = user?.id ? list.find((b: Barber & { also_attends_clients?: boolean }) => b.id === user.id) : null;
+      const attendsClients = !!me && (me.role === "barber" || !!(me as any).also_attends_clients);
+      if (me && attendsClients) list = [me, ...list.filter((b: Barber) => b.id !== me.id)];
       setBarbers(list);
       if (user?.role === "barber" && user?.id) {
         setSelectedBarber(user.id);
