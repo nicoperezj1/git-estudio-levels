@@ -423,6 +423,8 @@ export default function ClientesPage() {
                   <option value="walk_in">Pasó por fuera</option>
                   <option value="instagram">Instagram</option>
                   <option value="tiktok">TikTok</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="referral">Referido de un amigo/conocido</option>
                   <option value="google_maps">Google Maps</option>
                   <option value="promotion">Promoción</option>
                   <option value="influencer">Influencer</option>

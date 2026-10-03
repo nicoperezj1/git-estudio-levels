@@ -22,6 +22,8 @@ const SOURCE_LABELS: Record<string, string> = {
   walk_in: "Pasó por fuera",
   instagram: "Instagram",
   tiktok: "TikTok",
+  facebook: "Facebook",
+  referral: "Referido de un amigo/conocido",
   google_maps: "Google Maps",
   promotion: "Promoción",
   influencer: "Influencer",
@@ -31,6 +33,7 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const EMPTY_SOURCE_BUCKETS = () => ({
   link: [] as any[], walk_in: [] as any[], instagram: [] as any[], tiktok: [] as any[],
+  facebook: [] as any[], referral: [] as any[],
   google_maps: [] as any[], promotion: [] as any[], influencer: [] as any[],
   manual: [] as any[], unknown: [] as any[],
 });

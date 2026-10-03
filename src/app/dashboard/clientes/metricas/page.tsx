@@ -34,6 +34,8 @@ const SOURCE_COLORS: Record<string, { bg: string; text: string; bar: string; dot
   walk_in: { bg: "bg-teal-50", text: "text-teal-700", bar: "bg-teal-400", dot: "bg-teal-400" },
   instagram: { bg: "bg-pink-50", text: "text-pink-700", bar: "bg-pink-400", dot: "bg-pink-400" },
   tiktok: { bg: "bg-slate-50", text: "text-slate-700", bar: "bg-slate-500", dot: "bg-slate-500" },
+  facebook: { bg: "bg-indigo-50", text: "text-indigo-700", bar: "bg-indigo-400", dot: "bg-indigo-400" },
+  referral: { bg: "bg-amber-50", text: "text-amber-700", bar: "bg-amber-400", dot: "bg-amber-400" },
   google_maps: { bg: "bg-green-50", text: "text-green-700", bar: "bg-green-400", dot: "bg-green-400" },
   promotion: { bg: "bg-orange-50", text: "text-orange-700", bar: "bg-orange-400", dot: "bg-orange-400" },
   influencer: { bg: "bg-fuchsia-50", text: "text-fuchsia-700", bar: "bg-fuchsia-400", dot: "bg-fuchsia-400" },

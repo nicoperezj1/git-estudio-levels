@@ -31,6 +31,7 @@ const esc = (v: any) =>
 
 const SOURCE_LABELS: Record<string, string> = {
   link: "Reserva por link", walk_in: "Pasó por fuera", instagram: "Instagram", tiktok: "TikTok",
+  facebook: "Facebook", referral: "Referido de un amigo/conocido",
   google_maps: "Google Maps", promotion: "Promoción", influencer: "Influencer",
   manual: "Agendado manualmente", unknown: "Sin registrar",
 };

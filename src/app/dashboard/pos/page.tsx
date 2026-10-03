@@ -81,6 +81,7 @@ export default function POSPage() {
   const [addingClient, setAddingClient] = useState(false);
   const [newClientPhone, setNewClientPhone] = useState("");
   const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientSource, setNewClientSource] = useState("walk_in");
   const [savingClient, setSavingClient] = useState(false);
   const [clientPoints, setClientPoints] = useState(0);
   const [redeemedPoints, setRedeemedPoints] = useState(0);
@@ -836,7 +837,7 @@ export default function POSPage() {
                     const res = await fetch("/api/clients", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ name: typed, phone: newClientPhone.trim(), email: newClientEmail.trim(), source: "walk_in", ...(t ? { tenantId: t } : {}) }),
+                      body: JSON.stringify({ name: typed, phone: newClientPhone.trim(), email: newClientEmail.trim(), source: newClientSource, ...(t ? { tenantId: t } : {}) }),
                     });
                     const created = await res.json();
                     if (!res.ok || !created?.id) {
@@ -849,6 +850,7 @@ export default function POSPage() {
                       setAddingClient(false);
                       setNewClientPhone("");
                       setNewClientEmail("");
+                      setNewClientSource("walk_in");
                       showToast(`Cliente "${created.name}" agregado`, "success");
                     }
                   } finally {
@@ -891,6 +893,21 @@ export default function POSPage() {
                             placeholder="Correo *"
                             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
                           />
+                          <select
+                            value={newClientSource}
+                            onChange={(e) => setNewClientSource(e.target.value)}
+                            aria-label="¿Cómo nos conoció?"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+                          >
+                            <option value="walk_in">¿Cómo nos conoció? · Pasó por fuera</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="tiktok">TikTok</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="referral">Referido de un amigo/conocido</option>
+                            <option value="google_maps">Google Maps</option>
+                            <option value="promotion">Promoción</option>
+                            <option value="influencer">Influencer</option>
+                          </select>
                           <div className="flex gap-2">
                             <button onClick={addClient} disabled={savingClient || !formOk}
                               className="flex-1 px-3 py-1.5 bg-brand-blue text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">

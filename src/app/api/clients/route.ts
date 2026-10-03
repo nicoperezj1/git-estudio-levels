@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   // "Normal"/"Promocion" — la recepcion siempre pregunta de donde viene el cliente.
   // "walk_in" (Paso por fuera) es el default cuando no se elige nada. "promotion" e
   // "influencer" aceptan un detalle opcional (codigo de descuento / @handle).
-  const VALID_SOURCES = ["instagram", "tiktok", "google_maps", "promotion", "walk_in", "influencer"];
+  const VALID_SOURCES = ["instagram", "tiktok", "facebook", "google_maps", "promotion", "walk_in", "influencer", "referral"];
   const acquisitionSource = VALID_SOURCES.includes(source) ? source : "walk_in";
   const acquisitionDetail = (source === "promotion" || source === "influencer") ? (sourceDetail || null) : null;
 
