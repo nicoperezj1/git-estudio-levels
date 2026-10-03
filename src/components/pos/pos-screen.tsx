@@ -51,7 +51,9 @@ function Monogram({ name, tone, size = 40 }: { name: string; tone: "teal" | "amb
 interface Client {
   id: string;
   name: string;
-  phone?: string;
+  phone?: string | null;
+  email?: string | null;
+  created_at?: string;
 }
 
 interface Barber {
@@ -922,7 +924,13 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
                         setClientPoints(data?.client?.loyalty_points || data?.loyalty_points || 0);
                       }}
                         className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100">
-                        {c.name} {c.phone ? `· ${c.phone}` : ""}
+                        {/* Nombre + celular + correo: asi se distinguen dos clientes con el mismo nombre. */}
+                        <span className="block font-semibold text-gray-800">{c.name}</span>
+                        <span className="block text-[11px] text-gray-500">
+                          {c.phone ? c.phone : <span className="text-amber-600">Sin celular</span>}
+                          {c.email ? ` · ${c.email}` : ""}
+                          {c.created_at ? ` · desde ${new Date(c.created_at).toLocaleDateString("es-CL", { month: "short", year: "numeric" })}` : ""}
+                        </span>
                       </button>
                     ))}
                     {!exactMatch && (
@@ -988,6 +996,15 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
           </div>
 
           {/* Loyalty points - compact */}
+          {selectedClient && (() => {
+            const sc = clients.find((c) => c.id === selectedClient);
+            if (!sc) return null;
+            return (
+              <p className="text-[11px] text-gray-500">
+                {sc.phone || <span className="text-amber-600">Sin celular</span>}{sc.email ? ` · ${sc.email}` : ""}
+              </p>
+            );
+          })()}
           {selectedClient && clientPoints > 0 && (
             <div className="flex items-center justify-between rounded-xl border border-amber-400/25 bg-gradient-to-r from-amber-400/15 to-transparent px-3 py-2">
               <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600"><Star className="h-3.5 w-3.5" fill="currentColor" />{clientPoints - redeemedPoints} pts</span>

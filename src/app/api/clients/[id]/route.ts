@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 
 export async function GET(
   req: NextRequest,
@@ -92,4 +92,49 @@ export async function GET(
     appointments: (appointments || []).slice(0, 20),
     transactions: (transactions || []).slice(0, 20),
   });
+}
+
+// PATCH: editar los datos de un cliente (nombre, celular, correo, notas, etiquetas).
+// Antes esta ruta no tenia PATCH: la pantalla de Clientes no podia guardar nada.
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const supabase = createAdminSupabase();
+  const { data: existing } = await supabase.from("clients").select("id, tenant_id").eq("id", params.id).maybeSingle();
+  if (!existing) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  // Solo clientes de su propio negocio (el super_admin puede con cualquiera).
+  if (role !== "super_admin" && existing.tenant_id !== tenantId) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => ({} as any));
+  const update: Record<string, any> = {};
+
+  if (body.name !== undefined) {
+    const name = String(body.name || "").trim();
+    if (!name) return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
+    update.name = name;
+  }
+  if (body.phone !== undefined) {
+    const phone = String(body.phone || "").trim();
+    if (phone && phone.replace(/\D/g, "").length < 8) return NextResponse.json({ error: "El celular no es válido" }, { status: 400 });
+    update.phone = phone || null;
+  }
+  if (body.email !== undefined) {
+    const email = String(body.email || "").trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "El correo no es válido" }, { status: 400 });
+    update.email = email || null;
+  }
+  if (body.notes !== undefined) update.notes = body.notes ? String(body.notes) : null;
+  if (Array.isArray(body.personality_tags)) update.personality_tags = body.personality_tags.map((t: any) => String(t)).slice(0, 30);
+
+  if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+
+  const { data, error } = await supabase.from("clients").update(update).eq("id", params.id).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, client: data });
 }

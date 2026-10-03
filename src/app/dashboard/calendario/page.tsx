@@ -15,7 +15,7 @@ import { useBackToClose } from "@/lib/use-back-to-close";
 
 interface Barber { id: string; name: string; role?: string; also_attends_clients?: boolean; }
 interface Service { id: string; name: string; price: number; duration: number; }
-interface Client { id: string; name: string; }
+interface Client { id: string; name: string; phone?: string | null; email?: string | null; }
 
 interface Appointment {
   id: string;
@@ -751,6 +751,12 @@ export default function CalendarioPage() {
 
     if (popupTab === "service") {
       if (!selectedService) { showToast("Selecciona un servicio", "error"); setCreating(false); return; }
+      // Escribiste un nombre pero no elegiste ni añadiste al cliente: antes la cita quedaba sin cliente.
+      if (clientSearch.trim().length >= 2 && !selectedClient) {
+        showToast("Elige al cliente de la lista o toca \"Añadir como cliente nuevo\" antes de crear la cita", "error");
+        setCreating(false);
+        return;
+      }
       
       const startISO = `${day}T${popupData.startTime}:00`;
       const endISO = `${day}T${popupData.endTime}:00`;
@@ -921,7 +927,7 @@ export default function CalendarioPage() {
         setSelectedClient(data.id);
         setClientSearch(data.name);
         setFilteredClients([]);
-        showToast("Cliente creado", "success");
+        showToast("Cliente guardado. Ahora toca \"Crear\" para agendar la cita", "success");
       } else {
         showToast(data.error || "Error al crear cliente", "error");
       }
@@ -1920,11 +1926,15 @@ export default function CalendarioPage() {
                       onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(""); searchClients(e.target.value); }}
                       placeholder="Buscar cliente..."
                       className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+                    {selectedClient && <p className="mt-1 text-xs font-medium text-emerald-600">✓ Cliente listo. Toca "Crear" para guardar la cita.</p>}
                     {clientSearch.length >= 2 && !selectedClient && (
                       <div className="absolute z-10 w-full mt-1 bg-white border rounded-xl shadow-lg max-h-40 overflow-y-auto">
                         {filteredClients.map((c) => (
                           <button key={c.id} onClick={() => { setSelectedClient(c.id); setClientSearch(c.name); }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50">{c.name}</button>
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50">
+                            <span className="block font-medium text-gray-800">{c.name}</span>
+                            <span className="block text-[11px] text-gray-500">{c.phone || "Sin celular"}{c.email ? ` · ${c.email}` : ""}</span>
+                          </button>
                         ))}
                         {/* Create the client right here instead of leaving the calendar. */}
                         {showNewClientForm ? (

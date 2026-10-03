@@ -91,6 +91,40 @@ export default function ClienteDetailPage() {
   const [documents, setDocuments] = useState<Array<{ id: string; file_name: string; size_bytes: number | null; created_at: string; uploaded_by_name: string | null; url: string | null }>>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [docError, setDocError] = useState("");
+  // Editar datos del cliente (nombre, celular, correo, notas)
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", notes: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  const openEdit = () => {
+    if (!data) return;
+    const c = data.client;
+    setEditForm({ name: c.name || "", phone: c.phone || "", email: c.email || "", notes: c.notes || "" });
+    setEditError("");
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!data) return;
+    if (!editForm.name.trim()) { setEditError("El nombre es obligatorio"); return; }
+    setSavingEdit(true);
+    setEditError("");
+    try {
+      const res = await fetch(`/api/clients/${params.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) { setEditError(r?.error || "No se pudo guardar"); return; }
+      setData({ ...data, client: { ...data.client, ...r.client } });
+      setEditing(false);
+    } catch {
+      setEditError("No se pudo guardar. Revisa tu conexión.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const loadDocuments = async () => {
     try {
@@ -276,6 +310,9 @@ export default function ClienteDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button onClick={openEdit} className={ghostButton}>
+              <StickyNote className="h-4 w-4" strokeWidth={2} /> Editar datos
+            </button>
             <button onClick={() => router.push("/dashboard/calendario")} className={primaryButton}>
               <CalendarPlus className="h-4 w-4" strokeWidth={2} /> Agendar
             </button>
@@ -296,6 +333,31 @@ export default function ClienteDetailPage() {
           <p className="relative mt-4 rounded-2xl bg-brand-light px-4 py-3 text-sm text-brand-dark">{client.notes}</p>
         )}
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(false)}>
+          <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-brand-dark">Editar datos del cliente</h3>
+            <label className="block text-xs font-medium text-brand-gray">Nombre
+              <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className={`${inputClass} mt-1 w-full`} />
+            </label>
+            <label className="block text-xs font-medium text-brand-gray">Celular
+              <input type="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className={`${inputClass} mt-1 w-full`} />
+            </label>
+            <label className="block text-xs font-medium text-brand-gray">Correo
+              <input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className={`${inputClass} mt-1 w-full`} />
+            </label>
+            <label className="block text-xs font-medium text-brand-gray">Notas
+              <textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} className={`${inputClass} mt-1 w-full resize-y`} />
+            </label>
+            {editError && <p className="text-xs text-red-500">{editError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setEditing(false)} className={ghostButton}>Cancelar</button>
+              <button onClick={saveEdit} disabled={savingEdit} className={primaryButton}>{savingEdit ? "Guardando…" : "Guardar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Metricas */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
