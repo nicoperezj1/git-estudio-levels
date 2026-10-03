@@ -145,6 +145,8 @@ export default function CajaPage() {
       }
       if (!res.ok) throw new Error(d.error || "No se pudo aprobar");
       showToast(`Descuento por planilla aprobado (${formatCurrency(d.total)})`, "success");
+      if (d.movementSaved === false) showToast(`El stock bajó, pero no se pudo anotar el movimiento de inventario: ${d.movementError || "error"}`, "error");
+      if (d.ledgerSaved === false) showToast(`No se pudo anotar en el libro del profesional: ${d.ledgerError || "error"}`, "error");
       setPlanillaCode(""); loadPlanilla();
     } catch (e: any) {
       showToast(e?.message || "No se pudo aprobar", "error");

@@ -38,15 +38,25 @@ export async function POST(req: NextRequest) {
   if (!claimed || claimed.length === 0) return NextResponse.json({ error: "Código no encontrado o ya usado." }, { status: 409 });
 
   await supabase.from("products").update({ stock: Number(prod.stock) - d.quantity }).eq("id", prod.id);
-  await supabase.from("inventory_movements").insert({
-    product_id: prod.id, type: "out_use", quantity: d.quantity, barber_id: d.barber_id, tenant_id: tenantId,
+  // Movimiento de inventario (salida por uso). Se revisa el resultado: antes un fallo aqui pasaba sin avisar.
+  const movement = {
+    product_id: prod.id, type: "out_use", quantity: d.quantity, barber_id: d.barber_id, tenant_id: tenantId, status: "approved",
     notes: `Descuento por planilla - ${d.barber_name} (${code})`,
-  });
+  };
+  let movErr = (await supabase.from("inventory_movements").insert(movement)).error;
+  if (movErr) {
+    console.error("planilla: no se pudo registrar el movimiento de inventario:", movErr.message);
+    // Reintento sin las columnas opcionales por si alguna no existe en esta base.
+    const { barber_id, status, ...basic } = movement as any;
+    movErr = (await supabase.from("inventory_movements").insert(basic)).error;
+    if (movErr) console.error("planilla: reintento del movimiento tambien fallo:", movErr.message);
+  }
   const month = `${todayInChile().slice(0, 7)}-01`;
   const { error: ledgerErr } = await supabase.from("professional_ledger").insert({
     tenant_id: tenantId, barber_id: d.barber_id, month, kind: "payroll_discount", amount: Number(d.total), effect: -1,
     reason: `Planilla: ${d.product_name} x${d.quantity} (código ${code})`,
     created_by: userId, created_by_name: me?.name || null,
   });
-  return NextResponse.json({ success: true, total: Number(d.total), ledgerSaved: !ledgerErr });
+  if (ledgerErr) console.error("planilla: no se pudo anotar en el libro del profesional:", ledgerErr.message);
+  return NextResponse.json({ success: true, total: Number(d.total), ledgerSaved: !ledgerErr, movementSaved: !movErr, movementError: movErr?.message || null, ledgerError: ledgerErr?.message || null });
 }
