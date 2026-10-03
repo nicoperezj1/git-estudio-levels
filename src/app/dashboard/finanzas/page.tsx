@@ -70,6 +70,12 @@ const emptyFormData = {
   accountingMonth: "", // "" = el mes de hoy
 };
 
+// Tabla compacta: celdas mas angostas y texto un punto mas chico para que las 9 columnas entren sin scroll.
+const thc = "whitespace-nowrap px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-gray";
+const thcR = "whitespace-nowrap px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-gray";
+const tdc = "px-3 py-2.5 text-[13px] text-brand-dark";
+const tdcR = "px-3 py-2.5 text-right text-[13px] font-semibold tabular-nums";
+
 const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const CL_TZ = "America/Santiago";
 // Mes (YYYY-MM) de un instante, en hora de Chile.
@@ -388,15 +394,15 @@ export default function FinanzasPage() {
           <table className={ts.table}>
             <thead className={ts.thead}>
               <tr>
-                <th className={ts.th}>Hora</th>
-                <th className={ts.th}>Fecha</th>
-                <th className={ts.th}>Tipo</th>
-                <th className={ts.th}>Descripción</th>
-                <th className={ts.th}>Profesional / Corresponde a</th>
-                <th className={ts.th}>Emitido por</th>
-                <th className={ts.th}>Cliente</th>
-                <th className={ts.th}>Método de pago</th>
-                <th className={ts.thRight}>Monto</th>
+                <th className={thc}>Hora</th>
+                <th className={thc}>Fecha</th>
+                <th className={thc}>Tipo</th>
+                <th className={thc}>Descripción</th>
+                <th className={thc}>Profesional / Corresponde a</th>
+                <th className={thc}>Emitido por</th>
+                <th className={thc}>Cliente</th>
+                <th className={thc}>Método de pago</th>
+                <th className={thcR}>Monto</th>
                 {isAdmin && <th className="w-10 px-3 py-3"></th>}
               </tr>
             </thead>
@@ -412,15 +418,15 @@ export default function FinanzasPage() {
               ) : (
                 transactions.map((t) => (
                   <tr key={t.id} className={ts.tr}>
-                    <td className={`${ts.td} whitespace-nowrap tabular-nums text-brand-gray`}>{new Date(t.created_at).toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" })}</td>
-                    <td className={`${ts.td} whitespace-nowrap tabular-nums text-brand-gray`}>
+                    <td className={`${tdc} whitespace-nowrap tabular-nums text-brand-gray`}>{new Date(t.created_at).toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" })}</td>
+                    <td className={`${tdc} whitespace-nowrap tabular-nums text-brand-gray`}>
                       {new Date(t.created_at).toLocaleDateString("es-CL", { timeZone: CL_TZ })}
                       {/* Si corresponde a otro mes que el de su registro, se avisa (ej. egreso de septiembre cargado en octubre). */}
                       {t.accounting_month && t.accounting_month.slice(0, 7) !== monthOf(t.created_at) && (
                         <span className="mt-0.5 block text-[10px] font-semibold text-amber-600">Corresponde a {monthLabel(t.accounting_month.slice(0, 7))}</span>
                       )}
                     </td>
-                    <td className={ts.td}>
+                    <td className={tdc}>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                           t.type === "income" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
@@ -430,16 +436,16 @@ export default function FinanzasPage() {
                         {t.type === "income" ? "Ingreso" : "Egreso"}
                       </span>
                     </td>
-                    <td className={`${ts.td} max-w-[260px] truncate`}>{t.items?.map((i: any) => i.description).join(", ") || t.notes || "-"}</td>
-                    <td className={ts.td}>{t.barber?.name || (t.assigned_to ? assignedToLabels[t.assigned_to] : "-")}</td>
-                    <td className={`${ts.td} text-brand-gray`}>{t.created_by_name || "-"}</td>
-                    <td className={ts.td}>{t.client?.name || "-"}</td>
-                    <td className={ts.td}>
+                    <td className={`${tdc} max-w-[220px] truncate`}>{t.items?.map((i: any) => i.description).join(", ") || t.notes || "-"}</td>
+                    <td className={`${tdc} max-w-[130px] truncate`}>{t.barber?.name || (t.assigned_to ? assignedToLabels[t.assigned_to] : "-")}</td>
+                    <td className={`${tdc} max-w-[130px] truncate text-brand-gray`} title={t.created_by_name || undefined}>{t.created_by_name || "-"}</td>
+                    <td className={`${tdc} max-w-[130px] truncate`}>{t.client?.name || "-"}</td>
+                    <td className={tdc}>
                       <span className="rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-medium text-brand-gray dark:bg-white/10">
                         {paymentMethodLabels[t.payment_method] || t.payment_method}
                       </span>
                     </td>
-                    <td className={`${ts.tdRight} whitespace-nowrap ${t.type === "income" ? "text-emerald-500" : "text-red-500"}`}>
+                    <td className={`${tdcR} whitespace-nowrap ${t.type === "income" ? "text-emerald-500" : "text-red-500"}`}>
                       {t.type === "expense" ? "−" : "+"}
                       {formatCurrency(Number(t.total))}
                     </td>

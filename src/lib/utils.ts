@@ -24,11 +24,13 @@ export function slugify(text: string): string {
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("es-CL", {
+  // El signo va delante del $ ("-$2.778.443"); es-CL lo ponia despues ("$-2.778.443").
+  const abs = new Intl.NumberFormat("es-CL", {
     style: "currency",
     currency: "CLP",
     minimumFractionDigits: 0,
-  }).format(amount);
+  }).format(Math.abs(amount));
+  return amount < 0 ? `-${abs}` : abs;
 }
 
 export function formatDate(date: Date | string): string {
