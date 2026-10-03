@@ -618,12 +618,17 @@ export async function sendSupplyRequestEmail(params: SendSupplyRequestParams) {
 
   try {
     const resend = getResendClient();
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || "re-booking <no-reply@re-booking.cl>",
       to,
       subject: `Solicitud de insumos · ${businessName}`,
       html,
     });
+    // Resend no lanza excepción cuando rechaza el envío: devuelve { error }.
+    if (error) {
+      console.error("Error sending supply request email:", error);
+      return { success: false, error: error.message };
+    }
     return { success: true };
   } catch (error: any) {
     console.error("Error sending supply request email:", error);
