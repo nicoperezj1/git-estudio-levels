@@ -162,6 +162,8 @@ export async function computeProMonths(
   const { data: settlements } = await supabase.from("professional_settlements").select("*")
     .eq("tenant_id", tenantId).eq("month", first).eq("mode", mode);
   const settlementByBarber = new Map<string, any>((settlements || []).map((s: any) => [s.barber_id, s]));
+  // Arriendo: la correccion hecha en el libro manda sobre el valor antiguo de rental_records.
+  for (const s of settlements || []) if (s.days_override !== null && s.days_override !== undefined) savedDays.set(s.barber_id, Number(s.days_override));
 
   return pros.map((p: any): ProMonth => {
     const lines: LedgerLine[] = [];

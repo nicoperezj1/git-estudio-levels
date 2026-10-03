@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useTenant } from "@/lib/tenant-context";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
+import { ProfessionalLedgerView, useLedgerEnabled } from "@/components/finance/professional-ledger-view";
 
 interface BarberCommission {
   barberId: string;
@@ -23,7 +24,14 @@ const monthNames = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+// Con el libro de movimientos encendido (Configuracion) se usa la vista nueva; apagado, esta de siempre.
 export default function ComisionesPage() {
+  const ledger = useLedgerEnabled();
+  if (ledger === null) return <Spinner />;
+  return ledger ? <ProfessionalLedgerView mode="commission" /> : <ComisionesLegacy />;
+}
+
+function ComisionesLegacy() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());

@@ -90,6 +90,36 @@ export default function ConfiguracionPage() {
     }
   };
 
+  // Libro de movimientos del profesional (Arriendo y Comision): interruptor por negocio, apagado por defecto.
+  const [ledger, setLedger] = useState<{ enabled: boolean; migrationMissing: boolean } | null>(null);
+  const [savingLedger, setSavingLedger] = useState(false);
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/settings/pro-ledger?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((d) => setLedger({ enabled: !!d?.enabled, migrationMissing: !!d?.migrationMissing }))
+      .catch(() => setLedger(null));
+  }, [tenantId]);
+  const handleLedgerToggle = async (next: boolean) => {
+    if (!tenantId || savingLedger || !ledger) return;
+    setSavingLedger(true);
+    try {
+      const res = await fetch("/api/settings/pro-ledger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId, enabled: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "No se pudo guardar");
+      setLedger({ ...ledger, enabled: next });
+      showToast(next ? "Libro de movimientos activado" : "Libro de movimientos desactivado", "success");
+    } catch (e: any) {
+      showToast(e?.message || "No se pudo guardar", "error");
+    } finally {
+      setSavingLedger(false);
+    }
+  };
+
   // Deposit/abono settings
   const [depositEnabled, setDepositEnabled] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(30);
@@ -870,6 +900,35 @@ export default function ConfiguracionPage() {
               </span>
             </span>
           </label>
+        </div>
+      )}
+
+      {/* Libro de movimientos del profesional (Arriendo y Comision). Solo administrador. */}
+      {isAdmin && ledger && (
+        <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-3">
+          <div>
+            <h2 className="font-bold text-brand-dark">Arriendo y Comisión</h2>
+            <p className="text-xs text-brand-gray">Cómo se calcula lo que se le paga o cobra a cada profesional</p>
+          </div>
+          {ledger.migrationMissing ? (
+            <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">Falta una actualización de la base de datos (migración 091) para poder activarlo.</p>
+          ) : (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ledger.enabled}
+                disabled={savingLedger}
+                onChange={(e) => handleLedgerToggle(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300"
+              />
+              <span>
+                <span className="block text-sm font-medium text-brand-dark">Usar el libro de movimientos</span>
+                <span className="block text-xs text-brand-gray">
+                  Suma y resta propinas, comisión por productos, consumibles, dinero a favor, descuentos y movimientos manuales con una misma regla. Apagado, Arriendo y Comisiones calculan como siempre.
+                </span>
+              </span>
+            </label>
+          )}
         </div>
       )}
 

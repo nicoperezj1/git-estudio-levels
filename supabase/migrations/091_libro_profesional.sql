@@ -40,11 +40,13 @@ CREATE TABLE IF NOT EXISTS professional_settlements (
   month DATE NOT NULL,
   mode TEXT NOT NULL CHECK (mode IN ('commission', 'rental')),
   amount_paid NUMERIC(12,0) NOT NULL DEFAULT 0,
+  days_override INTEGER,                                 -- arriendo: dias trabajados corregidos a mano (NULL = automatico)
   paid_at TIMESTAMPTZ,
   updated_by_name TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, barber_id, month, mode)
 );
+ALTER TABLE professional_settlements ADD COLUMN IF NOT EXISTS days_override INTEGER;
 ALTER TABLE professional_settlements ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS professional_settlement_log (

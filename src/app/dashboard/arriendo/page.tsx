@@ -1,5 +1,6 @@
 "use client";
 
+import { ProfessionalLedgerView, useLedgerEnabled } from "@/components/finance/professional-ledger-view";
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -25,7 +26,14 @@ interface RentalProfessional {
 
 const monthNames = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
+// Con el libro de movimientos encendido (Configuracion) se usa la vista nueva; apagado, esta de siempre.
 export default function ArriendoPage() {
+  const ledger = useLedgerEnabled();
+  if (ledger === null) return <Spinner />;
+  return ledger ? <ProfessionalLedgerView mode="rental" /> : <ArriendoLegacy />;
+}
+
+function ArriendoLegacy() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
