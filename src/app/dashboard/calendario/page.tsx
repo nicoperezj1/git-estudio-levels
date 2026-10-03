@@ -313,6 +313,8 @@ export default function CalendarioPage() {
   const [showPopup, setShowPopup] = useState(false);
   const [popupTab, setPopupTab] = useState<"service" | "event">("service");
   const [popupData, setPopupData] = useState({ barberId: "", startTime: "", endTime: "", barberName: "" });
+  // Dia de la columna tocada en la vista de varios dias; null = el dia que se esta viendo (`date`).
+  const [popupDay, setPopupDay] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ barberId: string; y: number } | null>(null);
   // Moving an EXISTING appointment via touch (long-press + drag), mirrors the native
   // HTML5 drag used on desktop (draggable/onDragStart/onDrop), which has no touch
@@ -541,6 +543,7 @@ export default function CalendarioPage() {
     const barberIndex = displayBarbers.findIndex((b) => b.id === dragBarberId);
     const isRightSide = barberIndex >= displayBarbers.length / 2;
     setPopupPosition(isRightSide ? "left" : "right");
+    setPopupDay(null);
 
     setPopupData({
       barberId: dragBarberId,
@@ -562,8 +565,9 @@ export default function CalendarioPage() {
 
   // Open the creation popup explicitly (used by the "Agendar" button — reliable on mobile
   // where drag-to-create requires an awkward long-press).
-  const openCreatePopup = (barberId: string, startTime: string, endTime: string) => {
+  const openCreatePopup = (barberId: string, startTime: string, endTime: string, day?: string) => {
     const barber = displayBarbers.find((b) => b.id === barberId);
+    setPopupDay(day || null);
     setPopupPosition("right");
     setPopupData({ barberId, startTime, endTime, barberName: barber?.name || "" });
     setShowPopup(true);
@@ -694,12 +698,13 @@ export default function CalendarioPage() {
   // Create appointment from popup
   const handleCreate = async () => {
     setCreating(true);
+    const day = popupDay || date;
 
     if (popupTab === "service") {
       if (!selectedService) { showToast("Selecciona un servicio", "error"); setCreating(false); return; }
       
-      const startISO = `${date}T${popupData.startTime}:00`;
-      const endISO = `${date}T${popupData.endTime}:00`;
+      const startISO = `${day}T${popupData.startTime}:00`;
+      const endISO = `${day}T${popupData.endTime}:00`;
 
       const res = await fetch("/api/appointments", {
         method: "POST",
@@ -707,7 +712,7 @@ export default function CalendarioPage() {
         body: JSON.stringify({
           clientId: selectedClient || undefined,
           barberId: popupData.barberId,
-          date,
+          date: day,
           startTime: startISO,
           endTime: endISO,
           serviceIds: [selectedService],
@@ -729,7 +734,7 @@ export default function CalendarioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           barberId: popupData.barberId,
-          date,
+          date: day,
           allDay: false,
           startTime: popupData.startTime,
           endTime: popupData.endTime,
@@ -1269,9 +1274,23 @@ export default function CalendarioPage() {
                   // Con un solo profesional se mantiene el azul de siempre; con varios, un color por profesional.
                   const color = multiPros.length > 1 ? barberColors[pi % barberColors.length] : { bg: "bg-blue-100", border: "border-l-blue-500", text: "text-blue-800" };
                   return (
-                    <div key={`${pro.id}-${d}`} className={`flex-1 relative min-w-[110px] ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-50"}`}>
+                    <div
+                      key={`${pro.id}-${d}`}
+                      className={`flex-1 relative min-w-[110px] ${lastOfGroup ? "border-r-2 border-gray-300" : "border-r border-gray-100"}`}
+                      onClick={(e) => {
+                        // Un clic (o toque) en un espacio vacio abre Agendar/Bloquear para ESE profesional,
+                        // ESE dia y a la hora tocada. Las citas y bloqueos tienen su propio clic.
+                        if (!(e.target as HTMLElement).closest("[data-slot]")) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const y = Math.max(0, e.clientY - rect.top);
+                        popupOpenedAt.current = Date.now();
+                        openCreatePopup(pro.id, yToTime(y), yToTime(y + HOUR_HEIGHT * 0.75), d);
+                      }}
+                    >
                       {hours.map((h) => (
-                        <div key={h} className="h-16 border-b border-gray-50" />
+                        <div key={h} data-slot className="relative h-16 cursor-pointer border-b border-gray-200/70 hover:bg-gray-50/70">
+                          <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-gray-200/50" />
+                        </div>
                       ))}
                       {isColToday && nowMinutes >= START_HOUR * 60 && nowMinutes <= END_HOUR * 60 && (
                         <div
@@ -1339,7 +1358,7 @@ export default function CalendarioPage() {
                         );
                       })}
                       {dayAppts.length === 0 && dayBlocks.length === 0 && (
-                        <p className="absolute inset-x-0 top-4 text-center text-[11px] text-gray-300">Sin citas</p>
+                        <p className="pointer-events-none absolute inset-x-0 top-4 text-center text-[11px] text-gray-300">Sin citas</p>
                       )}
                     </div>
                   );
@@ -1751,6 +1770,12 @@ export default function CalendarioPage() {
               <h3 className="font-bold text-lg">Agendar / Bloquear</h3>
               <button onClick={() => setShowPopup(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
+
+            {popupDay && (
+              <p className="px-4 pt-3 text-sm font-medium capitalize text-gray-700">
+                {new Date(popupDay + "T12:00:00").toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
+              </p>
+            )}
 
             {/* Tabs */}
             <div className="flex gap-4 px-4 pt-3 border-b">
