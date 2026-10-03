@@ -6,10 +6,11 @@ import { useTenant } from "@/lib/tenant-context";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
 import { EmptyIcons } from "@/components/ui/empty-state";
+import StandbyV2 from "@/components/standby/standby-v2";
 
 interface Service { id: string; name: string; price: number; duration: number; }
 
-export default function StandbyPage() {
+function LegacyStandby() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -276,4 +277,21 @@ export default function StandbyPage() {
       </button>
     </div>
   );
+}
+
+// Standby nuevo (Fase 5) solo si el administrador lo activo en Configuracion > Caja y Standby;
+// si esta apagado (o la migracion 094 no esta), se ve el Standby de siempre, sin cambios.
+export default function StandbyPage() {
+  const { tenant, loading: tenantLoading } = useTenant();
+  const [mode, setMode] = useState<"loading" | "legacy" | "v2">("loading");
+  useEffect(() => {
+    if (tenantLoading) return;
+    const q = tenant?.id ? `?tenantId=${tenant.id}` : "";
+    fetch(`/api/settings/caja-seguridad${q}`)
+      .then((r) => r.json())
+      .then((d) => setMode(d?.standbyV2 ? "v2" : "legacy"))
+      .catch(() => setMode("legacy"));
+  }, [tenantLoading, tenant?.id]);
+  if (mode === "loading") return <Spinner />;
+  return mode === "v2" ? <StandbyV2 /> : <LegacyStandby />;
 }
