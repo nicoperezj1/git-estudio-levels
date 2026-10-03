@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Lock, Unlock } from "lucide-react";
+import { Info, Lock, Unlock } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -135,7 +135,20 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
                 {items.map((i) => (
                   <div key={i.key} className="py-2.5">
                     <div className="flex items-center justify-between gap-3">
-                      <label htmlFor={`fx-${i.key}`} className="text-sm text-brand-dark">{i.label}</label>
+                      <span className="flex items-center gap-1.5">
+                        <label htmlFor={`fx-${i.key}`} className="text-sm text-brand-dark">{i.label}</label>
+                        {i.key === "machine_commission" && machine && (
+                          // Ayuda escondida: se ve al pasar el mouse (computador) o al tocar el ícono (celular).
+                          <span className="group relative inline-flex">
+                            <button type="button" aria-label="Ver detalle de ventas con tarjeta" className="text-brand-gray/70 outline-none transition-colors hover:text-brand-blue focus:text-brand-blue">
+                              <Info className="h-4 w-4" strokeWidth={1.75} />
+                            </button>
+                            <span className="pointer-events-none absolute left-0 top-6 z-20 hidden w-64 rounded-xl border border-gray-100 bg-white p-3 text-xs leading-snug text-brand-dark shadow-xl group-hover:block group-focus-within:block">
+                              Este mes se vendió <b>{formatCurrency(machine.debit)}</b> con débito y <b>{formatCurrency(machine.credit)}</b> con crédito. Ingresa el monto real que cobró la máquina.
+                            </span>
+                          </span>
+                        )}
+                      </span>
                       <div className="flex w-40 shrink-0 items-center gap-1.5">
                         <span className="text-sm text-brand-gray">$</span>
                         <input
@@ -144,15 +157,10 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
                           disabled={closed}
                           value={values[i.key] ?? ""}
                           onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}
-                          className={`${inputClass} tabular-nums text-right disabled:opacity-60`}
+                          className={`${inputClass} !rounded-xl !py-1.5 tabular-nums text-right disabled:opacity-60`}
                         />
                       </div>
                     </div>
-                    {i.key === "machine_commission" && machine && (
-                      <p className="mt-1 text-[11px] leading-snug text-brand-gray">
-                        Este mes se vendió {formatCurrency(machine.debit)} con débito y {formatCurrency(machine.credit)} con crédito. Ingresa el monto real que cobró la máquina.
-                      </p>
-                    )}
                   </div>
                 ))}
               </div>
