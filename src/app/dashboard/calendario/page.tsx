@@ -563,17 +563,20 @@ export default function CalendarioPage() {
     setDragEndY(Math.max(0, e.clientY - rect.top));
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (fromLeave = false) => {
     if (!dragging || !dragBarberId) { setDragging(false); return; }
     
     const minY = Math.min(dragStartY, dragEndY);
     const maxY = Math.max(dragStartY, dragEndY);
     
-    // Minimum 15min (16px)
-    if (maxY - minY < 10) { setDragging(false); return; }
+    // Un clic simple (sin arrastrar) tambien abre el popup de Agendar / Bloquear, igual que el
+    // toque en el celular: parte con 45 min y se ajusta ahi mismo.
+    const isClick = maxY - minY < 10;
+    // Si el mouse solo salio de la columna sin soltar, no se abre nada.
+    if (isClick && fromLeave) { setDragging(false); return; }
 
     const startTime = yToTime(minY);
-    const endTime = yToTime(maxY);
+    const endTime = isClick ? yToTime(minY + HOUR_HEIGHT * 0.75) : yToTime(maxY);
     const barber = displayBarbers.find((b) => b.id === dragBarberId);
 
     // Calculate popup position: if barber is in the right half, show popup on left
@@ -1475,8 +1478,8 @@ export default function CalendarioPage() {
                       const rect = e.currentTarget.getBoundingClientRect();
                       setHoverInfo({ barberId: barber.id, y: Math.max(0, e.clientY - rect.top) });
                     }}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={() => { if (dragging) handleMouseUp(); setHoverInfo(null); }}
+                    onMouseUp={() => handleMouseUp()}
+                    onMouseLeave={() => { if (dragging) handleMouseUp(true); setHoverInfo(null); }}
                     onTouchStart={(e) => handleTouchStart(e, barber.id)}
                     onTouchEnd={handleTouchEnd}
                     onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; 

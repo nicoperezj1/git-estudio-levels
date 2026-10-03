@@ -4,6 +4,7 @@ import { createAdminSupabase } from "@/lib/supabase/server";
 import { sendBookingConfirmation } from "@/lib/resend";
 import { tryConsumeQuota } from "@/lib/message-quota";
 import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
+import { parseWallClock } from "@/lib/wallclock";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   const serviceNames = resolvedServices.map((s) => s.name).join(" + ");
 
   // Calculate end time
-  const start = new Date(startTime);
+  const start = parseWallClock(startTime);
   const end = new Date(start.getTime() + totalDuration * 60000);
 
   // Check for conflicts (double booking prevention). Con "cupos por bloque" (solo

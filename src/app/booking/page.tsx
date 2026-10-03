@@ -210,6 +210,28 @@ export default function BookingPage() {
     }
   }, [selectedBarber, selectedDate, selectedServices]);
 
+  // Con cupos por bloque otras personas pueden tomar un cupo mientras miras la lista: se refresca
+  // sola cada 15 s (solo cuando el negocio usa cupos) y si tu hora se llena, se te avisa.
+  const hasSpots = Object.keys(spots).length > 0;
+  useEffect(() => {
+    if (!hasSpots || step !== "datetime" || !selectedBarber || !selectedDate || selectedServices.length === 0) return;
+    const id = setInterval(() => {
+      fetch(`/api/public/availability?barberId=${selectedBarber.id}&date=${selectedDate}&duration=${totalDuration}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const fresh: string[] = data.slots || [];
+          setSlots(fresh);
+          setSpots(data.spots || {});
+          setSelectedSlot((cur) => {
+            if (cur && !fresh.includes(cur)) { setError("Esa hora se acaba de llenar. Elige otra."); return ""; }
+            return cur;
+          });
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(id);
+  }, [hasSpots, step, selectedBarber, selectedDate, selectedServices, totalDuration]);
+
   const handleBook = async () => {
     setError("");
     setSubmitting(true);
@@ -646,7 +668,9 @@ export default function BookingPage() {
                       >
                         {time}
                         {spots[slot] != null && (
-                          <span className={`block text-[10px] font-normal leading-tight ${selectedSlot === slot ? "text-white/80" : "text-brand-gray"}`}>
+                          <span className={`block text-[10px] leading-tight ${
+                            selectedSlot === slot ? "font-normal text-white/80" : spots[slot] === 1 ? "font-semibold text-red-500" : "font-normal text-brand-gray"
+                          }`}>
                             {spots[slot]} {spots[slot] === 1 ? "cupo" : "cupos"}
                           </span>
                         )}
@@ -657,8 +681,10 @@ export default function BookingPage() {
               )}
             </div>
 
+            {error && <p className="mt-4 text-sm text-red-500 text-center">{error}</p>}
+
             <button
-              onClick={() => setStep("details")}
+              onClick={() => { setError(""); setStep("details"); }}
               disabled={!selectedSlot}
               className="w-full mt-6 py-3 rounded-xl bg-brand-blue text-white font-bold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >

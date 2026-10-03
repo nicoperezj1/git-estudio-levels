@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { newClientAppointmentIds } from "@/lib/new-client";
 import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
+import { parseWallClock } from "@/lib/wallclock";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -72,9 +73,9 @@ export async function POST(req: NextRequest) {
   }
 
   const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
-  const start = new Date(startTime);
+  const start = parseWallClock(startTime);
   // Use custom end time if provided, otherwise calculate from service duration
-  const end = customEndTime ? new Date(customEndTime) : new Date(start.getTime() + totalDuration * 60000);
+  const end = customEndTime ? parseWallClock(customEndTime) : new Date(start.getTime() + totalDuration * 60000);
 
   // Check conflicts (con "cupos por bloque", solo kinesiologia, se admiten varias citas hasta el cupo)
   if (await isSlotFull(supabase, barberId, resolvedTenantId, date, start, end)) {
