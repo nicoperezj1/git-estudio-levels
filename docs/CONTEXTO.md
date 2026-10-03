@@ -170,3 +170,6 @@
 - La tabla `transactions` no tiene columna `appointment_id` en las migraciones, así que no se escribe.
 - Sin probar en pantalla ni con datos reales: la vista agrupada, los botones de Mi Agenda y el cobro que completa la cita (se verificaron con `tsc` y lógica simulada).
 - Los clientes importados o de otro sistema no tienen historial de citas en re-booking; su primera cita aquí seguirá diciendo "Nuevo".
+
+
+> **Lección (3 oct.): embeds ambiguos en PostgREST.** `inventory_movements` tiene DOS llaves hacia `profiles` (`barber_id` y `approved_by`, migración 016), así que `barber:profiles(name)` daba error y `GET /api/inventario/movements` devolvía lista vacía ("Movimientos recientes" siempre vacío). Se arregló con `barber:profiles!barber_id(name)`. Al pedir un embed, si la tabla tiene más de una llave a la misma tabla, indicar la columna (`!columna`).

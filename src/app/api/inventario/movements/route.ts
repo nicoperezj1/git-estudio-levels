@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     .select(`
       *,
       product:products(name),
-      barber:profiles(name)
+      barber:profiles!barber_id(name)
     `)
     .order("created_at", { ascending: false })
     .limit(50);
