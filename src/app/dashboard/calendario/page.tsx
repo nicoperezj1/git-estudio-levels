@@ -380,6 +380,43 @@ export default function CalendarioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantLoading, tenant?.id]);
 
+  // Cupos por bloque (solo Kinesiologia): si es mayor a 1, las citas que coinciden en el tiempo
+  // se muestran una al lado de la otra en vez de encimadas. Con 1 no cambia nada.
+  const [slotCap, setSlotCap] = useState(1);
+  useEffect(() => {
+    if (tenantLoading) return;
+    const t = getActiveTenantId();
+    fetch(`/api/settings/slot-capacity${t ? `?tenantId=${t}` : ""}`)
+      .then((r) => r.json())
+      .then((d) => setSlotCap(d?.eligible ? Math.max(1, Number(d?.max) || 1) : 1))
+      .catch(() => setSlotCap(1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantLoading, tenant?.id]);
+  const laneLayout = (list: any[]): Record<string, { lane: number; cols: number }> => {
+    const toMin = (t: string) => { const m = t?.match(/(\d{2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0; };
+    const items = list.map((a) => ({ id: a.id as string, s: toMin(a.start_time), e: toMin(a.end_time) })).sort((a, b) => a.s - b.s || a.e - b.e);
+    const out: Record<string, { lane: number; cols: number }> = {};
+    let cluster: typeof items = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const laneEnds: number[] = [];
+      for (const it of cluster) {
+        let lane = laneEnds.findIndex((end) => end <= it.s);
+        if (lane === -1) { lane = laneEnds.length; laneEnds.push(it.e); } else laneEnds[lane] = it.e;
+        out[it.id] = { lane, cols: 1 };
+      }
+      for (const it of cluster) out[it.id].cols = laneEnds.length;
+      cluster = [];
+    };
+    for (const it of items) {
+      if (cluster.length && it.s >= clusterEnd) { flush(); clusterEnd = -1; }
+      cluster.push(it);
+      clusterEnd = Math.max(clusterEnd, it.e);
+    }
+    if (cluster.length) flush();
+    return out;
+  };
+
   // Cuando hay un profesional elegido (vista 1/3/7 dias), se pide el rango completo de
   // dias de una sola vez en vez de un fetch por dia -- ver dateFrom/dateTo en
   // /api/appointments. Sin profesional elegido, se comporta exactamente igual que antes
@@ -1423,6 +1460,7 @@ export default function CalendarioPage() {
               {/* Barber columns */}
               {displayBarbers.map((barber, bi) => {
                 const barberAppts = appointments.filter((a: any) => a.barber_id === barber.id);
+                const lanes = slotCap > 1 ? laneLayout(barberAppts) : null;
                 const color = barberColors[bi % barberColors.length];
                 const isDragTarget = dragging && dragBarberId === barber.id;
 
@@ -1595,7 +1633,15 @@ export default function CalendarioPage() {
                           openApptDetails(appt.id);
                         }}
                         className={`absolute left-1 right-1 rounded-lg border-l-[3px] shadow-sm ${color.bg} ${color.border} ${color.text} px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-md hover:brightness-95 transition-all z-10 group ${movingApptId === appt.id ? "opacity-40 ring-2 ring-blue-500" : ""}`}
-                        style={getBlockStyle(appt)}
+                        style={(() => {
+                          const base: any = getBlockStyle(appt);
+                          const l = lanes?.[appt.id];
+                          if (l && l.cols > 1) {
+                            const w = 100 / l.cols;
+                            return { ...base, left: `calc(${w * l.lane}% + 2px)`, width: `calc(${w}% - 4px)`, right: "auto" };
+                          }
+                          return base;
+                        })()}
                       >
                         <p className="flex items-center gap-1 text-[11px] font-bold">
                             <span className="truncate">{appt.client?.name || "Cliente"}</span>

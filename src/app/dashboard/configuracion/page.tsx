@@ -90,6 +90,36 @@ export default function ConfiguracionPage() {
     }
   };
 
+  // Clientes por bloque (solo Kinesiologia): cuantos clientes atiende un profesional a la vez.
+  const [cap, setCap] = useState<{ eligible: boolean; max: number; limit: number } | null>(null);
+  const [savingCap, setSavingCap] = useState(false);
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/settings/slot-capacity?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((d) => setCap({ eligible: !!d?.eligible, max: Number(d?.max) || 1, limit: Number(d?.limit) || 6 }))
+      .catch(() => setCap(null));
+  }, [tenantId]);
+  const handleCapChange = async (next: number) => {
+    if (!tenantId || savingCap || !cap) return;
+    setSavingCap(true);
+    try {
+      const res = await fetch("/api/settings/slot-capacity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId, max: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "No se pudo guardar");
+      setCap({ ...cap, max: next });
+      showToast(next === 1 ? "Un cliente por bloque" : `Hasta ${next} clientes por bloque`, "success");
+    } catch (e: any) {
+      showToast(e?.message || "No se pudo guardar", "error");
+    } finally {
+      setSavingCap(false);
+    }
+  };
+
   // Libro de movimientos del profesional (Arriendo y Comision): interruptor por negocio, apagado por defecto.
   const [ledger, setLedger] = useState<{ enabled: boolean; migrationMissing: boolean } | null>(null);
   const [savingLedger, setSavingLedger] = useState(false);
@@ -929,6 +959,34 @@ export default function ConfiguracionPage() {
               </span>
             </span>
           </label>
+        </div>
+      )}
+
+      {/* Clientes por bloque: solo administrador y solo negocios de Kinesiologia. */}
+      {isAdmin && cap?.eligible && (
+        <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-3">
+          <div>
+            <h2 className="font-bold text-brand-dark">Clientes por bloque</h2>
+            <p className="text-xs text-brand-gray">Cuántos clientes puede atender un profesional a la vez en el mismo horario</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: cap.limit }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={savingCap}
+                onClick={() => handleCapChange(n)}
+                className={`w-10 h-10 rounded-xl text-sm font-semibold border transition-colors ${
+                  cap.max === n ? "bg-brand-blue text-white border-brand-blue" : "border-gray-200 text-brand-dark hover:bg-gray-50"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-brand-gray">
+            {cap.max === 1 ? "Un cliente por horario (lo normal)." : `Cada horario admite hasta ${cap.max} clientes. En el link de reserva se muestra cuántos cupos quedan.`}
+          </p>
         </div>
       )}
 

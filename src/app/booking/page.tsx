@@ -37,6 +37,8 @@ export default function BookingPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
+  // Cupos que quedan por hora (solo negocios de Kinesiologia con mas de 1 cliente por bloque).
+  const [spots, setSpots] = useState<Record<string, number>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -203,7 +205,7 @@ export default function BookingPage() {
         `/api/public/availability?barberId=${selectedBarber.id}&date=${selectedDate}&duration=${totalDuration}`
       )
         .then((r) => r.json())
-        .then((data) => setSlots(data.slots || []))
+        .then((data) => { setSlots(data.slots || []); setSpots(data.spots || {}); })
         .finally(() => { setLoadingSlots(false); preselectSlot.current = ""; });
     }
   }, [selectedBarber, selectedDate, selectedServices]);
@@ -643,6 +645,11 @@ export default function BookingPage() {
                         }`}
                       >
                         {time}
+                        {spots[slot] != null && (
+                          <span className={`block text-[10px] font-normal leading-tight ${selectedSlot === slot ? "text-white/80" : "text-brand-gray"}`}>
+                            {spots[slot]} {spots[slot] === 1 ? "cupo" : "cupos"}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

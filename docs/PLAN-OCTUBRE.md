@@ -127,6 +127,9 @@ Además:
 
 ---
 
+## 6b. Fase 4b (adelantada): cupos por bloque — solo Kinesiología
+Pedido de un negocio real (Espacio Integral): atender a 2 clientes a la vez por profesional. **SQL `093`** (`tenants.max_clients_per_slot`, default 1). Solo se puede activar si `business_category = kinesiologia`; en cualquier otro rubro el cupo es siempre 1 (como hoy). Configuración > "Clientes por bloque" (1 a 6). Un horario se bloquea solo cuando ya hay tantas citas a la vez como cupos (`src/lib/capacity.ts`): disponibilidad pública, agendado público y agendado desde el calendario (con segunda verificación al guardar). El link de reserva muestra "N cupos"; el calendario pone las citas simultáneas lado a lado. Cobro y comisión no cambian (cada cliente es una cita). **Riesgo:** bajo (default 1 = idéntico a hoy), pero toca el agendado: probar en pruebas antes de Pablo. Las migraciones siguientes se corrieron un número: Fase 5 = `094`, Fase 6 = `095`, Fase 7 = `096`.
+
 ## 7. Fase 5: Standby y caja
 
 | Cambio | Detalle |
@@ -137,7 +140,7 @@ Además:
 | Descuento por planilla | El profesional elige el producto y se genera un **código**. Recepción o admin lo ingresa para aprobar; recién ahí se descuenta el stock y se anota en el libro. Si es trabajador con contrato y supera el 15%, aviso de confirmación. |
 | Apagar caja (recepción) | Oculta montos y acciones; se vuelve a encender con el **PIN de la recepcionista**. Distinto de cerrar caja. |
 
-**SQL:** `093` (reportes, retiros de efectivo, códigos de planilla, tope por sucursal). **Riesgo: ALTO** (toca cobros). Proteger en esta fase `pos/checkout`, `pos/verify-pin`, `caja/reopen`. **Vuelta atrás:** interruptor por negocio para el Standby nuevo (si se apaga, queda el actual); `git revert` del resto.
+**SQL:** `094` (reportes, retiros de efectivo, códigos de planilla, tope por sucursal). **Riesgo: ALTO** (toca cobros). Proteger en esta fase `pos/checkout`, `pos/verify-pin`, `caja/reopen`. **Vuelta atrás:** interruptor por negocio para el Standby nuevo (si se apaga, queda el actual); `git revert` del resto.
 
 ---
 
@@ -158,7 +161,7 @@ Además:
 
 Para las tres: solo cuentan profesionales que hacen el servicio, trabajan ese día, tienen la hora libre y no están bloqueados ni de vacaciones. Si el elegido no puede, pasa al siguiente; nunca se pierde la reserva.
 
-**SQL:** `094` (vacaciones, regla elegida, % por profesional). **Riesgo:** medio (toca la reserva pública). **Vuelta atrás:** la regla por defecto es la actual; volver a ella en Preferencias deja todo como hoy.
+**SQL:** `095` (vacaciones, regla elegida, % por profesional). **Riesgo:** medio (toca la reserva pública). **Vuelta atrás:** la regla por defecto es la actual; volver a ella en Preferencias deja todo como hoy.
 
 ---
 
@@ -183,7 +186,7 @@ Basado en la plantilla Excel de Nicolás (`Plantilla_Liquidacion_Sueldo_Chile.xl
 - **Resultado:** PDF de liquidación con logo; costo empresa; el líquido entra como egreso "Remuneraciones" en el cierre.
 - **Guía al lado:** parámetros desde Previred → asistencia y licencias → comisiones y semana corrida → descuentos → emitir y pagar → cotizaciones en Previred dentro del plazo → Libro de Remuneraciones Electrónico si corresponde → guardar firmas. Aviso: "Herramienta de apoyo; valida con tu contador".
 
-**SQL:** `095` (ficha laboral, parámetros del mes, liquidaciones). **Riesgo:** medio (no cambia nada existente; es un módulo nuevo). **Vuelta atrás:** `git revert`; tablas nuevas pueden quedar sin uso.
+**SQL:** `096` (ficha laboral, parámetros del mes, liquidaciones). **Riesgo:** medio (no cambia nada existente; es un módulo nuevo). **Vuelta atrás:** `git revert`; tablas nuevas pueden quedar sin uso.
 
 ---
 

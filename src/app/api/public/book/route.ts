@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { sendBookingConfirmation } from "@/lib/resend";
 import { tryConsumeQuota } from "@/lib/message-quota";
+import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -54,17 +55,10 @@ export async function POST(req: NextRequest) {
   const start = new Date(startTime);
   const end = new Date(start.getTime() + totalDuration * 60000);
 
-  // Check for conflicts (double booking prevention)
-  const { data: conflicts } = await supabase
-    .from("appointments")
-    .select("id")
-    .eq("barber_id", barberId)
-    .eq("date", date)
-    .in("status", ["scheduled", "confirmed", "in_progress"])
-    .lt("start_time", end.toISOString())
-    .gt("end_time", start.toISOString());
-
-  if (conflicts && conflicts.length > 0) {
+  // Check for conflicts (double booking prevention). Con "cupos por bloque" (solo
+  // kinesiologia) un horario admite varias citas hasta llegar al cupo.
+  const { data: barberForCap } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
+  if (await isSlotFull(supabase, barberId, barberForCap?.tenant_id, date, start, end)) {
     return NextResponse.json({ error: "Horario no disponible. Selecciona otro." }, { status: 409 });
   }
 
@@ -132,6 +126,12 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: "Error creando la cita" }, { status: 500 });
+  }
+
+  // Dos personas pueden reservar el ultimo cupo a la vez: si nos pasamos, esta cita se deshace.
+  if (await exceededAfterInsert(supabase, barberId, tenantId, date, start, end)) {
+    await supabase.from("appointments").delete().eq("id", appointment!.id);
+    return NextResponse.json({ error: "Horario no disponible. Selecciona otro." }, { status: 409 });
   }
 
   // Add services to appointment

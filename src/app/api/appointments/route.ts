@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 import { newClientAppointmentIds } from "@/lib/new-client";
+import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -75,17 +76,8 @@ export async function POST(req: NextRequest) {
   // Use custom end time if provided, otherwise calculate from service duration
   const end = customEndTime ? new Date(customEndTime) : new Date(start.getTime() + totalDuration * 60000);
 
-  // Check conflicts
-  const { data: conflicts } = await supabase
-    .from("appointments")
-    .select("id")
-    .eq("barber_id", barberId)
-    .eq("date", date)
-    .in("status", ["scheduled", "confirmed", "in_progress"])
-    .lt("start_time", end.toISOString())
-    .gt("end_time", start.toISOString());
-
-  if (conflicts && conflicts.length > 0) {
+  // Check conflicts (con "cupos por bloque", solo kinesiologia, se admiten varias citas hasta el cupo)
+  if (await isSlotFull(supabase, barberId, resolvedTenantId, date, start, end)) {
     return NextResponse.json(
       { error: "El profesional tiene una cita en ese horario" },
       { status: 409 }
@@ -111,6 +103,12 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Dos personas pueden tomar el ultimo cupo a la vez: si nos pasamos, esta cita se deshace.
+  if (await exceededAfterInsert(supabase, barberId, resolvedTenantId, date, start, end)) {
+    await supabase.from("appointments").delete().eq("id", appointment.id);
+    return NextResponse.json({ error: "El profesional ya no tiene cupo en ese horario" }, { status: 409 });
+  }
 
   // Add services (surface a failure instead of silently losing them)
   const serviceInserts = services.map((s) => ({

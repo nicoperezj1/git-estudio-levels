@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { getSlotCapacity, fullSegments, peakOverlap } from "@/lib/capacity";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -80,11 +81,14 @@ export async function GET(req: NextRequest) {
   // Get barber's custom slot duration
   const { data: barberProfile } = await supabase
     .from("profiles")
-    .select("slot_duration")
+    .select("slot_duration, tenant_id")
     .eq("id", barberId)
     .single();
 
   const slotInterval = barberProfile?.slot_duration || 15; // Default 15min intervals
+
+  // Cupos por bloque (solo kinesiologia; en el resto de los rubros siempre es 1 = como siempre).
+  const capacity = await getSlotCapacity(supabase, (barberProfile as any)?.tenant_id);
 
   // Get existing appointments for this barber on this date
   const { data: appointments } = await supabase
@@ -120,11 +124,16 @@ export async function GET(req: NextRequest) {
 
   // Pre-parse busy intervals (appointments + partial blocks + break) into [start,end] min.
   const busyIntervals: Array<{ start: number; end: number }> = [];
+  const apptIntervals: Array<{ start: number; end: number }> = [];
   for (const appt of appointments || []) {
     const s = appt.start_time.match(/(\d{2}):(\d{2})/);
     const e = appt.end_time.match(/(\d{2}):(\d{2})/);
-    if (s && e) busyIntervals.push({ start: parseInt(s[1]) * 60 + parseInt(s[2]), end: parseInt(e[1]) * 60 + parseInt(e[2]) });
+    if (s && e) apptIntervals.push({ start: parseInt(s[1]) * 60 + parseInt(s[2]), end: parseInt(e[1]) * 60 + parseInt(e[2]) });
   }
+  // Con cupo 1 cada cita bloquea su horario (igual que siempre). Con cupo > 1 solo se bloquean
+  // los tramos donde ya hay tantas citas a la vez como cupos.
+  if (capacity > 1) busyIntervals.push(...fullSegments(apptIntervals, capacity));
+  else busyIntervals.push(...apptIntervals);
   for (const block of blocks || []) {
     if (block.all_day || !block.start_time || !block.end_time) continue;
     const s = block.start_time.match(/(\d{2}):(\d{2})/);
@@ -192,6 +201,15 @@ export async function GET(req: NextRequest) {
 
   for (const m of Array.from(candidates).sort((a, b) => a - b)) {
     slots.push(`${date}T${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00`);
+  }
+
+  if (capacity > 1) {
+    const spots: Record<string, number> = {};
+    for (const slot of slots) {
+      const m = parseInt(slot.slice(11, 13)) * 60 + parseInt(slot.slice(14, 16));
+      spots[slot] = Math.max(0, capacity - peakOverlap(apptIntervals, m, m + duration));
+    }
+    return NextResponse.json({ slots, date, barberId, capacity, spots });
   }
 
   return NextResponse.json({ slots, date, barberId });
