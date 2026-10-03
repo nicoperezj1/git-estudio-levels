@@ -32,6 +32,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
   const [closed, setClosed] = useState(false);
   const [log, setLog] = useState<CloseLog[]>([]);
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false); // plegado por defecto: el detalle se abre con "Editar"
 
   const load = async () => {
     setLoading(true);
@@ -115,40 +116,49 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
         </p>
       ) : (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {items.map((i) => (
-              <div key={i.key}>
-                <label className="mb-1.5 block text-xs font-semibold text-brand-gray">{i.label}</label>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-brand-gray">$</span>
-                  <input
-                    type="number" min={0} step={1} inputMode="numeric" placeholder="0"
-                    disabled={closed}
-                    value={values[i.key] ?? ""}
-                    onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}
-                    className={`${inputClass} tabular-nums disabled:opacity-60`}
-                  />
-                </div>
-                {i.key === "machine_commission" && machine && (
-                  <p className="mt-1 text-[11px] leading-snug text-brand-gray">
-                    Ayuda: este mes se vendió {formatCurrency(machine.debit)} con débito y {formatCurrency(machine.credit)} con crédito. Ingresa el monto real que cobró la máquina.
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
-            <p className="text-sm text-brand-gray">Total gastos fijos: <span className="font-bold text-brand-dark tabular-nums">{formatCurrency(total)}</span></p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-brand-gray">Total gastos fijos: <span className="text-lg font-bold text-brand-dark tabular-nums">{formatCurrency(total)}</span></p>
             <div className="flex flex-wrap gap-2">
-              <button onClick={save} disabled={saving || closed} className={`${primaryButton} disabled:opacity-50`}>
-                {saving ? "Guardando…" : "Guardar gastos fijos"}
+              <button onClick={() => setOpen(!open)} className={ghostButton}>
+                {open ? "Ocultar detalle" : closed ? "Ver gastos fijos" : "Editar gastos fijos"}
               </button>
               <button onClick={toggleClose} className={ghostButton}>
                 {closed ? "Reabrir mes" : "Cerrar mes"}
               </button>
             </div>
           </div>
+
+          {open && (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {items.map((i) => (
+                  <div key={i.key}>
+                    <label className="mb-1.5 block text-xs font-semibold text-brand-gray">{i.label}</label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm text-brand-gray">$</span>
+                      <input
+                        type="number" min={0} step={1} inputMode="numeric" placeholder="0"
+                        disabled={closed}
+                        value={values[i.key] ?? ""}
+                        onChange={(e) => setValues({ ...values, [i.key]: e.target.value })}
+                        className={`${inputClass} tabular-nums disabled:opacity-60`}
+                      />
+                    </div>
+                    {i.key === "machine_commission" && machine && (
+                      <p className="mt-1 text-[11px] leading-snug text-brand-gray">
+                        Ayuda: este mes se vendió {formatCurrency(machine.debit)} con débito y {formatCurrency(machine.credit)} con crédito. Ingresa el monto real que cobró la máquina.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <button onClick={save} disabled={saving || closed} className={`${primaryButton} disabled:opacity-50`}>
+                  {saving ? "Guardando…" : "Guardar gastos fijos"}
+                </button>
+              </div>
+            </>
+          )}
 
           {log.length > 0 && (
             <div className="rounded-xl bg-brand-light p-3">

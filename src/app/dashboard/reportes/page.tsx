@@ -127,9 +127,6 @@ export default function ReportesPage() {
         }
       />
 
-      {/* Gastos fijos del mes y cerrar / reabrir (solo administrador) */}
-      {isAtLeast("admin") && <MonthClosePanel month={month} year={year} onChanged={fetchReport} />}
-
       {/* Stat Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         <StatCard
@@ -351,6 +348,9 @@ export default function ReportesPage() {
           )}
         </Panel>
       </div>
+
+      {/* Gastos fijos del mes y cerrar / reabrir (solo administrador): al final, plegado. */}
+      {isAtLeast("admin") && <MonthClosePanel month={month} year={year} onChanged={fetchReport} />}
     </div>
   );
 }
