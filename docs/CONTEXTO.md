@@ -13,6 +13,8 @@
 - **Rama de trabajo en este repo:** `claude/hopeful-mayer-jtqlh4`.
 - **Cómo correr en local:** `cd ~/barberia && npm install && npm run dev` y abrir http://localhost:3000. Hay que estar dentro de la carpeta del proyecto; si no, `npm` no encuentra el `package.json`.
 
+> **Plan vigente:** `docs/PLAN-OCTUBRE.md` (fases, decisiones tomadas con Nico y plan de vuelta atrás de cada una).
+
 ## Reglas de trabajo
 - Responder en español, informal, claro, directo y sin jerga.
 - Cambios pequeños y revisables. Antes de cada commit: `npm ci` (una vez) y `npx tsc --noEmit`.
