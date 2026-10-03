@@ -26,6 +26,7 @@ const actionLabels: Record<string, string> = {
   discount_applied: "Descuento aplicado",
   client_import: "Importacion clientes",
   loyalty_redeem: "Canje puntos",
+  checkout_check: "Revisar venta",
 };
 
 const actionColors: Record<string, string> = {
@@ -36,6 +37,7 @@ const actionColors: Record<string, string> = {
   appointment_create: "bg-purple-100 text-purple-700",
   appointment_cancel: "bg-red-100 text-red-700",
   discount_applied: "bg-yellow-100 text-yellow-700",
+  checkout_check: "bg-red-100 text-red-700",
 };
 
 export default function AuditLogPage() {
@@ -99,6 +101,7 @@ export default function AuditLogPage() {
           { key: "appointment_cancel", label: "Cancelaciones" },
           { key: "cash_reopen", label: "Reaperturas" },
           { key: "discount_applied", label: "Descuentos" },
+          { key: "checkout_check", label: "Ventas a revisar" },
         ].map((f) => (
           <button key={f.key} onClick={() => setFilter(f.key)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f.key ? "bg-brand-blue text-white" : "bg-white border border-gray-200 text-brand-gray hover:border-brand-blue"}`}>

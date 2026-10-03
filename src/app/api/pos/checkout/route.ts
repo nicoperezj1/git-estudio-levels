@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
+import { checkTotalsPure, checkAgainstCatalog } from "@/lib/checkout-check";
 
 export async function POST(req: NextRequest) {
   // SEGURIDAD: antes cualquiera (sin sesion) podia registrar ventas. Ahora hace falta sesion y el
@@ -90,6 +91,30 @@ export async function POST(req: NextRequest) {
     user_name: barberName,
     metadata: { total, subtotal, discount, paymentMethod: primaryMethod, clientId, items: items.length },
   });
+
+  // MODO COMPARACION (no cambia ni rechaza la venta): el servidor recalcula los totales y los compara con
+  // lo que mando el navegador. Si algo no cuadra queda anotado en la auditoria ("checkout_check") para
+  // revisarlo antes de decidir si se activa el bloqueo. Cualquier error aca se ignora.
+  try {
+    const issues = [
+      ...checkTotalsPure({ items, subtotal, discount, total, payments, redeemedPoints }),
+      ...(await checkAgainstCatalog(supabase, tenantId, barberId, items)),
+    ];
+    if (issues.length > 0) {
+      console.warn("[checkout-check]", tx.id, JSON.stringify(issues));
+      await supabase.from("audit_log").insert({
+        action: "checkout_check",
+        entity_type: "transaction",
+        entity_id: tx.id,
+        description: `Revisar venta $${Number(total).toLocaleString("es-CL")}: ${issues.map((i) => i.code).join(", ")}`,
+        user_id: barberId,
+        user_name: barberName,
+        metadata: { issues, origin },
+      });
+    }
+  } catch (e) {
+    console.error("[checkout-check] error ignorado:", e);
+  }
 
   // Save split payment details
   if (payments && payments.length > 0) {
