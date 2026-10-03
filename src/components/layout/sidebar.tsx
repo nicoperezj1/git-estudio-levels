@@ -14,7 +14,7 @@ import {
   Tablet, CreditCard, Tag, Settings, LogOut, Scissors, Menu, X,
   Heart, Bell, Zap, Image, Star, ChevronLeft, ChevronRight, ChevronDown,
   MessageCircle, Clock, FileText, UserCircle, PiggyBank, ClipboardList,
-  Building2, ShieldCheck, Ticket, Percent, KeyRound,
+  Building2, ShieldCheck, Ticket, Percent, KeyRound, Truck,
 } from "lucide-react";
 
 interface NavItem {
@@ -98,6 +98,7 @@ const sections: NavSection[] = [
     items: [
       { name: "Profesionales", href: "/dashboard/barberos", icon: Scissors, minRole: "admin" },
       { name: "Sucursales", href: "/dashboard/sucursales", icon: MapPin, minRole: "admin" },
+      { name: "Proveedores", href: "/dashboard/proveedores", icon: Truck, minRole: "admin" },
       { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
       { name: "Galería", href: "/dashboard/galeria", icon: Image, minRole: "admin" },
       { name: "Pagos", href: "/dashboard/pagos", icon: CreditCard, minRole: "admin" },

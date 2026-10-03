@@ -51,7 +51,7 @@ Plan acordado con Nicolás el 3 de octubre de 2026. Ordena todos los pedidos de 
 
 ## 3. Fase 1: arreglos rápidos (bajo riesgo)
 
-> **Estado (3 oct., noche):** Fases 1, 2 y 3 COMPLETAS EN CÓDIGO. Fase 2 probada y cerrada. Pendientes de probar en pantalla: Fase 1 (parte) y Fase 3. SQL pendientes en pruebas: 091. Siguiente: Fase 4. Detalle en `docs/CONTEXTO.md`.
+> **Estado (3 oct., noche):** Fases 1, 2, 3 y 4 COMPLETAS EN CÓDIGO. Fase 2 probada y cerrada. Pendientes de probar en pantalla: Fase 1 (parte), Fase 3 y Fase 4. SQL pendientes en pruebas: 091 y 092. Siguiente: Fase 5 (riesgo ALTO). Detalle en `docs/CONTEXTO.md`.
 
 | Cambio | Detalle |
 |---|---|
