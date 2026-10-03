@@ -303,6 +303,34 @@ export default function ServiciosPage() {
   const positionById = new Map<string, number>();
   serviceGroups.forEach((g) => g.items.forEach((x) => positionById.set(x.id, positionById.size + 1)));
 
+  // Arrastrar un servicio a OTRA categoria (o a "Sin categoria"): cambia su categoria y lo deja
+  // en el lugar donde se suelta (antes de `beforeId`, o al final de la categoria si es null).
+  const moveServiceToCategory = (item: Service, targetKey: string, beforeId: string | null) => {
+    const active = services.filter((x) => x.active);
+    const inactive = services.filter((x) => !x.active);
+    const newCategory = targetKey === CATEGORY_NONE ? null : targetKey;
+    const moved: Service = { ...item, category: newCategory };
+    const groups = groupServicesByCategory(active.filter((x) => x.id !== item.id));
+    let target = groups.find((g) => g.key === targetKey);
+    if (!target) {
+      target = { key: targetKey, label: targetKey, items: [] };
+      if (targetKey === CATEGORY_NONE) groups.push(target); else groups.splice(groups.findIndex((g) => g.key === CATEGORY_NONE) === -1 ? groups.length : groups.findIndex((g) => g.key === CATEGORY_NONE), 0, target);
+    }
+    const at = beforeId ? target.items.findIndex((x) => x.id === beforeId) : -1;
+    if (at === -1) target.items.push(moved); else target.items.splice(at, 0, moved);
+    const reordered = groups.flatMap((g) => g.items).map((x, i) => ({ ...x, sort_order: i }));
+    setServices([...reordered, ...inactive]);
+    saveOrder(reordered);
+    fetch(`/api/services/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: newCategory }),
+    }).then((r) => {
+      if (!r.ok) throw new Error();
+      showToast(newCategory ? `Movido a "${newCategory}"` : "Movido a Sin categoría", "success");
+    }).catch(() => showToast("No se pudo cambiar la categoría", "error"));
+  };
+
   // Punto 2 (Nico, 27-sep): al agrupar por carpetas, arrastrar ya no reordena la lista
   // plana completa — solo tiene sentido reordenar DENTRO de la misma carpeta/categoria.
   // Se ubica cada servicio por su id (no por posicion en visibleFlat) dentro de su propio
@@ -315,8 +343,8 @@ export default function ServiciosPage() {
     const fromKey = fromItem.category || CATEGORY_NONE;
     const toKey = toItem.category || CATEGORY_NONE;
     if (fromKey !== toKey) {
-      showToast("Solo puedes reordenar servicios dentro de la misma categoria", "error");
-      return false;
+      moveServiceToCategory(fromItem, toKey, toItem.id);
+      return false; // ya muestra su propio aviso
     }
 
     setServices((prev) => {
@@ -342,7 +370,7 @@ export default function ServiciosPage() {
       return [...reordered, ...inactive];
     });
     return true;
-  }, [visibleFlat]);
+  }, [visibleFlat, services]);
 
   // Desktop drag events
   const handleDragStart = (index: number) => {
@@ -360,6 +388,7 @@ export default function ServiciosPage() {
     }
     setDragIndex(null);
     setOverIndex(null);
+    setOverCat(null);
   };
 
   // Touch drag events
@@ -454,11 +483,18 @@ export default function ServiciosPage() {
                       <div
                         draggable={group.key !== CATEGORY_NONE}
                         onDragStart={(e) => { e.stopPropagation(); setDragCat(group.key); }}
-                        onDragOver={(e) => { if (dragCat) { e.preventDefault(); setOverCat(group.key); } }}
+                        onDragOver={(e) => { if (dragCat || dragIndex !== null) { e.preventDefault(); setOverCat(group.key); } }}
+                        onDrop={() => {
+                          if (dragIndex !== null) {
+                            const it = visibleFlat[dragIndex];
+                            if (it && (it.category || CATEGORY_NONE) !== group.key) moveServiceToCategory(it, group.key, null);
+                            setDragIndex(null); setOverIndex(null); setOverCat(null);
+                          }
+                        }}
                         onDragEnd={() => { if (dragCat && overCat) moveCategory(dragCat, overCat); setDragCat(null); setOverCat(null); }}
                         onClick={() => toggleCategoryCollapsed(group.key)}
                         className={`w-full flex items-center gap-2 px-3 md:px-4 py-2.5 transition-colors text-left cursor-pointer ${
-                          dragCat === group.key ? "opacity-50 bg-brand-blue/5" : overCat === group.key && dragCat ? "bg-brand-blue/10 border-t-2 border-t-brand-blue" : "bg-gray-50 hover:bg-gray-100"
+                          dragCat === group.key ? "opacity-50 bg-brand-blue/5" : overCat === group.key && (dragCat || dragIndex !== null) ? "bg-brand-blue/10 border-t-2 border-t-brand-blue" : "bg-gray-50 hover:bg-gray-100"
                         }`}
                       >
                         {group.key !== CATEGORY_NONE ? (
