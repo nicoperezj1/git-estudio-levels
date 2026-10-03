@@ -72,6 +72,8 @@ export default function CajaPage() {
   const [barberFilter, setBarberFilter] = useState<string>("all");
   // Origen del movimiento (Standby / Punto de venta / Retiros y ajustes): para saber de donde viene cada uno al cuadrar.
   const [originFilter, setOriginFilter] = useState<string>("all");
+  // Orden por hora: "asc" = del primero al ultimo (el efectivo acumulado se lee de arriba hacia abajo), "desc" = lo mas reciente arriba.
+  const [timeOrder, setTimeOrder] = useState<"asc" | "desc">("asc");
 
   // Ver dias anteriores (Punto Nico, 25-sep), solo Administrador: la caja de "hoy" sigue
   // siendo lo unico que se puede abrir/cerrar/reabrir, pero se puede consultar el historial
@@ -784,11 +786,12 @@ export default function CajaPage() {
             let running = 0;
             const withBalance = rows.map((r) => { running += r.cashDelta; return { ...r, balance: running }; });
 
-            const filtered = withBalance.filter((r) => {
+            const filteredAsc = withBalance.filter((r) => {
               if (barberFilter !== "all" && (r.kind !== "tx" || (r.barberId || "none") !== barberFilter)) return false;
               if (originFilter !== "all" && r.kind !== "open" && r.originKey !== originFilter) return false;
               return true;
             });
+            const filtered = timeOrder === "asc" ? filteredAsc : [...filteredAsc].reverse();
             const barbersWithMovements = Array.from(
               new Map(data.transactions.filter((t) => t.barberName).map((t) => [t.barber_id, t.barberName])).entries()
             ) as [string, string][];
@@ -799,6 +802,10 @@ export default function CajaPage() {
                 <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3">
                   <h3 className="font-bold text-gray-800">Movimientos del Dia ({filtered.length})</h3>
                   <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => setTimeOrder(timeOrder === "asc" ? "desc" : "asc")}
+                      className="border rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" title="Cambiar el orden por hora">
+                      {timeOrder === "asc" ? "Hora ↑ primeros primero" : "Hora ↓ últimos primero"}
+                    </button>
                     <select value={originFilter} onChange={(e) => setOriginFilter(e.target.value)} className="border rounded-lg px-2 py-1.5 text-xs">
                       <option value="all">Todo origen</option>
                       <option value="standby">Standby</option>
@@ -825,7 +832,9 @@ export default function CajaPage() {
                     <table className="w-full text-sm min-w-[860px]">
                       <thead className="bg-gray-50 border-b text-left">
                         <tr>
-                          <th className="p-3 font-medium text-gray-600">Hora</th>
+                          <th className="p-3 font-medium text-gray-600 cursor-pointer select-none whitespace-nowrap" onClick={() => setTimeOrder(timeOrder === "asc" ? "desc" : "asc")} title="Cambiar el orden por hora">
+                            Hora {timeOrder === "asc" ? "↑" : "↓"}
+                          </th>
                           <th className="p-3 font-medium text-gray-600">Origen</th>
                           <th className="p-3 font-medium text-gray-600">Emitido por</th>
                           <th className="p-3 font-medium text-gray-600">Profesional</th>
