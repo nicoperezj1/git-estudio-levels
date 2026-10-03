@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Info, Lock, Unlock } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
@@ -33,6 +33,16 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
   const [log, setLog] = useState<CloseLog[]>([]);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(true);
+  // Burbuja de ayuda de "Comision maquina": se abre con el mouse encima o al tocar el icono, y se cierra
+  // al sacar el mouse o tocar fuera.
+  const [tip, setTip] = useState(false);
+  const tipRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!tip) return;
+    const close = (e: Event) => { if (!tipRef.current?.contains(e.target as Node)) setTip(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [tip]);
 
   const load = async () => {
     setLoading(true);
@@ -139,13 +149,27 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
                         <label htmlFor={`fx-${i.key}`} className="text-sm text-brand-dark">{i.label}</label>
                         {i.key === "machine_commission" && machine && (
                           // Ayuda escondida: se ve al pasar el mouse (computador) o al tocar el ícono (celular).
-                          <span className="group relative inline-flex">
-                            <button type="button" aria-label="Ver detalle de ventas con tarjeta" className="text-brand-gray/70 outline-none transition-colors hover:text-brand-blue focus:text-brand-blue">
+                          <span
+                            ref={tipRef}
+                            className="relative inline-flex"
+                            onMouseEnter={() => setTip(true)}
+                            onMouseLeave={() => setTip(false)}
+                          >
+                            <button
+                              type="button"
+                              aria-label="Ver detalle de ventas con tarjeta"
+                              onClick={() => setTip(true)}
+                              onFocus={() => setTip(true)}
+                              onBlur={() => setTip(false)}
+                              className="text-brand-gray/70 outline-none transition-colors hover:text-brand-blue focus:text-brand-blue"
+                            >
                               <Info className="h-4 w-4" strokeWidth={1.75} />
                             </button>
-                            <span className="pointer-events-none absolute left-0 top-6 z-20 hidden w-64 rounded-xl border border-gray-100 bg-white p-3 text-xs leading-snug text-brand-dark shadow-xl group-hover:block group-focus-within:block">
-                              Este mes se vendió <b>{formatCurrency(machine.debit)}</b> con débito y <b>{formatCurrency(machine.credit)}</b> con crédito. Ingresa el monto real que cobró la máquina.
-                            </span>
+                            {tip && (
+                              <span role="tooltip" className="pointer-events-none absolute left-0 top-6 z-20 w-64 rounded-xl border border-gray-100 bg-white p-3 text-xs leading-snug text-brand-dark shadow-xl">
+                                Este mes se vendió <b>{formatCurrency(machine.debit)}</b> con débito y <b>{formatCurrency(machine.credit)}</b> con crédito. Ingresa el monto real que cobró la máquina.
+                              </span>
+                            )}
                           </span>
                         )}
                       </span>
