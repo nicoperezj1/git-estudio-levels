@@ -74,6 +74,8 @@ export default function BookingPage() {
   const [closedDays, setClosedDays] = useState<number[]>([]);
   // Fechas puntuales en que el profesional esta de vacaciones.
   const [closedDates, setClosedDates] = useState<string[]>([]);
+  // true cuando el cliente uso "Primer profesional disponible" (la cita se marca como asignada sola).
+  const [autoAssigned, setAutoAssigned] = useState(false);
   const [closedDaysLoaded, setClosedDaysLoaded] = useState(false);
   const [tenantSlugState, setTenantSlugState] = useState<string>("");
 
@@ -283,6 +285,7 @@ export default function BookingPage() {
         clientEmail: clientEmail || null,
         clientPhone: clientPhone || null,
         notes: notes || null,
+        autoAssigned,
       }),
     });
 
@@ -323,6 +326,7 @@ export default function BookingPage() {
 
   const handleTimePick = (p: TimePick) => {
     preselectSlot.current = p.slot;
+    setAutoAssigned(!!p.auto);
     setSelectedBarber({ id: p.barber.id, name: p.barber.name, avatar_url: p.barber.avatar_url, bio: null, specialties: null, intro_video_url: null, years_experience: null });
     setSelectedServices(p.services.map((sv) => ({ id: sv.id, name: sv.name, description: sv.description, price: sv.price, duration: sv.duration })));
     setSelectedDate(p.date);
@@ -502,6 +506,7 @@ export default function BookingPage() {
                 const res = await fetch(`/api/public/first-available?date=${selectedDate || toLocalDateStr(new Date())}${tenantSlugState ? `&tenant=${tenantSlugState}` : ""}`);
                 const data = await res.json();
                 if (data.barber) {
+                  setAutoAssigned(true);
                   setSelectedBarber(data.barber);
                   setSelectedServices([]);
                   setStep("service");
@@ -519,7 +524,7 @@ export default function BookingPage() {
               {barbers.map((b) => (
                 <button
                   key={b.id}
-                  onClick={() => { setSelectedBarber(b); setSelectedServices([]); setStep("service"); }}
+                  onClick={() => { setAutoAssigned(false); setSelectedBarber(b); setSelectedServices([]); setStep("service"); }}
                   className="flex flex-col items-center p-5 rounded-2xl border border-gray-200 hover:border-brand-blue hover:shadow-lg transition-all text-center group"
                 >
                   {b.avatar_url ? (

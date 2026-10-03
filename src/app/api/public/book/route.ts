@@ -139,6 +139,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Horario no disponible. Selecciona otro." }, { status: 409 });
   }
 
+  // Marca de "primer profesional disponible" (migracion 095): sirve para medir el cumplimiento
+  // semanal de las metas. Si la columna aun no existe, simplemente no se marca.
+  if (body.autoAssigned === true) {
+    await supabase.from("appointments").update({ auto_assigned: true }).eq("id", appointment!.id);
+  }
+
   // Add services to appointment
   const serviceInserts = resolvedServices.map((s) => ({
     appointment_id: appointment!.id,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
 import { barbersOnVacation } from "@/lib/vacations";
+import { getRuleConfig, rankCandidates, weeklyAutoCounts, type Candidate } from "@/lib/booking-rules";
 
 // GET: Returns the barber with fewest appointments today (first available)
 export async function GET(req: NextRequest) {
@@ -94,8 +95,44 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No hay profesionales disponibles ese dia" }, { status: 404 });
   }
 
+  // Regla elegida por el negocio (Fase 6). Sin configurar (o regla 1 sin hora puntual) todo queda
+  // exactamente como antes: el de menos citas del dia.
+  const cfg = await getRuleConfig(supabase, tenantId);
+  const slot = searchParams.get("slot"); // hora ya elegida por el cliente ("YYYY-MM-DDTHH:MM:SS")
+  const candParam = (searchParams.get("candidates") || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const duration = Math.max(15, parseInt(searchParams.get("duration") || "45") || 45);
+
+  let pool = available;
+  if (candParam.length > 0) {
+    const narrowed = available.filter((b) => candParam.includes(b.id));
+    if (narrowed.length > 0) pool = narrowed;
+  }
+
+  let ranked = pool;
+  if (cfg.rule !== "least_agenda" || candParam.length > 0) {
+    let cands: Candidate[] = pool.map((b) => ({ id: b.id, appointments: b.appointments, firstSlot: slot || null }));
+    // Sin hora elegida, las reglas 2 y 3 miran las horas libres de cada profesional ese dia.
+    if (!slot && cfg.rule !== "least_agenda") {
+      const origin = new URL(req.url).origin;
+      const withSlots = await Promise.all(cands.map(async (c) => {
+        try {
+          const r = await fetch(`${origin}/api/public/availability?barberId=${c.id}&date=${date}&duration=${duration}`, { cache: "no-store" });
+          const d = await r.json();
+          return { ...c, firstSlot: (d.slots && d.slots[0]) || null };
+        } catch { return c; }
+      }));
+      const free = withSlots.filter((c) => c.firstSlot);
+      cands = free.length > 0 ? free : withSlots; // nunca quedarse sin candidatos
+    }
+    const autoCounts = cfg.rule === "target_share" ? await weeklyAutoCounts(supabase, tenantId, date) : {};
+    const order = rankCandidates(cands, cfg, { allProIds: barbers.map((b) => b.id), autoCounts });
+    const byId = new Map(pool.map((b) => [b.id, b]));
+    ranked = order.map((c) => byId.get(c.id)!).filter(Boolean);
+  }
+
   return NextResponse.json({
-    barber: available[0],
-    allAvailable: available,
+    barber: ranked[0],
+    allAvailable: ranked,
+    rule: cfg.rule,
   });
 }
