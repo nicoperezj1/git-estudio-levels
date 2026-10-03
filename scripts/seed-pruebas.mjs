@@ -240,6 +240,15 @@ for (let i = 0; i < doneAppts.length; i++) {
   newSales++;
 }
 console.log(`Ventas de prueba nuevas: ${newSales}.`);
+// Propinas de ejemplo ($1.000 en las ventas pares) para ver la linea "Propinas" del libro del profesional.
+{
+  const seedSales = must(await sb.from("transactions").select("id, notes, tip_amount").eq("tenant_id", tenantId).like("notes", "seed-venta:%").order("created_at", { ascending: true }), "ventas de prueba");
+  let tipped = 0;
+  for (let i = 0; i < seedSales.length; i += 2) {
+    if (Number(seedSales[i].tip_amount) === 0) { must(await sb.from("transactions").update({ tip_amount: 1000 }).eq("id", seedSales[i].id), "propina de ejemplo"); tipped++; }
+  }
+  if (tipped) console.log(`Propinas de ejemplo: ${tipped}.`);
+}
 
 {
   const [ty, tm] = today.split("-").map(Number);
