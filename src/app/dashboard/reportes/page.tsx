@@ -7,6 +7,8 @@ import {
   ChevronLeft, ChevronRight, FileDown, Coins, Percent, KeyRound, TrendingDown, PiggyBank, Receipt, CalendarCheck, UserPlus,
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, tableStyles as ts, primaryButton } from "@/components/ui/premium";
+import { useAuth } from "@/lib/auth-context";
+import { MonthClosePanel } from "@/components/finance/month-close-panel";
 
 interface ReportData {
   summary: {
@@ -40,6 +42,7 @@ const paymentMethodLabels: Record<string, string> = {
 };
 
 export default function ReportesPage() {
+  const { isAtLeast } = useAuth();
   const [chileYear, chileMonth] = todayInChile().split("-").map(Number);
   const [month, setMonth] = useState(chileMonth);
   const [year, setYear] = useState(chileYear);
@@ -123,6 +126,9 @@ export default function ReportesPage() {
           </>
         }
       />
+
+      {/* Gastos fijos del mes y cerrar / reabrir (solo administrador) */}
+      {isAtLeast("admin") && <MonthClosePanel month={month} year={year} onChanged={fetchReport} />}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

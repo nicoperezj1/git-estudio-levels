@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
-import { accountingColumnsAvailable, monthStart } from "@/lib/accounting";
+import { accountingColumnsAvailable, isMonthClosed, monthLabelEs, monthStart } from "@/lib/accounting";
 
 // Punto 5 (Pablo): editar/eliminar movimientos manuales, disponible solo para el
 // administrador (pueden existir errores de digitacion o movimientos mal ingresados).
 // Gate en el servidor, no solo en la UI: ocultar el menu en la pagina no alcanza si
 // cualquier usuario autenticado pudiera llamar a este endpoint directamente.
-async function requireAdmin() {
-  const { role } = await getCurrentUserRoleAndTenant();
+// Valida admin, que el movimiento sea de SU negocio (antes un admin de otro negocio podia editar o
+// anular movimientos ajenos) y que su mes no este cerrado. Devuelve el movimiento o una respuesta de error.
+async function guard(id: string, extraMonth?: string | null) {
+  const { role, tenantId } = await getCurrentUserRoleAndTenant();
   if (role !== "admin" && role !== "super_admin") {
-    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    return { denied: NextResponse.json({ error: "No autorizado" }, { status: 403 }) };
   }
-  return null;
+  const supabase = createAdminSupabase();
+  const { data: tx } = await supabase.from("transactions").select("*").eq("id", id).maybeSingle();
+  if (!tx || (role !== "super_admin" && tx.tenant_id !== tenantId)) {
+    return { denied: NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 }) };
+  }
+  // Mes al que corresponde (fecha contable; si no tiene, el mes de su fecha de creacion en Chile).
+  const created = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago", year: "numeric", month: "2-digit" })
+    .format(new Date(tx.created_at));
+  const month = (tx.accounting_month ? monthStart(String(tx.accounting_month).slice(0, 7)) : null) || monthStart(created);
+  for (const m of [month, extraMonth]) {
+    if (m && (await isMonthClosed(supabase, tx.tenant_id, m))) {
+      return { denied: NextResponse.json({ error: `El mes de ${monthLabelEs(m)} esta cerrado. Reabrelo en Cierre mensual para modificar este movimiento.` }, { status: 409 }) };
+    }
+  }
+  return { tx };
 }
 
 const ASSIGNED_TO_VALUES = new Set(["professional", "reception", "business"]);
@@ -20,12 +36,12 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-
-  const supabase = createAdminSupabase();
   const body = await req.json();
   const { description, amount, paymentMethod, notes, assignedTo, barberId, accountingMonth } = body;
+  const checked = await guard(params.id, monthStart(accountingMonth));
+  if ("denied" in checked) return checked.denied;
+
+  const supabase = createAdminSupabase();
 
   const updates: Record<string, any> = {};
   if (amount !== undefined) {
@@ -85,8 +101,8 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const checked = await guard(params.id);
+  if ("denied" in checked) return checked.denied;
 
   const supabase = createAdminSupabase();
 

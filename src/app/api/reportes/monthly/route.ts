@@ -1,4 +1,4 @@
-import { accountingColumnsAvailable, monthFilter } from "@/lib/accounting";
+import { accountingColumnsAvailable, fetchMonthTx } from "@/lib/accounting";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 import { todayInChile, chileDayBoundsUtc } from "@/lib/utils";
@@ -63,19 +63,9 @@ export async function GET(req: NextRequest) {
   const acc = await accountingColumnsAvailable(supabase);
   const mr = { first: firstDayStr, last: lastDayStr, startIso: startDate, endIso: endDate };
 
-  // Income transactions
-  const { data: incomeTx } = await tf(monthFilter(supabase
-    .from("transactions")
-    .select("total, payment_method, barber_id")
-    .eq("type", "income")
-    .eq("status", "completed"), acc, mr));
-
-  // Expense transactions
-  const { data: expenseTx } = await tf(monthFilter(supabase
-    .from("transactions")
-    .select("id, total")
-    .eq("type", "expense")
-    .eq("status", "completed"), acc, mr));
+  // Income / expense transactions (todas las filas, por fecha contable)
+  const incomeTx = await fetchMonthTx(supabase, { select: "total, payment_method, barber_id", type: "income", range: mr, scope: tf, acc });
+  const expenseTx = await fetchMonthTx(supabase, { select: "id, total", type: "expense", range: mr, scope: tf, acc });
 
   const totalIncome = (incomeTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
   const totalExpenses = (expenseTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);

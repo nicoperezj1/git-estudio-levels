@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 import { chileDayBoundsUtc, todayInChile } from "@/lib/utils";
-import { accountingColumnsAvailable, monthEnd, monthFilter, monthStart } from "@/lib/accounting";
+import { accountingColumnsAvailable, isMonthClosed, monthEnd, monthFilter, monthLabelEs, monthStart } from "@/lib/accounting";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -133,9 +133,12 @@ export async function POST(req: NextRequest) {
     barber_id: resolvedBarberId,
   };
   const { userId } = await getCurrentUserRoleAndTenant();
-  const row = acc
-    ? { ...base, accounting_month: monthStart(accountingMonth) || monthStart(todayInChile()), created_by: userId }
-    : base;
+  const month = monthStart(accountingMonth) || monthStart(todayInChile());
+  // Mes cerrado: no se registran movimientos manuales que correspondan a el (hay que reabrirlo).
+  if (acc && month && (await isMonthClosed(supabase, resolvedTenantId, month))) {
+    return NextResponse.json({ error: `El mes de ${monthLabelEs(month)} esta cerrado. Reabrelo en Cierre mensual para registrar este movimiento.` }, { status: 409 });
+  }
+  const row = acc ? { ...base, accounting_month: month, created_by: userId } : base;
 
   const { data: tx, error: txError } = await supabase
     .from("transactions")
