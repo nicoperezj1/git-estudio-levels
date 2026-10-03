@@ -14,7 +14,7 @@ import {
   Tablet, CreditCard, Tag, Settings, LogOut, Scissors, Menu, X,
   Heart, Bell, Zap, Image, Star, ChevronLeft, ChevronRight, ChevronDown,
   MessageCircle, Clock, FileText, UserCircle, PiggyBank, ClipboardList,
-  Building2, ShieldCheck, Ticket, Percent, KeyRound, Truck,
+  Building2, ShieldCheck, Ticket, Percent, KeyRound, Truck, Briefcase, Plane,
 } from "lucide-react";
 
 interface NavItem {
@@ -98,18 +98,25 @@ const sections: NavSection[] = [
     items: [
       { name: "Profesionales", href: "/dashboard/barberos", icon: Scissors, minRole: "admin" },
       { name: "Sucursales", href: "/dashboard/sucursales", icon: MapPin, minRole: "admin" },
-      { name: "Proveedores", href: "/dashboard/proveedores", icon: Truck, minRole: "admin" },
+      {
+        name: "Mi negocio", href: "/dashboard/mi-negocio", icon: Briefcase, minRole: "admin",
+        // Fase 6: lo que se administra del negocio, junto en un solo menu.
+        children: [
+          { name: "Vacaciones", href: "/dashboard/vacaciones", icon: Plane, minRole: "admin" },
+          { name: "Comisiones", href: "/dashboard/comisiones", icon: Percent, minRole: "barber", feature: "commissions" },
+          { name: "Arriendo", href: "/dashboard/arriendo", icon: KeyRound, minRole: "admin", feature: "rental" },
+          { name: "Servicios", href: "/dashboard/servicios", icon: Tag, minRole: "admin" },
+          { name: "Proveedores", href: "/dashboard/proveedores", icon: Truck, minRole: "admin" },
+        ],
+      },
       { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
       { name: "Galería", href: "/dashboard/galeria", icon: Image, minRole: "admin" },
       { name: "Pagos", href: "/dashboard/pagos", icon: CreditCard, minRole: "admin" },
       {
         name: "Configuración", href: "/dashboard/configuracion", icon: Settings, minRole: "admin",
-        // Comisiones/Arriendo/Terminal POS/Servicios/Inventario son hijos de Configuracion.
+        // Terminal POS e Inventario son hijos de Configuracion (Comisiones, Arriendo, Servicios y Proveedores ahora viven en Mi negocio).
         children: [
-          { name: "Comisiones", href: "/dashboard/comisiones", icon: Percent, minRole: "barber", feature: "commissions" },
-          { name: "Arriendo", href: "/dashboard/arriendo", icon: KeyRound, minRole: "admin", feature: "rental" },
           { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin", feature: "pos" },
-          { name: "Servicios", href: "/dashboard/servicios", icon: Tag, minRole: "admin" },
           { name: "Inventario", href: "/dashboard/inventario", icon: Package, minRole: "admin", feature: "inventory" },
           { name: "Plan y facturación", href: "/dashboard/configuracion/facturacion", icon: CreditCard, minRole: "admin" },
         ],
