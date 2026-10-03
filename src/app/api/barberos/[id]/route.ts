@@ -82,6 +82,7 @@ export async function PATCH(
     "personal_pin", "avatar_url", "bio", "specialties",
     "intro_video_url", "years_experience", "slot_duration",
     "also_attends_clients", "instagram", "rental_cash_to_barber", "birth_date",
+    "manager_name",
   ];
 
   const update: Record<string, any> = {};
@@ -111,12 +112,19 @@ export async function PATCH(
     );
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("profiles")
     .update(update)
     .eq("id", params.id)
     .select()
     .single();
+
+  // manager_name es una columna nueva (migracion 089). Si el SQL aun no se aplico, no se pierde el
+  // resto de los cambios: se reintenta sin ese campo.
+  if (error && "manager_name" in update && /manager_name/.test(error.message)) {
+    const { manager_name: _omit, ...rest } = update;
+    ({ data, error } = await supabase.from("profiles").update(rest).eq("id", params.id).select().single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);

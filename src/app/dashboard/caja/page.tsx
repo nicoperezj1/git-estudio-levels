@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
+import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 
@@ -398,6 +399,7 @@ export default function CajaPage() {
     <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
+          <ReceptionistGreeting className="mb-0.5" />
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Caja Diaria</h1>
           <p className="text-gray-500 text-sm">{isToday ? todayLabel : selectedDateLabel}</p>
         </div>

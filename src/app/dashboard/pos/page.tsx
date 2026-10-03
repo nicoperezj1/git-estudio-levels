@@ -9,6 +9,7 @@ import {
   Banknote, CreditCard, ArrowLeftRight, ArrowRight, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { SaleCelebration } from "@/components/pos/sale-celebration";
+import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
 
 interface Service {
   id: string;
@@ -580,6 +581,7 @@ export default function POSPage() {
     <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-4rem)]">
       {/* Left: Items */}
       <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <ReceptionistGreeting className="mb-2" />
         {/* Barra superior: pestañas segmentadas + buscador + orden */}
         <div className="mb-5 space-y-3">
           <div className="flex flex-wrap items-center gap-3">

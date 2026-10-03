@@ -79,6 +79,9 @@ export default function EditProfessionalPage() {
         also_attends_clients: (data as any).also_attends_clients,
         instagram: (data as any).instagram,
         rental_cash_to_barber: (data as any).rental_cash_to_barber,
+        // Solo se manda para recepcion (columna nueva, migracion 089): asi guardar a cualquier
+        // otro perfil nunca depende de que el SQL ya este aplicado.
+        ...(isReceptionistProfile ? { manager_name: (data as any).manager_name || null } : {}),
       }),
     });
     setSaving(false);
@@ -142,6 +145,11 @@ export default function EditProfessionalPage() {
 
   if (loading) return <Spinner />;
   if (!data) return <p className="p-6 text-center text-gray-500">Profesional no encontrado</p>;
+
+  // Ficha de una persona con cargo Recepcionista: no es profesional de agenda, asi que se ocultan
+  // link de agenda, duracion de slot, modalidad, comision, horario, servicios y presentacion, y se
+  // muestra "Nombre de encargado" (el saludo "Hola David" en Caja y Punto de Venta).
+  const isReceptionistProfile = (data as any).role === "receptionist";
 
   // Receptionist view: basic presentation data (photo, Instagram, bio) + work
   // schedule. Everything else (work mode, rates, PIN, email/phone, delete) stays hidden.
@@ -244,6 +252,7 @@ export default function EditProfessionalPage() {
       </div>
 
       {/* Personal booking link */}
+      {!isReceptionistProfile && (
       <div className="bg-brand-light border border-brand-blue/20 rounded-2xl p-4">
         <p className="text-xs text-brand-gray font-medium mb-1.5">Link de agenda personal</p>
         <div className="flex items-center gap-2">
@@ -282,6 +291,8 @@ export default function EditProfessionalPage() {
         </div>
         <p className="text-[10px] text-brand-gray mt-2">Comparte este link en Instagram, WhatsApp o redes sociales para que tus clientes agenden directo contigo.</p>
       </div>
+
+      )}
 
       {/* Basic info */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
@@ -346,6 +357,7 @@ export default function EditProfessionalPage() {
               onChange={(e) => setData({ ...data, personal_pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
               className="w-full border rounded-xl px-3 py-2.5 text-sm font-mono tracking-widest" />
           </div>
+          {!isReceptionistProfile && (
           <div>
             <label className="block text-xs text-gray-500 mb-1">Duración de slot (minutos)</label>
             <select value={(data as any).slot_duration || 45}
@@ -365,6 +377,17 @@ export default function EditProfessionalPage() {
             </select>
             <p className="text-[10px] text-gray-400 mt-1">Intervalo entre citas disponibles en la agenda online</p>
           </div>
+          )}
+          {isReceptionistProfile && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Nombre de encargado</label>
+            <input type="text" value={(data as any).manager_name || ""}
+              onChange={(e) => setData({ ...data, manager_name: e.target.value } as any)}
+              placeholder="Ej: David"
+              className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+            <p className="text-[10px] text-gray-400 mt-1">Con este nombre se le saluda en Caja y Punto de Venta: &ldquo;Hola David&rdquo;</p>
+          </div>
+          )}
         </div>
 
         {/* Also attends clients toggle (for admins) */}
@@ -387,6 +410,7 @@ export default function EditProfessionalPage() {
         ) : null}
       </div>
 
+      {!isReceptionistProfile && (<>
       {/* Work mode selector */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
         <h2 className="font-bold text-gray-800">Modalidad de Trabajo</h2>
@@ -565,6 +589,8 @@ export default function EditProfessionalPage() {
           </div>
         </div>
       </div>
+
+      </>)}
 
       {/* Change Role */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
