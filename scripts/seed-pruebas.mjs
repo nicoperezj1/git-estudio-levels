@@ -142,7 +142,7 @@ if (!tenantId) {
   // Igual que /api/auth/signup-business: negocio en prueba, admin vinculado y tenant_settings.
   const t = must(await sb.from("tenants").insert({
     name: "Estudio Levels (pruebas)", slug: `levels-pruebas-${Date.now().toString(36).slice(-4)}`,
-    admin_email: ADMIN_EMAIL, admin_name: "Nicolás", plan: "starter", status: "trial",
+    admin_email: ADMIN_EMAIL, admin_name: "Nicolás", plan: "pro", max_professionals: 8, status: "trial", // Pro: incluye Caja, Comisiones y Arriendo
     trial_ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
   }).select("id").single(), "crear negocio");
   tenantId = t.id;
