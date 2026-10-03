@@ -120,6 +120,35 @@ export default function ConfiguracionPage() {
     }
   };
 
+  // Caja y Standby (Fase 5): Standby nuevo (apagado por defecto) y tope de efectivo antes de pedir una reduccion.
+  const [cajaSec, setCajaSec] = useState<{ standbyV2: boolean; cashCap: number | null; migrationMissing?: boolean } | null>(null);
+  const [capInput, setCapInput] = useState("");
+  const [savingCajaSec, setSavingCajaSec] = useState(false);
+  useEffect(() => {
+    if (!tenantId) return;
+    fetch(`/api/settings/caja-seguridad?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((d) => { setCajaSec({ standbyV2: !!d?.standbyV2, cashCap: d?.cashCap ?? null, migrationMissing: !!d?.migrationMissing }); setCapInput(d?.cashCap ? String(d.cashCap) : ""); })
+      .catch(() => setCajaSec(null));
+  }, [tenantId]);
+  const saveCajaSec = async (patch: { standbyV2?: boolean; cashCap?: number | null }, okMsg: string) => {
+    if (!tenantId || savingCajaSec) return;
+    setSavingCajaSec(true);
+    try {
+      const res = await fetch("/api/settings/caja-seguridad", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId, ...patch }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "No se pudo guardar");
+      setCajaSec((c) => (c ? { ...c, ...patch } : c));
+      showToast(okMsg, "success");
+    } catch (e: any) {
+      showToast(e?.message || "No se pudo guardar", "error");
+    } finally {
+      setSavingCajaSec(false);
+    }
+  };
+
   // Libro de movimientos del profesional (Arriendo y Comision): interruptor por negocio, apagado por defecto.
   const [ledger, setLedger] = useState<{ enabled: boolean; migrationMissing: boolean } | null>(null);
   const [savingLedger, setSavingLedger] = useState(false);
@@ -959,6 +988,37 @@ export default function ConfiguracionPage() {
               </span>
             </span>
           </label>
+        </div>
+      )}
+
+      {/* Caja y Standby (Fase 5). Solo administrador. */}
+      {isAdmin && cajaSec && (
+        <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-4">
+          <div>
+            <h2 className="font-bold text-brand-dark">Caja y Standby</h2>
+            <p className="text-xs text-brand-gray">Standby con servicios y productos, y aviso para llevar el efectivo a la caja fuerte</p>
+          </div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" checked={cajaSec.standbyV2} disabled={savingCajaSec}
+              onChange={(e) => saveCajaSec({ standbyV2: e.target.checked }, e.target.checked ? "Standby nuevo activado" : "Standby de siempre activado")}
+              className="mt-1 h-4 w-4 rounded border-gray-300" />
+            <span>
+              <span className="block text-sm font-medium text-brand-dark">Standby nuevo</span>
+              <span className="block text-xs text-brand-gray">Saluda al profesional y le muestra sus servicios y los productos de venta. Si lo apagas, vuelve el Standby de siempre.</span>
+            </span>
+          </label>
+          <div>
+            <label className="block text-sm font-medium text-brand-dark mb-1">Tope de efectivo en caja</label>
+            <div className="flex gap-2">
+              <input type="number" min={0} value={capInput} onChange={(e) => setCapInput(e.target.value)} placeholder="Sin tope"
+                className="w-44 border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              <button type="button" disabled={savingCajaSec}
+                onClick={() => saveCajaSec({ cashCap: capInput.trim() === "" ? null : Number(capInput) }, capInput.trim() === "" ? "Sin tope de efectivo" : "Tope guardado")}
+                className="px-4 py-2 bg-brand-blue text-white rounded-xl text-sm font-medium disabled:opacity-50">Guardar</button>
+            </div>
+            <p className="text-xs text-brand-gray mt-1">Cuando el efectivo pase este monto, se le pedirá a quien esté en caja llevar el excedente a la caja fuerte. Vacío = sin aviso.</p>
+          </div>
+          {cajaSec.migrationMissing && <p className="text-xs text-red-500">Falta aplicar la migración 094 en la base de datos.</p>}
         </div>
       )}
 
