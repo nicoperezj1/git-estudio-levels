@@ -37,7 +37,13 @@ interface CajaData {
     barber_id?: string | null;
     barberName?: string | null;
     services?: string;
+    issuedByName?: string | null;
+    origin?: string | null;
+    cashAmount?: number;
+    barberTakesCash?: boolean;
   }>;
+  withdrawals?: Array<{ id: string; amount: number; note: string | null; created_by_name: string | null; created_at: string }>;
+  adjustments?: Array<{ id: string; amount: number; note: string; created_by_name: string | null; created_at: string; declared_cash: number | null }>;
 }
 
 const paymentLabels: Record<string, string> = {
@@ -64,6 +70,8 @@ export default function CajaPage() {
 
   // Filter the daily movements by professional.
   const [barberFilter, setBarberFilter] = useState<string>("all");
+  // Origen del movimiento (Standby / Punto de venta / Retiros y ajustes): para saber de donde viene cada uno al cuadrar.
+  const [originFilter, setOriginFilter] = useState<string>("all");
 
   // Ver dias anteriores (Punto Nico, 25-sep), solo Administrador: la caja de "hoy" sigue
   // siendo lo unico que se puede abrir/cerrar/reabrir, pero se puede consultar el historial
@@ -729,37 +737,82 @@ export default function CajaPage() {
             </div>
           )}
 
-          {/* Transaction list — full breakdown for daily reconciliation */}
+          {/* Movimientos del dia — TODOS, con quien los emitio y desde donde (Standby, Punto de venta, retiros, ajustes),
+              y el efectivo que deberia haber en caja despues de cada uno. Asi quien cierra la caja puede seguir el rastro
+              completo aunque los movimientos los haya hecho otra persona en otro horario. */}
           {(() => {
-            const filtered = data.transactions.filter((t) =>
-              barberFilter === "all" ? true : (t.barber_id || "none") === barberFilter
-            );
-            // Barbers that actually have movements today, for the filter dropdown.
+            type Row = {
+              key: string; kind: "open" | "tx" | "withdrawal" | "adjustment"; at: number; tx?: any;
+              label: string; amount: number; sign: "+" | "-" | ""; method: string; by: string | null; origin: string; originKey: string;
+              barber: string | null; barberId: string | null; tip: number; cashDelta: number;
+            };
+            const rows: Row[] = [];
+            if (data.register) {
+              rows.push({
+                key: "open", kind: "open", at: new Date(data.register.opened_at || data.register.created_at || 0).getTime(), label: "Apertura de caja",
+                amount: Number(data.summary.openingAmount), sign: "", method: "Efectivo", by: data.register.opened_by_profile?.name || null,
+                origin: "Caja", originKey: "caja", barber: null, barberId: null, tip: 0, cashDelta: Number(data.summary.openingAmount),
+              });
+            }
+            for (const t of data.transactions) {
+              const cashLike = t.payment_method === "cash" || (t.payment_method === "mixed" && Number(t.cashAmount) > 0);
+              const cash = Number(t.cashAmount ?? t.total);
+              const delta = !cashLike ? 0 : t.type === "income" ? (t.barberTakesCash ? 0 : cash) : -cash;
+              const originKey = t.origin === "standby" ? "standby" : t.origin === "pos" ? "pos" : "otro";
+              rows.push({
+                key: t.id, kind: "tx", tx: t, at: new Date(t.created_at).getTime(),
+                label: t.services || t.notes || (t.type === "income" ? "Venta" : "Gasto"), amount: Number(t.total), sign: t.type === "income" ? "+" : "-",
+                method: paymentLabels[t.payment_method] || t.payment_method, by: t.issuedByName || null,
+                origin: originKey === "standby" ? "Standby" : originKey === "pos" ? "Punto de venta" : "Sin dato", originKey,
+                barber: t.barberName || null, barberId: t.barber_id || null, tip: Number(t.tip_amount || 0), cashDelta: delta,
+              });
+            }
+            for (const w of data.withdrawals || []) {
+              rows.push({
+                key: `w-${w.id}`, kind: "withdrawal", at: new Date(w.created_at).getTime(), label: w.note || "Retiro a la caja fuerte", amount: Number(w.amount), sign: "-",
+                method: "Efectivo", by: w.created_by_name, origin: "Retiro", originKey: "ajustes", barber: null, barberId: null, tip: 0, cashDelta: -Number(w.amount),
+              });
+            }
+            for (const a of data.adjustments || []) {
+              rows.push({
+                key: `a-${a.id}`, kind: "adjustment", at: new Date(a.created_at).getTime(), label: `Ajuste de caja: ${a.note}`, amount: Math.abs(Number(a.amount)), sign: Number(a.amount) < 0 ? "-" : "+",
+                method: "Efectivo", by: a.created_by_name, origin: "Ajuste", originKey: "ajustes", barber: null, barberId: null, tip: 0, cashDelta: Number(a.amount),
+              });
+            }
+            rows.sort((x, y) => x.at - y.at);
+            // Efectivo que deberia haber en caja despues de cada movimiento (acumulado).
+            let running = 0;
+            const withBalance = rows.map((r) => { running += r.cashDelta; return { ...r, balance: running }; });
+
+            const filtered = withBalance.filter((r) => {
+              if (barberFilter !== "all" && (r.kind !== "tx" || (r.barberId || "none") !== barberFilter)) return false;
+              if (originFilter !== "all" && r.kind !== "open" && r.originKey !== originFilter) return false;
+              return true;
+            });
             const barbersWithMovements = Array.from(
-              new Map(
-                data.transactions
-                  .filter((t) => t.barberName)
-                  .map((t) => [t.barber_id, t.barberName])
-              ).entries()
+              new Map(data.transactions.filter((t) => t.barberName).map((t) => [t.barber_id, t.barberName])).entries()
             ) as [string, string][];
+            const colors: Record<string, string> = { standby: "bg-indigo-50 text-indigo-700", pos: "bg-sky-50 text-sky-700", ajustes: "bg-amber-50 text-amber-700", caja: "bg-gray-100 text-gray-600", otro: "bg-gray-100 text-gray-500" };
 
             return (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
                 <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3">
                   <h3 className="font-bold text-gray-800">Movimientos del Dia ({filtered.length})</h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select value={originFilter} onChange={(e) => setOriginFilter(e.target.value)} className="border rounded-lg px-2 py-1.5 text-xs">
+                      <option value="all">Todo origen</option>
+                      <option value="standby">Standby</option>
+                      <option value="pos">Punto de venta</option>
+                      <option value="ajustes">Retiros y ajustes</option>
+                    </select>
                     {barbersWithMovements.length > 0 && (
-                      <select value={barberFilter} onChange={(e) => setBarberFilter(e.target.value)}
-                        className="border rounded-lg px-2 py-1.5 text-xs">
+                      <select value={barberFilter} onChange={(e) => setBarberFilter(e.target.value)} className="border rounded-lg px-2 py-1.5 text-xs">
                         <option value="all">Todos los profesionales</option>
-                        {barbersWithMovements.map(([id, name]) => (
-                          <option key={id} value={id}>{name}</option>
-                        ))}
+                        {barbersWithMovements.map(([id, name]) => (<option key={id} value={id}>{name}</option>))}
                       </select>
                     )}
                     {isToday && (
-                      <button onClick={() => setShowManualModal(true)}
-                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-medium">
+                      <button onClick={() => setShowManualModal(true)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-medium">
                         + Registrar movimiento
                       </button>
                     )}
@@ -769,62 +822,66 @@ export default function CajaPage() {
                   <p className="p-6 text-center text-gray-400">Sin movimientos</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[640px]">
+                    <table className="w-full text-sm min-w-[860px]">
                       <thead className="bg-gray-50 border-b text-left">
                         <tr>
-                          <th className="p-3 font-medium text-gray-600">Profesional</th>
                           <th className="p-3 font-medium text-gray-600">Hora</th>
-                          <th className="p-3 font-medium text-gray-600">Servicio</th>
-                          <th className="p-3 font-medium text-gray-600 text-right">Precio</th>
+                          <th className="p-3 font-medium text-gray-600">Origen</th>
+                          <th className="p-3 font-medium text-gray-600">Emitido por</th>
+                          <th className="p-3 font-medium text-gray-600">Profesional</th>
+                          <th className="p-3 font-medium text-gray-600">Detalle</th>
+                          <th className="p-3 font-medium text-gray-600 text-right">Monto</th>
                           <th className="p-3 font-medium text-gray-600">Metodo</th>
                           <th className="p-3 font-medium text-gray-600 text-right">Propina</th>
+                          <th className="p-3 font-medium text-gray-600 text-right" title="Efectivo que deberia haber en caja despues de este movimiento">Efectivo en caja</th>
                           <th className="p-3 w-10" />
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {filtered.map((t) => (
-                          <tr key={t.id} className="hover:bg-gray-50">
-                            <td className="p-3">
-                              <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.type === "income" ? "bg-green-500" : "bg-red-500"}`} />
-                                {t.barberName || <span className="text-gray-400">—</span>}
-                              </div>
-                            </td>
-                            <td className="p-3 text-gray-500">
-                              {new Date(t.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
-                            </td>
-                            <td className="p-3">{t.services || t.notes || (t.type === "income" ? "Venta" : "Gasto")}</td>
-                            <td className={`p-3 text-right font-medium ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                              {t.type === "income" ? "+" : "-"}{formatCurrency(Number(t.total))}
-                            </td>
-                            <td className="p-3 text-gray-600">{paymentLabels[t.payment_method] || t.payment_method}</td>
-                            <td className="p-3 text-right text-gray-600">{t.tip_amount ? formatCurrency(Number(t.tip_amount)) : "—"}</td>
-                            <td className="p-3 text-right relative" ref={openMenuId === t.id ? menuRef : undefined}>
-                              <button type="button" onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
-                                disabled={deletingId === t.id}
-                                className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 disabled:opacity-50"
-                                aria-label="Mas acciones">
-                                {deletingId === t.id ? "…" : "⋮"}
-                              </button>
-                              {openMenuId === t.id && (
-                                <div className="absolute right-3 top-10 z-10 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-36 text-left">
-                                  <button onClick={() => handleMenuEdit(t)}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    Modificar
-                                  </button>
-                                  <button onClick={() => handleMenuDelete(t)}
-                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                                    Eliminar
-                                  </button>
+                        {filtered.map((r) => {
+                          const t = r.tx;
+                          return (
+                            <tr key={r.key} className="hover:bg-gray-50">
+                              <td className="p-3 text-gray-500 whitespace-nowrap">{new Date(r.at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</td>
+                              <td className="p-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${colors[r.originKey]}`}>{r.origin}</span></td>
+                              <td className="p-3 text-gray-700">{r.by || <span className="text-gray-300">—</span>}</td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  {r.kind === "tx" && <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.sign === "+" ? "bg-green-500" : "bg-red-500"}`} />}
+                                  {r.barber || <span className="text-gray-300">—</span>}
                                 </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="p-3 max-w-[260px] truncate" title={r.label}>{r.label}</td>
+                              <td className={`p-3 text-right font-medium whitespace-nowrap ${r.sign === "+" ? "text-green-600" : r.sign === "-" ? "text-red-600" : "text-gray-700"}`}>
+                                {r.sign}{formatCurrency(r.amount)}
+                              </td>
+                              <td className="p-3 text-gray-600">{r.method}</td>
+                              <td className="p-3 text-right text-gray-600">{r.tip ? formatCurrency(r.tip) : "—"}</td>
+                              <td className={`p-3 text-right font-semibold whitespace-nowrap ${r.balance < 0 ? "text-red-600" : "text-gray-800"}`}>{formatCurrency(r.balance)}</td>
+                              <td className="p-3 text-right relative" ref={t && openMenuId === t.id ? menuRef : undefined}>
+                                {t && (
+                                  <>
+                                    <button type="button" onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)} disabled={deletingId === t.id}
+                                      className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 disabled:opacity-50" aria-label="Mas acciones">
+                                      {deletingId === t.id ? "…" : "⋮"}
+                                    </button>
+                                    {openMenuId === t.id && (
+                                      <div className="absolute right-3 top-10 z-10 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-36 text-left">
+                                        <button onClick={() => handleMenuEdit(t)} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Modificar</button>
+                                        <button onClick={() => handleMenuDelete(t)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Eliminar</button>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
+                <p className="px-4 py-2.5 text-[11px] text-gray-400 border-t">"Efectivo en caja" suma la apertura y cada movimiento en efectivo, en orden. Si una fila no coincide con lo que hay de verdad, ahí empezó la diferencia.</p>
               </div>
             );
           })()}

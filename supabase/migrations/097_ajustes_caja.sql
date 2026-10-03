@@ -26,5 +26,9 @@ ALTER TABLE problem_reports ADD COLUMN IF NOT EXISTS consent BOOLEAN NOT NULL DE
 ALTER TABLE problem_reports ADD COLUMN IF NOT EXISTS resolution_note TEXT;
 ALTER TABLE problem_reports ADD COLUMN IF NOT EXISTS declared_cash NUMERIC(12,0);
 
+-- Origen de cada venta (standby / pos / manual): para que quien cierra la caja sepa de donde viene cada movimiento.
+-- (transactions.created_by ya existe desde la 090: ahora tambien se llena en las ventas del POS y del Standby.)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS origin TEXT;
+
 -- Verificacion (Supabase muestra solo el ultimo resultado): debe devolver 1 fila.
 SELECT table_name FROM information_schema.tables WHERE table_name = 'cash_adjustments';

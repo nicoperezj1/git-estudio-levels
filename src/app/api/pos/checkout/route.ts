@@ -11,6 +11,9 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { items, clientId, barberId, paymentMethod, payments, couponCode, discount, subtotal, total, redeemedPoints, appointmentId } = body;
+  // De donde sale la venta y quien la emite (para el control de la caja): en Standby es el profesional que entro con su
+  // PIN; en el Punto de Venta, la persona con la sesion abierta.
+  const origin = body.origin === "standby" ? "standby" : "pos";
   // payments: optional array [{method: "cash", amount: 10000}, {method: "debit_card", amount: 7000}]
   // If not provided, falls back to single paymentMethod for full total
 
@@ -44,24 +47,33 @@ export async function POST(req: NextRequest) {
 
   // Create transaction
 
-  const { data: tx, error } = await supabase
-    .from("transactions")
-    .insert({
-      type: "income",
-      status: "completed",
-      subtotal,
-      discount: discount || 0,
-      total,
-      payment_method: primaryMethod,
-      client_id: clientId || null,
-      barber_id: barberId,
-      coupon_id: couponId,
-      tenant_id: tenantId,
-    })
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Quien emite: en Standby, el profesional (si es del mismo negocio); si no, quien tiene la sesion.
+  let issuedBy: string = userId;
+  if (origin === "standby" && typeof body.issuedBy === "string") {
+    const { data: who } = await supabase.from("profiles").select("id").eq("id", body.issuedBy).eq("tenant_id", tenantId).maybeSingle();
+    if (who) issuedBy = who.id;
+  }
+  const txRow: Record<string, any> = {
+    type: "income",
+    status: "completed",
+    subtotal,
+    discount: discount || 0,
+    total,
+    payment_method: primaryMethod,
+    client_id: clientId || null,
+    barber_id: barberId,
+    coupon_id: couponId,
+    tenant_id: tenantId,
+    created_by: issuedBy,
+    origin,
+  };
+  let { data: tx, error } = await supabase.from("transactions").insert(txRow).select().single();
+  if (error && /origin|created_by/i.test(error.message)) {
+    // Migraciones 090/097 aun no aplicadas: se guarda la venta igual, sin esos datos.
+    const { origin: _o, created_by: _c, ...legacy } = txRow;
+    ({ data: tx, error } = await supabase.from("transactions").insert(legacy).select().single());
+  }
+  if (error || !tx) return NextResponse.json({ error: error?.message || "No se pudo registrar la venta" }, { status: 500 });
 
   // Log in audit
   const clientName = clientId

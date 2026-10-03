@@ -30,15 +30,32 @@ export async function GET(req: NextRequest) {
   // Enriched breakdown for the "Movimientos del dia" table: who did it (barber), what
   // (service/item descriptions), the tip, plus the amount/method/time. This is what
   // lets the daily cash count be reconciled inside re-booking instead of a side Excel.
-  let txQuery = supabase
-    .from("transactions")
-    .select("id, type, total, payment_method, notes, created_at, tip_amount, barber_id, barber:profiles(name, work_mode, rental_cash_to_barber), items:transaction_items(description)")
-    .eq("status", "completed")
-    .gte("created_at", dayStart)
-    .lt("created_at", dayEnd)
-    .order("created_at", { ascending: true });
-  if (tenantId && tenantId !== "ALL") txQuery = txQuery.eq("tenant_id", tenantId);
-  const { data: transactionsRaw } = await txQuery;
+  const txSelect = (extra: string) =>
+    `id, type, total, payment_method, notes, created_at, tip_amount, barber_id${extra}, barber:profiles(name, work_mode, rental_cash_to_barber), items:transaction_items(description)`;
+  const runTx = (extra: string) => {
+    let q = supabase
+      .from("transactions")
+      .select(txSelect(extra))
+      .eq("status", "completed")
+      .gte("created_at", dayStart)
+      .lt("created_at", dayEnd)
+      .order("created_at", { ascending: true });
+    if (tenantId && tenantId !== "ALL") q = q.eq("tenant_id", tenantId);
+    return q;
+  };
+  // Con quien emitio cada movimiento y desde donde (created_by / origin: migraciones 090 y 097). Si alguna aun no esta
+  // aplicada, se pide sin esos datos para que la caja nunca quede en blanco.
+  let { data: transactionsRaw, error: txErr } = await runTx(", created_by, origin");
+  if (txErr) ({ data: transactionsRaw, error: txErr } = await runTx(", created_by"));
+  if (txErr) ({ data: transactionsRaw } = await runTx(""));
+
+  // Nombres de quienes emitieron (created_by no tiene llave hacia profiles: se buscan aparte).
+  const issuerIds = Array.from(new Set((transactionsRaw || []).map((t: any) => t.created_by).filter(Boolean)));
+  const issuerNames = new Map<string, string>();
+  if (issuerIds.length > 0) {
+    const { data: issuers } = await supabase.from("profiles").select("id, name").in("id", issuerIds);
+    for (const i of (issuers || []) as any[]) issuerNames.set(i.id, i.name);
+  }
 
   // Bug (reportado por Nico, 26-sep): un cobro dividido (ej. debito + efectivo) guarda
   // payment_method = "mixed" en transactions (ver /api/pos/checkout), y el detalle real
@@ -75,6 +92,8 @@ export async function GET(req: NextRequest) {
     created_at: t.created_at,
     tip_amount: t.tip_amount || 0,
     barber_id: t.barber_id,
+    issuedByName: t.created_by ? issuerNames.get(t.created_by) || null : null,
+    origin: t.origin || null,
     barberName: t.barber?.name || null,
     barberTakesCash: t.barber?.work_mode === "rental" && !!t.barber?.rental_cash_to_barber,
     services: Array.isArray(t.items) ? t.items.map((i: any) => i.description).filter(Boolean).join(", ") : "",

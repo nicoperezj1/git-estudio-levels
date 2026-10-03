@@ -542,6 +542,8 @@ export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
           total,
           redeemedPoints: redeemedPoints || 0,
           appointmentId: appointmentId || null,
+          origin: standby ? "standby" : "pos",
+          issuedBy: standby ? standby.barber.id : undefined,
         }),
       });
       if (res.ok) {
