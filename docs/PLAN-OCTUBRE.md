@@ -29,7 +29,7 @@ Plan acordado con Nicolás el 3 de octubre de 2026. Ordena todos los pedidos de 
 | "Emitido por" | Se guarda desde ahora; los movimientos antiguos quedan sin ese dato. |
 | Descuento sobre el 15% (trabajadores con contrato) | Se permite, con ventana de confirmación que explica el límite legal (art. 58 Código del Trabajo). El negocio decide. |
 | Vacaciones de profesionales | **Solo bloquean horas** (agenda y reserva online). |
-| Gastos fijos del mes | Se ingresan **desde cero cada mes** (no se copian solos). |
+| Gastos del mes | Se ingresan **desde cero cada mes** (no se copian solos). |
 | Comisión de la máquina | **Manual**, cada mes. Al lado se muestra lo vendido ese mes con débito y con crédito como ayuda. |
 | Reducción de efectivo | Tope **por sucursal** (si hay una sola, por negocio). |
 | Campos que se ocultan en la ficha | **Solo para recepcionistas:** link de agenda, duración de slot, modalidad, comisión, horario, servicios y presentación. |
@@ -75,10 +75,10 @@ Plan acordado con Nicolás el 3 de octubre de 2026. Ordena todos los pedidos de 
 | Fecha contable | Campo **"Corresponde al mes"** en cada ingreso y egreso (por defecto, el mes de hoy). Arregla que un egreso de septiembre registrado en octubre no salga en el cierre de septiembre. |
 | Emitido por | Guardar quién registra cada movimiento. |
 | Ingresos y Egresos | Columnas: fecha, hora, tipo, descripción, profesional / corresponde a, emitido por, cliente, método de pago, monto. Filtros y exportación. Todo lo demás se mantiene. |
-| Gastos fijos del mes | Sección en el cierre mensual: impuestos, comisión máquina (con ayuda débito/crédito), arriendo/dividendo, insumos, luz, publicidad, honorarios/freelance, equipamiento. Se ingresan cada mes y se ven en egresos, cierre e informes. |
+| Gastos del mes | Sección en el cierre mensual: impuestos, comisión máquina (con ayuda débito/crédito), arriendo/dividendo, insumos, luz, publicidad, honorarios/freelance, equipamiento. Se ingresan cada mes y se ven en egresos, cierre e informes. |
 | Cierre mensual e informes | Leen la **fecha contable**. Botón **"Cerrar mes"** / **"Reabrir"** (solo admin), con registro de cambios. |
 
-**SQL:** `090` (columnas `accounting_month` y `created_by` en movimientos, tabla de gastos fijos, tabla de meses cerrados). Los movimientos existentes quedan con fecha contable = su fecha de creación (no se cambian datos). **Riesgo: ALTO** (toca el dinero de los informes).
+**SQL:** `090` (columnas `accounting_month` y `created_by` en movimientos, tabla de gastos del mes, tabla de meses cerrados). Los movimientos existentes quedan con fecha contable = su fecha de creación (no se cambian datos). **Riesgo: ALTO** (toca el dinero de los informes).
 
 **Vuelta atrás:**
 - Las columnas nuevas no cambian datos viejos; si el código falla, `git revert` y los informes vuelven a calcular como antes.

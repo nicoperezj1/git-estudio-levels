@@ -318,18 +318,13 @@ export default function ReportesPage() {
           ) : (
             <div>
               <ul className="divide-y divide-gray-100">
-                {data.expensesDetail.map((row, i) => {
-                  const isFixed = row.name.endsWith(" (gasto fijo)");
-                  return (
-                    <li key={i} className="flex items-baseline justify-between gap-4 py-2.5">
-                      <span className="min-w-0 truncate text-sm text-brand-dark">
-                        {isFixed ? row.name.replace(" (gasto fijo)", "") : row.name}
-                        {isFixed && <span className="ml-2 rounded-full bg-brand-blue/10 px-2 py-0.5 align-middle text-[10px] font-semibold text-brand-blue">fijo</span>}
-                      </span>
-                      <span className="shrink-0 text-sm font-medium tabular-nums text-red-500">{formatCurrency(row.total)}</span>
-                    </li>
-                  );
-                })}
+                {data.expensesDetail.map((row, i) => (
+                  <li key={i} className="flex items-baseline justify-between gap-4 py-2.5">
+                    {/* El sufijo " (gasto fijo)" es de registros guardados antes del cambio de nombre. */}
+                    <span className="min-w-0 truncate text-sm text-brand-dark">{row.name.replace(" (gasto fijo)", "")}</span>
+                    <span className="shrink-0 text-sm font-medium tabular-nums text-red-500">{formatCurrency(row.total)}</span>
+                  </li>
+                ))}
               </ul>
               <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-gray-200 pt-3">
                 <span className="text-sm font-bold text-brand-dark">Total egresos</span>
@@ -339,7 +334,7 @@ export default function ReportesPage() {
           )}
         </Panel>
 
-        {/* Gastos fijos del mes y cerrar / reabrir (solo administrador), al lado de los egresos. */}
+        {/* Gastos del mes y cerrar / reabrir (solo administrador), al lado de los egresos. */}
         {isAtLeast("admin") && <MonthClosePanel month={month} year={year} onChanged={fetchReport} />}
       </div>
     </div>

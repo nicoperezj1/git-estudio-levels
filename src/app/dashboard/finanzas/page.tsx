@@ -212,7 +212,7 @@ export default function FinanzasPage() {
         d.toLocaleTimeString("es-CL", { timeZone: CL_TZ, hour: "2-digit", minute: "2-digit" }),
         d.toLocaleDateString("es-CL", { timeZone: CL_TZ }),
         t.type === "income" ? "Ingreso" : "Egreso",
-        t.items?.map((i: any) => i.description).join(", ") || t.notes || "",
+        t.items?.map((i: any) => String(i.description).replace(" (gasto fijo)", "")).join(", ") || t.notes || "",
         t.barber?.name || (t.assigned_to ? assignedToLabels[t.assigned_to] : ""),
         t.created_by_name || "",
         t.client?.name || "",
@@ -486,7 +486,7 @@ export default function FinanzasPage() {
                         {t.type === "income" ? "Ingreso" : "Egreso"}
                       </span>
                     </td>
-                    <td className={`${tdc} max-w-[220px] truncate`}>{t.items?.map((i: any) => i.description).join(", ") || t.notes || "-"}</td>
+                    <td className={`${tdc} max-w-[220px] truncate`}>{t.items?.map((i: any) => String(i.description).replace(" (gasto fijo)", "")).join(", ") || t.notes || "-"}</td>
                     <td className={`${tdc} max-w-[130px] truncate`}>{t.barber?.name || (t.assigned_to ? assignedToLabels[t.assigned_to] : "-")}</td>
                     <td className={`${tdc} max-w-[130px] truncate text-brand-gray`} title={t.created_by_name || undefined}>{t.created_by_name || "-"}</td>
                     <td className={`${tdc} max-w-[130px] truncate`}>{t.client?.name || "-"}</td>

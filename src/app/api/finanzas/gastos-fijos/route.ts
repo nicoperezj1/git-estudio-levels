@@ -84,7 +84,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Falta aplicar la migracion 090 en la base de datos." }, { status: 409 });
   }
   if (await isMonthClosed(supabase, tenantId, month)) {
-    return NextResponse.json({ error: `El mes de ${monthLabelEs(month)} esta cerrado. Reabrelo para modificar los gastos fijos.` }, { status: 409 });
+    return NextResponse.json({ error: `El mes de ${monthLabelEs(month)} esta cerrado. Reabrelo para modificar los gastos del mes.` }, { status: 409 });
   }
 
   for (const it of body.items) {
@@ -103,14 +103,14 @@ export async function PUT(req: NextRequest) {
       continue;
     }
 
-    const description = `${cat.label} (gasto fijo)`;
+    const description = cat.label;
     if (existing) {
       await supabase.from("transactions").update({ subtotal: amount, total: amount }).eq("id", existing.id);
       await supabase.from("transaction_items").update({ unit_price: amount, total: amount, description }).eq("transaction_id", existing.id);
     } else {
       const { data: tx, error } = await supabase.from("transactions").insert({
         type: "expense", status: "completed", subtotal: amount, total: amount,
-        payment_method: "transfer", notes: `Gasto fijo ${monthLabelEs(month)}`,
+        payment_method: "transfer", notes: `Gasto del mes ${monthLabelEs(month)}`,
         tenant_id: tenantId, assigned_to: "business",
         accounting_month: month, created_by: auth.userId, fixed_category: cat.key,
       }).select("id").single();

@@ -13,8 +13,8 @@ const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", 
 interface FixedItem { key: string; label: string; amount: number }
 interface CloseLog { action: "close" | "reopen"; user_name: string | null; created_at: string }
 
-// Gastos fijos del mes + cerrar / reabrir el mes. Solo administrador (el servidor tambien lo exige).
-// Los gastos fijos se ingresan desde cero cada mes y se guardan como egresos, asi que aparecen en
+// Gastos del mes + cerrar / reabrir el mes. Solo administrador (el servidor tambien lo exige).
+// Los gastos del mes se ingresan desde cero cada mes y se guardan como egresos, asi que aparecen en
 // Ingresos y egresos, en el cierre mensual y en los informes.
 export function MonthClosePanel({ month, year, onChanged }: { month: number; year: number; onChanged: () => void }) {
   const ym = `${year}-${String(month).padStart(2, "0")}`;
@@ -77,8 +77,8 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
         body: JSON.stringify({ month: ym, items: items.map((i) => ({ category: i.key, amount: Number(values[i.key]) || 0 })) }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showToast(data.error || "No se pudieron guardar los gastos fijos", "error"); return; }
-      showToast("Gastos fijos guardados", "success");
+      if (!res.ok) { showToast(data.error || "No se pudieron guardar los gastos del mes", "error"); return; }
+      showToast("Gastos del mes guardados", "success");
       await load();
       onChanged();
     } finally {
@@ -91,7 +91,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
     const ok = await confirm({
       title: closing ? `Cerrar ${monthName}` : `Reabrir ${monthName}`,
       message: closing
-        ? "Al cerrar el mes no se podrán registrar, editar ni anular movimientos manuales de ese mes, ni cambiar sus gastos fijos. Podrás reabrirlo cuando quieras."
+        ? "Al cerrar el mes no se podrán registrar, editar ni anular movimientos manuales de ese mes, ni cambiar sus gastos del mes. Podrás reabrirlo cuando quieras."
         : "Al reabrir el mes se podrán volver a registrar y editar movimientos de ese mes. Queda anotado quién lo reabrió.",
       confirmText: closing ? "Cerrar mes" : "Reabrir mes",
       variant: "warning",
@@ -110,7 +110,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
 
   return (
     <Panel
-      title={`Gastos fijos y cierre · ${monthName}`}
+      title={`Gastos del mes y cierre · ${monthName}`}
       subtitle="Se ingresan desde cero cada mes y se suman a los egresos."
       action={
         <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${closed ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}>
@@ -127,10 +127,10 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-brand-gray">Total gastos fijos: <span className="text-base font-bold text-brand-dark tabular-nums">{formatCurrency(total)}</span></p>
+            <p className="text-sm text-brand-gray">Total gastos del mes: <span className="text-base font-bold text-brand-dark tabular-nums">{formatCurrency(total)}</span></p>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setOpen(!open)} className={ghostButton}>
-                {open ? "Ocultar detalle" : closed ? "Ver gastos fijos" : "Editar gastos fijos"}
+                {open ? "Ocultar detalle" : closed ? "Ver gastos del mes" : "Editar gastos del mes"}
               </button>
               <button onClick={toggleClose} className={ghostButton}>
                 {closed ? "Reabrir mes" : "Cerrar mes"}
@@ -190,7 +190,7 @@ export function MonthClosePanel({ month, year, onChanged }: { month: number; yea
               </div>
               <div className="flex justify-end">
                 <button onClick={save} disabled={saving || closed} className={`${primaryButton} disabled:opacity-50`}>
-                  {saving ? "Guardando…" : "Guardar gastos fijos"}
+                  {saving ? "Guardando…" : "Guardar gastos del mes"}
                 </button>
               </div>
             </>
