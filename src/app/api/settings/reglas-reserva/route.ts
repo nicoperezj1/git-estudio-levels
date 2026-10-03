@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { BOOKING_RULES, getRuleConfig, type BookingRule } from "@/lib/booking-rules";
 import { todayInChile } from "@/lib/utils";
+import { WINDOW_OPTIONS, getWindowDays } from "@/lib/booking-window";
 
 // Preferencias de reserva: que regla usa "Primer profesional disponible" (solo administrador).
 // tenants.booking_rule + booking_rule_pros (migracion 095). Sin la migracion, queda la regla de siempre.
@@ -20,7 +21,8 @@ export async function GET() {
   const team = (pros || []).filter((p: any) => p.role === "barber" || p.also_attends_clients).map((p: any) => ({ id: p.id, name: p.name }));
   const { error } = await supabase.from("tenants").select("booking_rule").eq("id", c.tenantId!).maybeSingle();
   const cfg = await getRuleConfig(supabase, c.tenantId!);
-  return NextResponse.json({ ...cfg, pros: team, migrationMissing: !!error && /does not exist|schema cache/i.test(error.message) });
+  const windowDays = await getWindowDays(supabase, c.tenantId!);
+  return NextResponse.json({ ...cfg, windowDays, pros: team, migrationMissing: !!error && /does not exist|schema cache/i.test(error.message) });
 }
 
 export async function POST(req: NextRequest) {
@@ -50,6 +52,13 @@ export async function POST(req: NextRequest) {
   if (error) {
     const missing = /does not exist|schema cache|violates check/i.test(error.message);
     return NextResponse.json({ error: missing ? "Falta aplicar la migración 095 en la base de datos." : error.message }, { status: 500 });
+  }
+  // Dias que el cliente puede agendar (migracion 099). null = predeterminado.
+  if (body?.windowDays !== undefined) {
+    const w = body.windowDays === null ? null : Number(body.windowDays);
+    if (w !== null && !WINDOW_OPTIONS.includes(w)) return NextResponse.json({ error: "Elige 7, 14, 21 o 31 días." }, { status: 400 });
+    const { error: ew } = await supabase.from("tenants").update({ booking_window_days: w }).eq("id", c.tenantId!);
+    if (ew) return NextResponse.json({ error: /does not exist|schema cache/i.test(ew.message) ? "Falta aplicar la migración 099 en la base de datos." : ew.message }, { status: 500 });
   }
   const rows = Array.from(valid).map((id) => ({
     tenant_id: c.tenantId, barber_id: id, is_priority: priority.has(id), target_pct: targets[id] ?? null, updated_at: new Date().toISOString(),

@@ -19,6 +19,7 @@ function toPublic(t: any) {
     google_rating: t.google_rating ?? null,
     google_reviews_count: t.google_reviews_count ?? null,
     booking_view_mode: t.booking_view_mode ?? "professional",
+    booking_window_days: t.booking_window_days ?? null,
   };
 }
 

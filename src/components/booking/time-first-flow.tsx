@@ -16,7 +16,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const ds = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const hhmm = (slot: string) => slot.slice(11, 16);
 
-export default function TimeFirstFlow({ tenantSlug, closedWeekdays, onPick }: { tenantSlug: string; closedWeekdays: number[]; onPick: (p: TimePick) => void }) {
+export default function TimeFirstFlow({ tenantSlug, closedWeekdays, windowDays, onPick }: { tenantSlug: string; closedWeekdays: number[]; windowDays?: number | null; onPick: (p: TimePick) => void }) {
   const [phase, setPhase] = useState<"services" | "time" | "pro">("services");
   const [services, setServices] = useState<Svc[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -30,9 +30,9 @@ export default function TimeFirstFlow({ tenantSlug, closedWeekdays, onPick }: { 
 
   const days = useMemo(() => {
     const out: Date[] = [];
-    for (let i = 0; i < 28; i++) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + i); out.push(d); }
+    for (let i = 0; i < (windowDays ?? 28); i++) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + i); out.push(d); }
     return out;
-  }, []);
+  }, [windowDays]);
 
   useEffect(() => {
     fetch(`/api/public/services?tenant=${encodeURIComponent(tenantSlug)}`)

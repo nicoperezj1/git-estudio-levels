@@ -24,6 +24,7 @@ export function BookingRuleCard() {
   const [rule, setRule] = useState<Rule>("least_agenda");
   const [priority, setPriority] = useState<string[]>([]);
   const [targets, setTargets] = useState<Record<string, string>>({});
+  const [windowDays, setWindowDays] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [reco, setReco] = useState<null | { monthLabel: string; sales: Record<string, number>; newIds: string[] }>(null);
   const [recoBusy, setRecoBusy] = useState(false);
@@ -35,6 +36,7 @@ export function BookingRuleCard() {
       setRule(d.rule || "least_agenda");
       setPriority(d.priorityIds || []);
       setTargets(Object.fromEntries(Object.entries(d.targets || {}).map(([k, v]) => [k, String(v)])));
+      setWindowDays(d.windowDays ?? null);
       setMigrationMissing(!!d.migrationMissing);
       setLoaded(true);
     }).catch(() => {});
@@ -61,7 +63,7 @@ export function BookingRuleCard() {
     try {
       const res = await fetch("/api/settings/reglas-reserva", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rule, priorityIds: priority, targets, markRecoSeen: !!reco || rule === "target_share" }),
+        body: JSON.stringify({ rule, priorityIds: priority, targets, windowDays, markRecoSeen: !!reco || rule === "target_share" }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d?.error || "No se pudo guardar");
@@ -77,6 +79,23 @@ export function BookingRuleCard() {
       <div>
         <h2 className="font-bold text-brand-dark">Preferencias de reserva</h2>
         <p className="text-xs text-brand-gray">Cómo se elige al profesional cuando el cliente toca "Primer profesional disponible".</p>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-brand-dark mb-1">Días que el cliente puede agendar</p>
+        <p className="text-xs text-brand-gray mb-2">Cuántos días hacia adelante aparecen en la reserva online (contando hoy).</p>
+        <div className="flex flex-wrap gap-2">
+          {[7, 14, 21, 31].map((n) => (
+            <button key={n} type="button" onClick={() => setWindowDays(n)}
+              className={`px-3 py-1.5 rounded-full text-sm border ${windowDays === n ? "bg-brand-blue text-white border-brand-blue" : "border-gray-200 text-brand-dark"}`}>
+              {n} días
+            </button>
+          ))}
+          <button type="button" onClick={() => setWindowDays(null)}
+            className={`px-3 py-1.5 rounded-full text-sm border ${windowDays === null ? "bg-brand-blue text-white border-brand-blue" : "border-gray-200 text-brand-dark"}`}>
+            Predeterminado
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">

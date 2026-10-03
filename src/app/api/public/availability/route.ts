@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { getSlotCapacity, fullSegments, peakOverlap } from "@/lib/capacity";
 import { isOnVacation } from "@/lib/vacations";
+import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -92,6 +93,10 @@ export async function GET(req: NextRequest) {
     .single();
 
   const slotInterval = barberProfile?.slot_duration || 15; // Default 15min intervals
+
+  // Mas alla de los dias que el negocio deja agendar (Preferencias de reserva) no hay horas.
+  const windowDays = await getWindowDays(supabase, (barberProfile as any)?.tenant_id);
+  if (isBeyondWindow(date, windowDays)) return NextResponse.json({ slots: [], date, barberId, outOfWindow: true });
 
   // Cupos por bloque (solo kinesiologia; en el resto de los rubros siempre es 1 = como siempre).
   const capacity = await getSlotCapacity(supabase, (barberProfile as any)?.tenant_id);

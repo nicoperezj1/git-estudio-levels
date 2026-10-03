@@ -189,7 +189,7 @@ export default function BookingPage() {
       if (!closedDays.includes(new Date(y, m - 1, dd).getDay()) && !closedDates.includes(selectedDate)) return;
     }
     let d = new Date();
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < (businessInfo?.booking_window_days ?? 60); i++) {
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       if (!closedDays.includes(d.getDay()) && !closedDates.includes(ds)) {
         // Local date string, not UTC (toISOString shifted "today" to tomorrow in the
@@ -307,7 +307,7 @@ export default function BookingPage() {
   const toLocalDateStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const dateOptions: string[] = [];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < (businessInfo?.booking_window_days ?? 14); i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     // Skip closed days (y las fechas de vacaciones del profesional)
@@ -491,7 +491,7 @@ export default function BookingPage() {
 
         {/* Vista por horario: servicio → día y hora → profesional disponible */}
         {step === "barber" && activeView === "time" && (
-          <TimeFirstFlow tenantSlug={tenantSlugState} closedWeekdays={closedWeekdays} onPick={handleTimePick} />
+          <TimeFirstFlow tenantSlug={tenantSlugState} closedWeekdays={closedWeekdays} windowDays={businessInfo?.booking_window_days ?? null} onPick={handleTimePick} />
         )}
 
         {/* Step 1: Barber (PRIMERO) */}

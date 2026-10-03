@@ -48,3 +48,9 @@ Sin cambios pendientes.
 - Recálculo de totales en el servidor y verificación del pago de Mercado Pago en `pos/checkout`.
 - Libro de Remuneraciones Electrónico y archivo Previred (solo la guía).
 - El correo de "Solicitud de insumos" (revisar Resend con Pablo).
+
+## Días para agendar (migración 099)
+1. Correr `supabase/migrations/099_ventana_reserva.sql` (devuelve 1 fila `booking_window_days`).
+2. Configuración > Preferencias de reserva: elegir 7/14/21/31 días y "Guardar preferencias".
+3. Abrir `/booking?tenant=...`: la vista por profesional y la por horario muestran solo esos días.
+4. "Predeterminado" vuelve a 14 días (profesional) / 28 días (horario).

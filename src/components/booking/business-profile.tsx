@@ -15,6 +15,7 @@ export interface BusinessInfo {
   google_maps_url?: string | null;
   google_rating?: number | null;
   google_reviews_count?: number | null;
+  booking_window_days?: number | null;
   booking_view_mode?: "time" | "professional" | "both";
   hours?: BusinessHour[];
 }

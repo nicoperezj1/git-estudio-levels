@@ -6,6 +6,7 @@ import { tryConsumeQuota } from "@/lib/message-quota";
 import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
 import { isOnVacation } from "@/lib/vacations";
+import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El profesional no atiende ese día. Selecciona otra fecha." }, { status: 409 });
   }
   const { data: barberForCap } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
+  if (isBeyondWindow(date, await getWindowDays(supabase, barberForCap?.tenant_id))) {
+    return NextResponse.json({ error: "Esa fecha todavía no está disponible para reservar. Elige una más cercana." }, { status: 409 });
+  }
   if (await isSlotFull(supabase, barberId, barberForCap?.tenant_id, date, start, end)) {
     return NextResponse.json({ error: "Horario no disponible. Selecciona otro." }, { status: 409 });
   }
