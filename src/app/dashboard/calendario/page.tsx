@@ -11,6 +11,7 @@ import { buildConfirmWhatsAppUrl } from "@/lib/whatsapp-confirm";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun } from "lucide-react";
 import { Segmented, primaryButton } from "@/components/ui/premium";
+import { useBackToClose } from "@/lib/use-back-to-close";
 
 interface Barber { id: string; name: string; role?: string; also_attends_clients?: boolean; }
 interface Service { id: string; name: string; price: number; duration: number; }
@@ -664,11 +665,26 @@ export default function CalendarioPage() {
     }, 400);
   };
 
-  const handleTouchEnd = () => {
+  // Cuando se abre el cuadro con un toque, se ignora el "clic" fantasma que el celular dispara justo
+  // despues sobre el fondo (si no, el cuadro se cerraba solo o tomaba otro bloque).
+  const popupOpenedAt = useRef(0);
+  useBackToClose(showPopup, () => setShowPopup(false));
+  useBackToClose(!!selectedApptId, () => setSelectedApptId(null));
+  useBackToClose(!!editingBlock, () => setEditingBlock(null));
+
+  const handleTouchEnd = (e?: React.TouchEvent) => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     if (!touchRef.current || !touchRef.current.activated) {
+      // Toque corto (sin mover el dedo ni mantener): abre "Agendar / Bloquear" en ese
+      // profesional y a esa hora. Mover el dedo es scroll y cancela touchRef antes de llegar aqui.
+      const tap = touchRef.current;
       touchRef.current = null;
       setDragging(false);
+      if (tap && !showPopup) {
+        e?.preventDefault();
+        popupOpenedAt.current = Date.now();
+        openCreatePopup(tap.barberId, yToTime(tap.startY), yToTime(tap.startY + HOUR_HEIGHT * 0.75));
+      }
       return;
     }
     handleMouseUp();
@@ -1395,7 +1411,7 @@ export default function CalendarioPage() {
                   <div
                     key={barber.id}
                     data-barber-column={barber.id}
-                    className="flex-1 relative border-r border-gray-50 min-w-[120px] select-none"
+                    className="flex-1 relative border-r border-gray-100 min-w-[120px] select-none"
                     onMouseDown={(e) => handleMouseDown(e, barber.id)}
                     onMouseMove={(e) => {
                       handleMouseMove(e);
@@ -1423,7 +1439,9 @@ export default function CalendarioPage() {
                   >
                     {/* Hour grid lines */}
                     {hours.map((h) => (
-                      <div key={h} className="h-16 border-b border-gray-50 hover:bg-gray-50/50" />
+                      <div key={h} className="relative h-16 border-b border-gray-200/70 hover:bg-gray-50/50">
+                        <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-gray-200/50" />
+                      </div>
                     ))}
 
                     {/* Out-of-hours shading. Greys out the parts of the day OUTSIDE this
@@ -1721,7 +1739,7 @@ export default function CalendarioPage() {
 
       {/* Google Calendar style popup - positioned beside the selection */}
       {showPopup && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowPopup(false)}>
+        <div className="fixed inset-0 z-50" onClick={() => { if (Date.now() - popupOpenedAt.current > 400) setShowPopup(false); }}>
           <div
             className={`fixed top-20 bg-white rounded-2xl shadow-2xl border border-gray-200 w-[90vw] md:w-96 animate-scale-in max-h-[80vh] overflow-y-auto ${
               popupPosition === "left" ? "left-4 md:left-16" : "right-4 md:right-8"
@@ -1730,7 +1748,7 @@ export default function CalendarioPage() {
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-bold text-lg">Cita</h3>
+              <h3 className="font-bold text-lg">Agendar / Bloquear</h3>
               <button onClick={() => setShowPopup(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
 
@@ -1738,11 +1756,11 @@ export default function CalendarioPage() {
             <div className="flex gap-4 px-4 pt-3 border-b">
               <button onClick={() => setPopupTab("service")}
                 className={`pb-2 text-sm font-medium border-b-2 transition-colors ${popupTab === "service" ? "border-brand-blue text-brand-blue" : "border-transparent text-gray-500"}`}>
-                Servicio
+                Agendar
               </button>
               <button onClick={() => setPopupTab("event")}
                 className={`pb-2 text-sm font-medium border-b-2 transition-colors ${popupTab === "event" ? "border-brand-blue text-brand-blue" : "border-transparent text-gray-500"}`}>
-                Evento / Bloqueo
+                Bloquear
               </button>
             </div>
 
