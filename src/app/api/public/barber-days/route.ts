@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { vacationDates } from "@/lib/vacations";
+import { todayInChile, dateStrOffset } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -38,5 +40,9 @@ export async function GET(req: NextRequest) {
     if (hours.find((h) => h.day_of_week === day)?.is_closed) closedDays.push(day);
   }
 
-  return NextResponse.json({ closedDays });
+  // Fechas puntuales en que el profesional esta de vacaciones (proximos 120 dias), para el selector de fecha.
+  const today = todayInChile();
+  const closedDates = await vacationDates(supabase, barberId, today, dateStrOffset(today, 120));
+
+  return NextResponse.json({ closedDays, closedDates });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
+import { barbersOnVacation } from "@/lib/vacations";
 
 // GET: Returns the barber with fewest appointments today (first available)
 export async function GET(req: NextRequest) {
@@ -63,6 +64,8 @@ export async function GET(req: NextRequest) {
     .eq("all_day", true);
 
   const blockedIds = new Set((blocks || []).map((b) => b.barber_id));
+  // De vacaciones ese dia (migracion 095).
+  for (const id of Array.from(await barbersOnVacation(supabase, tenantId, date))) blockedIds.add(id);
 
   // Exclude barbers who DON'T WORK on this weekday. "Primer barbero disponible" was
   // returning professionals on their day off because it only checked all-day blocks,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { vacationDates } from "@/lib/vacations";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -33,7 +34,18 @@ export async function GET(req: NextRequest) {
     console.error("[barber/blocks] query failed:", error.message);
     return NextResponse.json([]);
   }
-  return NextResponse.json(data || []);
+  // Las vacaciones (Mi negocio > Vacaciones) se muestran como bloqueos de todo el dia ("Vacaciones").
+  // Son solo de lectura: se cambian en la pagina de Vacaciones.
+  let result: any[] = data || [];
+  if (month) {
+    const [y, m] = month.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const dates = await vacationDates(supabase, barberId, `${month}-01`, `${month}-${String(lastDay).padStart(2, "0")}`);
+    result = [...result, ...dates.map((d) => ({
+      id: `vac-${barberId}-${d}`, barber_id: barberId, date: d, all_day: true, start_time: null, end_time: null, reason: "Vacaciones", is_vacation: true,
+    }))];
+  }
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {

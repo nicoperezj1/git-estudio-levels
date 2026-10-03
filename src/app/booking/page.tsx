@@ -72,6 +72,8 @@ export default function BookingPage() {
   const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration, 0);
 
   const [closedDays, setClosedDays] = useState<number[]>([]);
+  // Fechas puntuales en que el profesional esta de vacaciones.
+  const [closedDates, setClosedDates] = useState<string[]>([]);
   const [closedDaysLoaded, setClosedDaysLoaded] = useState(false);
   const [tenantSlugState, setTenantSlugState] = useState<string>("");
 
@@ -160,7 +162,7 @@ export default function BookingPage() {
     setClosedDaysLoaded(false);
     fetch(`/api/public/barber-days?barberId=${selectedBarber.id}`)
       .then((r) => r.json())
-      .then((data) => setClosedDays(Array.isArray(data?.closedDays) ? data.closedDays : []))
+      .then((data) => { setClosedDays(Array.isArray(data?.closedDays) ? data.closedDays : []); setClosedDates(Array.isArray(data?.closedDates) ? data.closedDates : []); })
       .catch(() => setClosedDays([]))
       .finally(() => setClosedDaysLoaded(true));
   }, [selectedBarber]);
@@ -182,11 +184,12 @@ export default function BookingPage() {
     if (selectedDate) {
       // Keep the user's pick unless it falls on a day this professional doesn't attend.
       const [y, m, dd] = selectedDate.split("-").map(Number);
-      if (!closedDays.includes(new Date(y, m - 1, dd).getDay())) return;
+      if (!closedDays.includes(new Date(y, m - 1, dd).getDay()) && !closedDates.includes(selectedDate)) return;
     }
     let d = new Date();
-    for (let i = 0; i < 14; i++) {
-      if (!closedDays.includes(d.getDay())) {
+    for (let i = 0; i < 60; i++) {
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!closedDays.includes(d.getDay()) && !closedDates.includes(ds)) {
         // Local date string, not UTC (toISOString shifted "today" to tomorrow in the
         // evening in Chile, which is exactly the "no aparece el dia actual" report).
         setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
@@ -194,7 +197,7 @@ export default function BookingPage() {
       }
       d.setDate(d.getDate() + 1);
     }
-  }, [closedDaysLoaded, closedDays]);
+  }, [closedDaysLoaded, closedDays, closedDates]);
 
   // Fetch slots when barber or date changes
   useEffect(() => {
@@ -304,8 +307,9 @@ export default function BookingPage() {
   for (let i = 0; i < 14; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    // Skip closed days
+    // Skip closed days (y las fechas de vacaciones del profesional)
     if (closedDays.includes(d.getDay())) continue;
+    if (closedDates.includes(toLocalDateStr(d))) continue;
     dateOptions.push(toLocalDateStr(d));
   }
 

@@ -160,6 +160,11 @@ export default function CalendarioPage() {
   const [savingBlock, setSavingBlock] = useState(false);
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  // Las vacaciones se ven como bloqueos de todo el dia pero se cambian en Mi negocio > Vacaciones.
+  const openBlockEditor = (b: any) => {
+    if (String(b?.id || "").startsWith("vac-")) { showToast("Son vacaciones del profesional: se cambian en Mi negocio > Vacaciones", "success"); return; }
+    setEditingBlock(b);
+  };
   const { tenant, loading: tenantLoading } = useTenant();
   const { user, effectiveRole } = useAuth();
   const router = useRouter();
@@ -1175,7 +1180,7 @@ export default function CalendarioPage() {
                       <button
                         key={bl.id}
                         type="button"
-                        onClick={() => setEditingBlock({
+                        onClick={() => openBlockEditor({
                           id: bl.id,
                           barberId: bl.barber_id,
                           reason: bl.reason || "",
@@ -1361,7 +1366,7 @@ export default function CalendarioPage() {
                             key={block.id}
                             className="absolute left-1 right-1 rounded-md bg-gray-100 border border-gray-200 px-1.5 py-1 overflow-hidden z-[5] cursor-pointer hover:bg-gray-200/70"
                             style={{ top: `${top}px`, height: `${Math.max(height, 24)}px` }}
-                            onClick={() => setEditingBlock({
+                            onClick={() => openBlockEditor({
                               id: block.id,
                               barberId: block.barber_id,
                               reason: block.reason || "",
@@ -1742,7 +1747,7 @@ export default function CalendarioPage() {
                             // lectura y la unica forma de actuar sobre el bloqueo era la X
                             // roja siempre visible. Ahora abre un panel con nombre, duracion
                             // y eliminar — sin la X.
-                            setEditingBlock({
+                            openBlockEditor({
                               id: block.id,
                               barberId: block.barber_id,
                               reason: block.reason || "",

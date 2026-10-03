@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { getSlotCapacity, fullSegments, peakOverlap } from "@/lib/capacity";
+import { isOnVacation } from "@/lib/vacations";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -11,6 +12,11 @@ export async function GET(req: NextRequest) {
 
   if (!barberId || !date) {
     return NextResponse.json({ error: "barberId and date required" }, { status: 400 });
+  }
+
+  // Vacaciones del profesional (migracion 095): ese dia no hay horas.
+  if (await isOnVacation(supabase, barberId, date)) {
+    return NextResponse.json({ slots: [], date, barberId, closed: true, vacation: true });
   }
 
   // Get day of week (0=Sunday, 1=Monday, etc.), computed independent of the server's

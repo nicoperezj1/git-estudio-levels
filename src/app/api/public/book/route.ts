@@ -5,6 +5,7 @@ import { sendBookingConfirmation } from "@/lib/resend";
 import { tryConsumeQuota } from "@/lib/message-quota";
 import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
+import { isOnVacation } from "@/lib/vacations";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
 
   // Check for conflicts (double booking prevention). Con "cupos por bloque" (solo
   // kinesiologia) un horario admite varias citas hasta llegar al cupo.
+  if (await isOnVacation(supabase, barberId, date)) {
+    return NextResponse.json({ error: "El profesional no atiende ese día. Selecciona otra fecha." }, { status: 409 });
+  }
   const { data: barberForCap } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
   if (await isSlotFull(supabase, barberId, barberForCap?.tenant_id, date, start, end)) {
     return NextResponse.json({ error: "Horario no disponible. Selecciona otro." }, { status: 409 });
