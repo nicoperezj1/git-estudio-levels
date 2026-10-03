@@ -48,6 +48,8 @@ export interface ProMonth {
   productSales?: number;
   // arriendo
   dailyRate?: number;
+  profileDailyRate?: number;    // valor habitual del profesional (ficha)
+  rateOverride?: boolean;        // este mes se cambio el valor del dia a mano
   daysWorked?: number;
   autoDays?: number;
   autoDates?: string[];          // dias con citas completadas
@@ -97,25 +99,42 @@ export async function computeProMonths(
   if (!pros || pros.length === 0) return [];
   const ids: string[] = pros.map((p: any) => p.id);
 
+  // Las consultas que no dependen unas de otras arrancan JUNTAS (antes iban una tras otra y la pantalla tardaba mucho).
+  const run = (b: PromiseLike<any>): Promise<any> => Promise.resolve(b);
   // Ventas del mes de estos profesionales (sin los "[AJUSTE MANUAL]" antiguos: ahora viven en el libro).
-  const txs = await fetchAllRows<any>(() =>
+  const txsP = fetchAllRows<any>(() =>
     supabase.from("transactions").select("id, barber_id, total, tip_amount, notes")
       .eq("tenant_id", tenantId).eq("type", "income").eq("status", "completed")
       .in("barber_id", ids).gte("created_at", startUtc).lt("created_at", endUtc)
   ).catch(() => [] as any[]);
+  const ledgerP = run(supabase.from("professional_ledger").select("*")
+    .eq("tenant_id", tenantId).eq("month", first).eq("status", "active").order("created_at", { ascending: true }));
+  const settlementsP = run(supabase.from("professional_settlements").select("*")
+    .eq("tenant_id", tenantId).eq("month", first).eq("mode", mode));
+  const schedP = mode === "rental" ? run(supabase.from("barber_schedule").select("barber_id, day_of_week, is_working").in("barber_id", ids)) : null;
+  const apptsP = mode === "rental"
+    ? fetchAllRows<any>(() =>
+        supabase.from("appointments").select("barber_id, date").eq("tenant_id", tenantId).eq("status", "completed").in("barber_id", ids).gte("date", first).lte("date", last)
+      ).catch(() => [] as any[])
+    : null;
+  const recsP = mode === "rental"
+    ? run(supabase.from("rental_records").select("barber_id, days_worked").eq("tenant_id", tenantId).eq("month", month).eq("year", year))
+    : null;
+  const txs = await txsP;
   const sales = txs.filter((t) => !String(t.notes || "").startsWith("[AJUSTE MANUAL]"));
   const txBarber = new Map<string, string>(sales.map((t) => [t.id, t.barber_id]));
 
   // Productos vendidos (por venta) y su comision.
-  const items: any[] = [];
-  for (const c of chunk(sales.map((t) => t.id), 200)) {
-    const { data } = await supabase.from("transaction_items").select("transaction_id, product_id, total, quantity").in("transaction_id", c);
-    items.push(...(data || []));
-  }
+  const itemResults: any[] = await Promise.all(
+    chunk(sales.map((t) => t.id), 200).map((c) => run(supabase.from("transaction_items").select("transaction_id, product_id, total, quantity").in("transaction_id", c)))
+  );
+  const items: any[] = itemResults.flatMap((r) => r.data || []);
   const productIds = Array.from(new Set(items.map((i) => i.product_id).filter(Boolean)));
   const productRule = new Map<string, { type: string | null; value: number }>();
-  for (const c of chunk(productIds as string[], 200)) {
-    const r = await supabase.from("products").select("id, sales_commission_type, sales_commission_value").in("id", c);
+  const productResults: any[] = await Promise.all(
+    chunk(productIds as string[], 200).map((c) => run(supabase.from("products").select("id, sales_commission_type, sales_commission_value").in("id", c)))
+  );
+  for (const r of productResults) {
     if (!r.error) for (const p of r.data || []) productRule.set(p.id, { type: p.sales_commission_type, value: Number(p.sales_commission_value) || 0 });
   }
 
@@ -150,26 +169,22 @@ export async function computeProMonths(
   const savedDays = new Map<string, number>();
   const offByBarber = new Map<string, number[]>();
   if (mode === "rental") {
-    const { data: sched } = await supabase.from("barber_schedule").select("barber_id, day_of_week, is_working").in("barber_id", ids);
+    const { data: sched } = await schedP!;
     for (const r of sched || []) {
       if (r.is_working === false) offByBarber.set(r.barber_id, [...(offByBarber.get(r.barber_id) || []), Number(r.day_of_week)]);
     }
-    const appts = await fetchAllRows<any>(() =>
-      supabase.from("appointments").select("barber_id, date").eq("tenant_id", tenantId).eq("status", "completed").in("barber_id", ids).gte("date", first).lte("date", last)
-    ).catch(() => [] as any[]);
+    const appts = await apptsP!;
     for (const a of appts) {
       if (!daysByBarber.has(a.barber_id)) daysByBarber.set(a.barber_id, new Set());
       daysByBarber.get(a.barber_id)!.add(a.date);
     }
-    const { data: recs } = await supabase.from("rental_records").select("barber_id, days_worked").eq("tenant_id", tenantId).eq("month", month).eq("year", year);
+    const { data: recs } = await recsP!;
     for (const r of recs || []) savedDays.set(r.barber_id, Number(r.days_worked));
   }
 
   // Libro y liquidaciones.
-  const { data: ledgerRows } = await supabase.from("professional_ledger").select("*")
-    .eq("tenant_id", tenantId).eq("month", first).eq("status", "active").order("created_at", { ascending: true });
-  const { data: settlements } = await supabase.from("professional_settlements").select("*")
-    .eq("tenant_id", tenantId).eq("month", first).eq("mode", mode);
+  const { data: ledgerRows } = await ledgerP;
+  const { data: settlements } = await settlementsP;
   const settlementByBarber = new Map<string, any>((settlements || []).map((s: any) => [s.barber_id, s]));
   // Arriendo: lo hecho en el libro manda sobre el valor antiguo de rental_records. Los dias elegidos en el calendario
   // mandan sobre el numero a secas.
@@ -210,7 +225,10 @@ export async function computeProMonths(
       baseLabel = `Comisión ${rate}% sobre servicios`;
       extra = { rate, serviceSales: svc, productSales: Math.round(productSalesByBarber.get(p.id) || 0) };
     } else {
-      const dailyRate = Number(p.rental_daily_rate) || 29000;
+      const profileDailyRate = Number(p.rental_daily_rate) || 29000;
+      const ov = settlementByBarber.get(p.id)?.daily_rate_override;
+      const rateOverride = ov !== null && ov !== undefined;
+      const dailyRate = rateOverride ? Number(ov) : profileDailyRate;
       const autoDates = Array.from(daysByBarber.get(p.id) || []).sort();
       const autoDays = autoDates.length;
       const daysWorked = savedDays.has(p.id) ? (savedDays.get(p.id) as number) : autoDays;
@@ -218,7 +236,7 @@ export async function computeProMonths(
       baseLabel = `Arriendo: ${daysWorked} día${daysWorked === 1 ? "" : "s"} × ${dailyRate.toLocaleString("es-CL")}`;
       const workedDates = datesByBarber.has(p.id) ? (datesByBarber.get(p.id) as string[]) : null;
       extra = {
-        dailyRate, daysWorked, autoDays, autoDates, workedDates, offWeekdays: offByBarber.get(p.id) || [],
+        dailyRate, profileDailyRate, rateOverride, daysWorked, autoDays, autoDates, workedDates, offWeekdays: offByBarber.get(p.id) || [],
         daysSource: workedDates ? "calendar" : manualDays.has(p.id) ? "manual" : "auto",
       };
     }

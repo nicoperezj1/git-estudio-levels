@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, Coins, Wallet, Hourglass, Plus } from "lucide-react";
 import { formatCurrency, todayInChile } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
@@ -57,8 +57,8 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
   const [calFor, setCalFor] = useState<ProMonth | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/profesionales/libro?mode=${mode}&month=${month}&year=${year}${tq}`);
       const data = await res.json();
@@ -130,8 +130,101 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
     } finally { setBusy(false); }
   };
 
+  // Dias trabajados: la pantalla se actualiza AL INSTANTE (la cuenta es simple: dias x valor) y el guardado ocurre solo,
+  // medio segundo despues del ultimo cambio. Asi se puede tocar + / − o escribir el numero sin esperar al servidor.
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const inflight = useRef(0);
+  const setDaysQuick = (p: ProMonth, raw: number) => {
+    const n = Math.min(31, Math.max(0, Math.round(raw) || 0));
+    setItems((prev) => {
+      const next = prev.map((i) => {
+        if (i.barberId !== p.barberId) return i;
+        const base = n * (i.dailyRate ?? 0);
+        const total = base - i.adjustments;
+        return {
+          ...i, daysWorked: n, daysSource: "manual" as const, workedDates: null, base, total, pending: total - i.paid,
+          baseLabel: `Arriendo: ${n} día${n === 1 ? "" : "s"} × ${(i.dailyRate ?? 0).toLocaleString("es-CL")}`,
+        };
+      });
+      setTotals({ total: next.reduce((a, i) => a + i.total, 0), paid: next.reduce((a, i) => a + i.paid, 0), pending: next.reduce((a, i) => a + i.pending, 0) });
+      return next;
+    });
+    clearTimeout(timers.current[p.barberId]);
+    timers.current[p.barberId] = setTimeout(async () => {
+      delete timers.current[p.barberId];
+      inflight.current++;
+      try {
+        const res = await fetch(`/api/profesionales/libro/liquidacion?x=1${tq}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ barberId: p.barberId, month, year, days: n }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showToast(data.error || "No se pudieron guardar los días", "error");
+          await load(true);
+        }
+      } finally {
+        inflight.current--;
+      }
+    }, 500);
+  };
+
+  // Valor del dia de ESTE mes: mismo criterio, se ve al instante y se guarda solo.
+  const setRateQuick = (p: ProMonth, raw: number) => {
+    const n = Math.min(10_000_000, Math.max(0, Math.round(raw) || 0));
+    setItems((prev) => {
+      const next = prev.map((i) => {
+        if (i.barberId !== p.barberId) return i;
+        const days = i.daysWorked ?? 0;
+        const base = days * n;
+        const total = base - i.adjustments;
+        return {
+          ...i, dailyRate: n, rateOverride: n !== i.profileDailyRate, base, total, pending: total - i.paid,
+          baseLabel: `Arriendo: ${days} día${days === 1 ? "" : "s"} × ${n.toLocaleString("es-CL")}`,
+        };
+      });
+      setTotals({ total: next.reduce((a, i) => a + i.total, 0), paid: next.reduce((a, i) => a + i.paid, 0), pending: next.reduce((a, i) => a + i.pending, 0) });
+      return next;
+    });
+    const key = `rate-${p.barberId}`;
+    clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(async () => {
+      delete timers.current[key];
+      const res = await fetch(`/api/profesionales/libro/liquidacion?x=1${tq}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barberId: p.barberId, month, year, dailyRate: n }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "No se pudo guardar el valor del día", "error");
+        await load(true);
+      }
+    }, 500);
+  };
+  const resetRate = async (p: ProMonth) => {
+    const res = await fetch(`/api/profesionales/libro/liquidacion?x=1${tq}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ barberId: p.barberId, month, year, dailyRate: null }),
+    });
+    if (!res.ok) { showToast("No se pudo guardar", "error"); return; }
+    await load(true);
+  };
+  // Deja el valor cambiado como el valor habitual del profesional (su ficha) para los proximos meses.
+  const makeRateUsual = async (p: ProMonth) => {
+    const ok = await confirm({
+      title: "Cambiar el valor habitual",
+      message: `El valor del día de ${p.name} pasará a ${formatCurrency(p.dailyRate ?? 0)} desde ahora. Los meses que ya cerraste con otro valor no cambian si lo corregiste en ellos.`,
+      confirmText: "Dejar como habitual", variant: "warning",
+    });
+    if (!ok) return;
+    const r1 = await fetch(`/api/barberos/${p.barberId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rental_daily_rate: p.dailyRate }) });
+    if (!r1.ok) { showToast("No se pudo cambiar el valor habitual", "error"); return; }
+    await resetRate(p);
+    showToast("Valor habitual actualizado", "success");
+  };
+
   // Arriendo: guarda los dias trabajados. `body` = { days } (solo la cantidad), { dates } (calendario) o {} (automatico).
-  const patchDays = async (p: ProMonth, body: { days?: number; dates?: string[] }) => {
+  const patchDays = async (p: ProMonth, body: { days?: number; dates?: string[]; auto?: boolean }) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/profesionales/libro/liquidacion?x=1${tq}`, {
@@ -202,16 +295,33 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {isAdmin && (
-                        <button type="button" disabled={busy || (p.daysWorked ?? 0) <= 0} onClick={() => patchDays(p, { days: Math.max(0, (p.daysWorked ?? 0) - 1) })}
-                          aria-label="Un día menos" className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-brand-dark hover:border-brand-blue disabled:opacity-40">−</button>
+                      {isAdmin ? (
+                        <>
+                          <button type="button" disabled={(p.daysWorked ?? 0) <= 0} onClick={() => setDaysQuick(p, (p.daysWorked ?? 0) - 1)}
+                            aria-label="Un día menos" className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-brand-dark hover:border-brand-blue disabled:opacity-40">−</button>
+                          <input type="number" min={0} max={31} step={1} inputMode="numeric" value={p.daysWorked ?? 0} aria-label="Días trabajados"
+                            onFocus={(e) => e.currentTarget.select()}
+                            onChange={(e) => setDaysQuick(p, e.target.value === "" ? 0 : Number(e.target.value))}
+                            className="h-9 w-16 rounded-lg border border-gray-200 bg-white text-center text-lg font-extrabold tabular-nums text-brand-dark outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10" />
+                          <button type="button" disabled={(p.daysWorked ?? 0) >= 31} onClick={() => setDaysQuick(p, (p.daysWorked ?? 0) + 1)}
+                            aria-label="Un día más" className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-brand-dark hover:border-brand-blue disabled:opacity-40">+</button>
+                        </>
+                      ) : (
+                        <span className="min-w-[2ch] text-center text-xl font-extrabold tabular-nums text-brand-dark">{p.daysWorked ?? 0}</span>
                       )}
-                      <span className="min-w-[2ch] text-center text-xl font-extrabold tabular-nums text-brand-dark">{p.daysWorked ?? 0}</span>
-                      {isAdmin && (
-                        <button type="button" disabled={busy || (p.daysWorked ?? 0) >= 31} onClick={() => patchDays(p, { days: (p.daysWorked ?? 0) + 1 })}
-                          aria-label="Un día más" className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-brand-dark hover:border-brand-blue disabled:opacity-40">+</button>
-                      )}
-                      <span className="text-xs text-brand-gray">× {formatCurrency(p.dailyRate ?? 0)} = <b className="text-brand-dark">{formatCurrency(p.base)}</b></span>
+                      <span className="flex items-center gap-1.5 text-xs text-brand-gray">
+                        ×
+                        {isAdmin ? (
+                          <span className="flex items-center rounded-lg border border-gray-200 bg-white px-2 focus-within:border-brand-blue">
+                            <span className="text-brand-gray">$</span>
+                            <input type="number" min={0} step={500} inputMode="numeric" value={p.dailyRate ?? 0} aria-label="Valor del día"
+                              onFocus={(e) => e.currentTarget.select()}
+                              onChange={(e) => setRateQuick(p, e.target.value === "" ? 0 : Number(e.target.value))}
+                              className="h-8 w-20 bg-transparent text-right text-sm font-semibold tabular-nums text-brand-dark outline-none" />
+                          </span>
+                        ) : formatCurrency(p.dailyRate ?? 0)}
+                        = <b className="text-sm text-brand-dark">{formatCurrency(p.base)}</b>
+                      </span>
                       {isAdmin && (
                         <button type="button" onClick={() => setCalFor(p)} className={`${ghostButton} !px-3 !py-1.5 text-xs`}>
                           <CalendarDays className="h-3.5 w-3.5" /> Calendario
@@ -219,6 +329,18 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
                       )}
                     </div>
                   </div>
+                )}
+
+                {mode === "rental" && p.rateOverride && (
+                  <p className="mt-1.5 px-1 text-[11px] text-amber-700">
+                    Valor del día cambiado solo para este mes (habitual: {formatCurrency(p.profileDailyRate ?? 0)}).
+                    {isAdmin && (
+                      <>
+                        {" "}<button type="button" onClick={() => makeRateUsual(p)} className="font-semibold underline">Dejarlo como habitual</button>
+                        {" · "}<button type="button" onClick={() => resetRate(p)} className="font-semibold underline">Volver al habitual</button>
+                      </>
+                    )}
+                  </p>
                 )}
 
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-sm">
@@ -380,7 +502,7 @@ export function ProfessionalLedgerView({ mode }: { mode: ProMode }) {
         <DaysCalendarModal
           pro={calFor} year={year} month={month} busy={busy} onClose={() => setCalFor(null)}
           onSave={async (dates) => { if (await patchDays(calFor, { dates })) { showToast("Días actualizados", "success"); setCalFor(null); } }}
-          onAuto={async () => { if (await patchDays(calFor, {})) { showToast("Volvió al cálculo automático", "success"); setCalFor(null); } }}
+          onAuto={async () => { if (await patchDays(calFor, { auto: true })) { showToast("Volvió al cálculo automático", "success"); setCalFor(null); } }}
         />
       )}
     </div>

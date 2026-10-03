@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
-// Arriendo: dias trabajados del mes. Tres formas: `dates` (dias elegidos en el calendario), `days` (solo la cantidad) o
+// Arriendo: dias trabajados y valor del dia del mes. Dias, tres formas: `dates` (dias elegidos en el calendario), `days` (solo la cantidad) o
 // ninguno de los dos (vuelve al calculo automatico). No toca rental_records, para que apagar el libro no cambie los
 // numeros de antes. Solo administrador.
 export async function PATCH(req: NextRequest) {
@@ -75,16 +75,30 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Datos no validos" }, { status: 400 });
   }
 
+  // Solo se cambia lo que viene en la peticion: `dates` / `days` / `auto` (dias trabajados) y/o `dailyRate` (valor del dia).
+  const update: Record<string, any> = {};
   let days: number | null = null;
-  let dates: string[] | null = null;
   if (Array.isArray(body?.dates)) {
     const ym = month.slice(0, 7);
-    dates = Array.from(new Set(body.dates.map(String))).filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d.startsWith(ym)).sort() as string[];
+    const dates = Array.from(new Set(body.dates.map(String))).filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d.startsWith(ym)).sort() as string[];
     days = dates.length;
+    update.worked_dates = dates; update.days_override = days;
   } else if (body?.days !== undefined && body?.days !== null) {
     days = Math.round(Number(body.days));
     if (!Number.isFinite(days) || days < 0 || days > 31) return NextResponse.json({ error: "Datos no validos" }, { status: 400 });
+    update.worked_dates = null; update.days_override = days;
+  } else if (body?.auto === true) {
+    update.worked_dates = null; update.days_override = null;
   }
+  if ("dailyRate" in (body || {})) {
+    if (body.dailyRate === null) update.daily_rate_override = null;
+    else {
+      const r = Math.round(Number(body.dailyRate));
+      if (!Number.isFinite(r) || r < 0 || r > 10_000_000) return NextResponse.json({ error: "Valor del dia no valido" }, { status: 400 });
+      update.daily_rate_override = r;
+    }
+  }
+  if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nada que guardar" }, { status: 400 });
 
   const supabase = createAdminSupabase();
   if (!(await isLedgerEnabled(supabase, tenantId))) {
@@ -95,7 +109,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data: me } = await supabase.from("profiles").select("name").eq("id", caller.userId).maybeSingle();
   const { error } = await supabase.from("professional_settlements").upsert({
-    tenant_id: tenantId, barber_id: body.barberId, month, mode: "rental", days_override: days, worked_dates: dates,
+    tenant_id: tenantId, barber_id: body.barberId, month, mode: "rental", ...update,
     updated_by_name: me?.name || null, updated_at: new Date().toISOString(),
   }, { onConflict: "tenant_id,barber_id,month,mode", ignoreDuplicates: false });
   if (error) return NextResponse.json({ error: "Falta aplicar la migracion 091 (version nueva) en la base de datos." }, { status: 409 });

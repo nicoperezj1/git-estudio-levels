@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS professional_settlements (
 ALTER TABLE professional_settlements ADD COLUMN IF NOT EXISTS days_override INTEGER;
 -- Arriendo: los dias concretos elegidos en el calendario del mes (['2026-09-01', ...]). NULL = no se uso el calendario.
 ALTER TABLE professional_settlements ADD COLUMN IF NOT EXISTS worked_dates JSONB;
+-- Arriendo: valor del dia de ESTE mes si se cambio a mano (NULL = el valor habitual del profesional).
+ALTER TABLE professional_settlements ADD COLUMN IF NOT EXISTS daily_rate_override NUMERIC(10,0);
 ALTER TABLE professional_settlements ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS professional_settlement_log (
