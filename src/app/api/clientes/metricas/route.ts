@@ -56,13 +56,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ summary: [], monthly: [], clientsBySource: EMPTY_SOURCE_BUCKETS() });
   }
 
-  let query = supabase
-    .from("clients")
-    .select("id, name, email, phone, acquisition_source, acquisition_detail, created_at")
-    .order("created_at", { ascending: true });
-  if (tenantId !== "ALL") query = query.eq("tenant_id", tenantId);
-
-  const { data: clients } = await query;
+  // Supabase devuelve como maximo 1.000 filas por consulta; sin paginar, solo se leian
+  // los primeros 1.000 clientes (los mas antiguos/importados) y los nuevos nunca se
+  // contaban. Se lee por paginas hasta traer todos. El orden incluye "id" para que las
+  // paginas no se solapen entre si cuando varios clientes comparten created_at.
+  const PAGE = 1000;
+  const clients: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let query = supabase
+      .from("clients")
+      .select("id, name, email, phone, acquisition_source, acquisition_detail, created_at")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (tenantId !== "ALL") query = query.eq("tenant_id", tenantId);
+    const { data, error } = await query;
+    if (error) {
+      return NextResponse.json({ error: "No se pudieron leer los clientes" }, { status: 500 });
+    }
+    clients.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
 
   // Agrupa clientes por origen.
   const bySource: Record<string, Array<{ id: string; name: string; email: string | null; phone: string | null; firstVisit: string; detail: string | null }>> = EMPTY_SOURCE_BUCKETS();
