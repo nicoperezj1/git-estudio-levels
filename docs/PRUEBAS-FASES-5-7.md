@@ -13,7 +13,7 @@ Probar SOLO en `rebooking-pruebas`. Antes de cada SQL: respaldo (en pruebas no h
 
 ## Fase 5 — Standby y caja
 1. Configuración > **Caja y Standby**: activar "Standby nuevo" y poner un tope bajo (ej. 20.000).
-2. Standby: ingresar con PIN 2222. Debe decir "Hola, Camila", mostrar SUS servicios y los productos de venta con stock.
+2. Standby: ingresar con PIN 2222. Debe verse como el Punto de Venta (servicios y productos, cliente, cupón, descuento, pago dividido) con "Hola, Camila", solo SUS servicios, y arriba "En caja", Reportar problema, Descuento por planilla y Cerrar sesión. Cobrar con un cliente y revisar que la venta aparece en Ingresos/Egresos, Caja y Métricas; con tarjeta NO se activa la máquina.
 3. Cobrar en efectivo hasta pasar el tope: sale "Haz una reducción de $X…". **Confirmar**; en Caja el "Esperado" baja y aparece el aviso de retiro.
 4. Repetir con **Reportar problema** (en esa pantalla y desde el botón de abajo): debe aparecer en el Dashboard (tarjeta "Problemas reportados").
 5. En Standby: **Descuento por planilla** → elegir producto → sale un código de 6 caracteres. En **Caja > Descuento por planilla** ingresar el código: baja el stock y queda en el libro del profesional (Comisiones/Arriendo, tipo "Descuento por planilla").
