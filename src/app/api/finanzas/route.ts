@@ -54,7 +54,10 @@ export async function GET(req: NextRequest) {
   if (barberId) query = query.eq("barber_id", barberId);
 
   const { data: transactions, error } = await query;
-  if (error) return NextResponse.json({ transactions: [], stats: { totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 } });
+  if (error) {
+    console.error("finanzas GET:", error.message);
+    return NextResponse.json({ transactions: [], stats: { totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 } });
+  }
 
   // "Emitido por": nombre de quien registro el movimiento (solo los hechos desde la migracion 090).
   const creatorIds = Array.from(new Set((transactions || []).map((t: any) => t.created_by).filter(Boolean)));

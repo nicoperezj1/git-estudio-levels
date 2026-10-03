@@ -8,7 +8,12 @@
 -- 3) Registro de cierre / reapertura de meses.
 
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS accounting_month DATE;                       -- siempre dia 1 del mes
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES profiles(id) ON DELETE SET NULL;
+-- created_by SIN llave foranea a profiles, a proposito: transactions ya tiene barber_id -> profiles, y una
+-- segunda relacion hace AMBIGUOS los `barber:profiles(name)` de Caja, Dashboard y Finanzas (PostgREST
+-- PGRST201) y esas pantallas dejan de cargar. El nombre se resuelve con una consulta aparte.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_by UUID;
+-- Si una version anterior de este archivo ya creo esa llave, se quita (re-ejecutable).
+ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_created_by_fkey;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS fixed_category TEXT;                         -- NULL = movimiento normal
 
 CREATE INDEX IF NOT EXISTS idx_transactions_accounting_month ON transactions(tenant_id, accounting_month);
@@ -30,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_month_closings ON month_closings(tenant_id, month
 -- Sin politicas: solo la API (llave de servicio) lee y escribe esta tabla.
 ALTER TABLE month_closings ENABLE ROW LEVEL SECURITY;
 
--- Verificacion: debe devolver 3 filas (las tres columnas nuevas) y month_closings = 1.
-SELECT column_name FROM information_schema.columns
-WHERE table_name = 'transactions' AND column_name IN ('accounting_month', 'created_by', 'fixed_category');
-SELECT count(*) AS month_closings_existe FROM information_schema.tables WHERE table_name = 'month_closings';
+-- Verificacion (Supabase muestra solo el resultado de la ULTIMA consulta, por eso la importante va al final):
+-- debe devolver UNA sola fila: transactions_barber_id_fkey.
+SELECT conname FROM pg_constraint
+WHERE conrelid = 'transactions'::regclass AND contype = 'f' AND confrelid = 'profiles'::regclass;
