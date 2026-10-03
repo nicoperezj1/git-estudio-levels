@@ -11,6 +11,7 @@ import {
 import { SaleCelebration } from "@/components/pos/sale-celebration";
 import { CashReductionPrompt } from "@/components/pos/cash-reduction-prompt";
 import { StandbyHeader } from "@/components/standby/standby-header";
+import { CajaLockGate } from "@/components/caja/caja-lock";
 import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
 import { useLedgerEnabled } from "@/components/finance/professional-ledger-view";
 
@@ -71,7 +72,14 @@ interface CartItem {
 // puntos, propina, pago dividido, tarjeta en la maquina, caja, ingresos, metricas…).
 export interface StandbyCtx { barber: { id: string; name: string }; onExit: () => void; onReview?: () => void }
 
+// En el Punto de Venta del computador general (sin Standby) la pantalla se puede apagar con "Apagar caja" y se enciende con
+// el PIN de recepcion o del administrador (el mismo bloqueo de la pantalla Caja). El Standby tiene su propio PIN.
 export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
+  if (standby) return <PosScreenInner standby={standby} />;
+  return <CajaLockGate>{(lock) => <PosScreenInner onLock={lock} />}</CajaLockGate>;
+}
+
+function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: () => void }) {
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -612,7 +620,14 @@ export default function PosScreen({ standby }: { standby?: StandbyCtx }) {
         {standby ? (
           <StandbyHeader barber={standby.barber} products={products} saleCounter={saleCounter} onExit={standby.onExit} onReview={standby.onReview} />
         ) : (
-          <ReceptionistGreeting className="mb-2" />
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <ReceptionistGreeting className="mb-0" />
+            {onLock && (
+              <button type="button" onClick={onLock} className="shrink-0 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-brand-gray hover:bg-gray-50 hover:text-brand-dark">
+                🔒 Apagar caja
+              </button>
+            )}
+          </div>
         )}
         {/* Barra superior: pestañas segmentadas + buscador + orden */}
         <div className="mb-5 space-y-3">
