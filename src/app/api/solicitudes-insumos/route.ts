@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (!tenantId || tenantId === "ALL") return NextResponse.json({ requests: [] });
   const supabase = createAdminSupabase();
   const { data, error } = await supabase.from("supply_requests")
-    .select("id, created_by_name, items, notes, email_sent, created_at")
+    .select("id, created_by_name, items, notes, email_sent, email_to, created_at")
     .eq("tenant_id", tenantId).eq("status", "open").order("created_at", { ascending: false }).limit(50);
   return NextResponse.json({ requests: error ? [] : data || [] });
 }

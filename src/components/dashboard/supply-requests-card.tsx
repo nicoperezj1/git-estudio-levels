@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Req {
-  id: string; created_by_name: string | null; created_at: string; notes: string | null; email_sent: boolean;
+  id: string; created_by_name: string | null; created_at: string; notes: string | null; email_sent: boolean; email_to?: string | null;
   items: Array<{ name: string; current_stock: number | null; to_buy: number }>;
 }
 
@@ -53,6 +53,10 @@ export function SupplyRequestsCard({ tenantId }: { tenantId?: string }) {
               ))}
             </ul>
             {r.notes && <p className="mt-1.5 text-xs text-brand-gray">Nota: {r.notes}</p>}
+            {/* Para saber si el correo salio o no (no es evidente mirando el Dashboard). */}
+            <p className={`mt-1.5 text-[11px] ${r.email_sent ? "text-emerald-600" : "text-amber-600"}`}>
+              {r.email_sent ? `Correo enviado a ${r.email_to || "el administrador"}` : "El correo no se pudo enviar (la solicitud sí quedó guardada aquí)."}
+            </p>
           </div>
         ))}
       </div>
