@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { getSlotCapacity, isSlotFull } from "@/lib/capacity";
+import { parseWallClock } from "@/lib/wallclock";
 
 export async function PATCH(
   req: NextRequest,
@@ -40,6 +42,22 @@ export async function PATCH(
       if (startIso) {
         const total = svcs.reduce((n: number, sv: any) => n + (sv.duration || 0), 0);
         update.end_time = new Date(new Date(startIso).getTime() + total * 60000).toISOString();
+      }
+    }
+  }
+
+  // Cupos por bloque (solo kinesiologia): mover una cita a un horario/profesional ya lleno no se
+  // permite. Con cupo 1 (todos los demas rubros) no se comprueba nada, igual que siempre.
+  if (update.start_time || update.end_time || update.barber_id) {
+    const { data: cur } = await supabase.from("appointments").select("barber_id, date, start_time, end_time, tenant_id").eq("id", params.id).single();
+    if (cur) {
+      const barber = update.barber_id || cur.barber_id;
+      if (await getSlotCapacity(supabase, cur.tenant_id) > 1) {
+        const start = parseWallClock(update.start_time || cur.start_time);
+        const end = parseWallClock(update.end_time || cur.end_time);
+        if (await isSlotFull(supabase, barber, cur.tenant_id, update.date || cur.date, start, end, params.id)) {
+          return NextResponse.json({ error: "Ese horario ya no tiene cupo" }, { status: 409 });
+        }
       }
     }
   }

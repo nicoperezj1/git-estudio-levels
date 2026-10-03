@@ -65,9 +65,9 @@ async function overlapping(supabase: Admin, barberId: string, date: string, star
 }
 
 // true = NO se puede agendar (horario lleno para ese profesional).
-export async function isSlotFull(supabase: Admin, barberId: string, tenantId: string | null | undefined, date: string, start: Date, end: Date): Promise<boolean> {
+export async function isSlotFull(supabase: Admin, barberId: string, tenantId: string | null | undefined, date: string, start: Date, end: Date, excludeId?: string): Promise<boolean> {
   const cap = await getSlotCapacity(supabase, tenantId);
-  const rows = await overlapping(supabase, barberId, date, start.toISOString(), end.toISOString());
+  const rows = (await overlapping(supabase, barberId, date, start.toISOString(), end.toISOString())).filter((r) => r.id !== excludeId);
   return rows.length > 0 && (cap === 1 ? true : peakOverlap(rows.map((r) => r.iv), start.getTime(), end.getTime()) >= cap);
 }
 
