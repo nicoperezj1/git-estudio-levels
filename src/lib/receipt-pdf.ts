@@ -108,7 +108,11 @@ export async function buildReceiptPdf(o: {
   ensure(120);
   y -= 6;
   const owed = pro.total < 0;
-  const totalLabel = owed ? "El negocio le debe al profesional" : rental ? "Total a cobrar al profesional" : "Total a pagar al profesional";
+  // Un total NEGATIVO significa cosas distintas: en comision el profesional se llevo mas de lo que gano (el debe al
+  // negocio); en arriendo los descuentos superan lo que debia pagar (el negocio le debe a el).
+  const totalLabel = owed
+    ? (rental ? "El negocio le debe al profesional" : "El profesional le debe al negocio")
+    : rental ? "Total a cobrar al profesional" : "Total a pagar al profesional";
   text(totalLabel, M, y, 12, bold, DARK);
   textRight(clp(Math.abs(pro.total)), W - M, y, 16, bold, DARK);
   y -= 24;
