@@ -475,8 +475,8 @@ export default function InventarioPage() {
 
       {/* New Product Modal */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-modal flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-5 md:p-6 w-full max-w-md shadow-xl animate-scale-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-modal flex items-start justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-5 md:p-6 w-full max-w-md shadow-xl animate-scale-in my-4">
             <h2 className="text-lg font-bold mb-4">{editingProductId ? "Editar Producto" : "Nuevo Producto"}</h2>
             <form onSubmit={handleCreateProduct} className="space-y-4">
               <div>
