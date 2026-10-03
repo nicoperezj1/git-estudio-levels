@@ -51,7 +51,7 @@ Plan acordado con Nicolás el 3 de octubre de 2026. Ordena todos los pedidos de 
 
 ## 3. Fase 1: arreglos rápidos (bajo riesgo)
 
-> **Estado (3 oct., noche):** HECHO: Métricas de clientes, "Cómo nos conoció" (+POS), Mi Agenda (admin primero), orden de servicios (reserva por hora + proteger reorder), puntos usan la regla del negocio. FALTA: nombre de encargado/recepcionista, calendario celular, 7 días con clic, fidelidad configurable. Detalle en `docs/CONTEXTO.md`.
+> **Estado (3 oct., noche):** Fase 1 COMPLETA EN CÓDIGO (falta probar en pantalla): Métricas, "Cómo nos conoció" (+POS), Mi Agenda, orden de servicios, puntos por negocio, fidelidad configurable, nombre de encargado (SQL 089), calendario celular y 7 días con clic. Siguiente: Fase 2. Detalle en `docs/CONTEXTO.md`.
 
 | Cambio | Detalle |
 |---|---|

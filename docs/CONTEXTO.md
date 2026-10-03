@@ -23,7 +23,11 @@
 >   - Cómo nos conoció: se sumaron "Facebook" y "Referido de un amigo/conocido" (Clientes, Métricas, PDF del cierre) y el selector aparece también al crear cliente desde el POS. Sin SQL.
 >   - Mi Agenda: el admin que atiende clientes sale primero y seleccionado.
 >   - Orden de servicios: el arrastrar ya existía; ahora la reserva "por hora" (`public/services`) respeta `sort_order`, y `/api/services/reorder` exige sesión y negocio.
-> - **Fase 1 que FALTA** (seguir en este orden): nombre de encargado de recepción + ocultar campos que no le aplican; calendario en celular (un toque abre Agendar/Bloquear, "Atrás" y tocar fuera solo cierran, líneas de hora sutiles); calendario 7 días con varios profesionales permite agendar con clic; fidelidad configurable (puntos y recompensas por negocio; proteger `loyalty/earn` y `redeem`). Después **Fase 2 (finanzas)**.
+>   - Fidelidad: "puntos por compra" editable por negocio (Fidelidad); `loyalty/earn` y `redeem` exigen sesión y negocio. Sin SQL.
+>   - Recepción: campo "Nombre de encargado" (saludo "Hola David" en Caja y POS) y la ficha de un Recepcionista oculta link de agenda, slot, modalidad, comisión, arriendo, horario, servicios y presentación. **Migración 089** (`profiles.manager_name`), el código tolera que aún no exista.
+>   - Calendario celular: un toque abre Agendar/Bloquear; "Atrás" y tocar fuera solo cierran el cuadro (también detalle de cita y bloqueo); líneas de hora y media hora visibles pero sutiles.
+>   - Calendario varios días (7 días con varios profesionales): un clic en un espacio vacío abre Agendar/Bloquear para ese profesional y ese día.
+> - **Fase 1 completa en código; falta probarla en pantalla** (Nico prueba en localhost). Para ver el nombre de encargado hay que correr `supabase/migrations/089_profile_manager_name.sql` en el SQL Editor **de pruebas**. **Siguiente: Fase 2 (finanzas)**, ver `docs/PLAN-OCTUBRE.md` sección 4.
 > - **Fase 0 pendiente con Pablo:** parche `0013`, sitio de prueba en Vercel. Claves expuestas (`MP_WEBHOOK_SECRET`, token `APP_USR`) por regenerar: urgente y no necesita código.
 > - Nico prueba en su computador (`localhost`). Aún **no tiene acceso de admin** a Supabase, Vercel ni al GitHub de Pablo: los cambios se le entregan como zip a Pablo.
 
