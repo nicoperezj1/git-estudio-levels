@@ -3,6 +3,7 @@ import { createServerSupabase, createAdminSupabase, resolveTenantForRequest } fr
 import { newClientAppointmentIds } from "@/lib/new-client";
 import { isSlotFull, exceededAfterInsert, getSlotCapacity } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
+import { sendPush } from "@/lib/push";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -130,21 +131,15 @@ export async function POST(req: NextRequest) {
   // reception created it) — by push AND by email. Email is the reliable channel: it
   // arrives even if the barber never enabled browser notifications. Non-blocking.
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
     const [{ data: barber }, { data: client }] = await Promise.all([
       supabase.from("profiles").select("name, email").eq("id", barberId).single(),
       clientId ? supabase.from("clients").select("name").eq("id", clientId).single() : Promise.resolve({ data: null }),
     ]);
-    await fetch(`${appUrl}/api/push/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: barberId,
-        title: "Nueva Cita Agendada",
-        body: `${client?.name || "Cliente"} - ${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`,
-        url: "/dashboard/mi-agenda",
-        tag: "new-appointment",
-      }),
+    await sendPush({
+      userId: barberId,
+      title: "Nueva Cita Agendada",
+      body: `${client?.name || "Cliente"} - ${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`,
+      url: "/dashboard/mi-agenda",
     });
     if (barber?.email) {
       const { sendBarberNewAppointment } = await import("@/lib/resend");

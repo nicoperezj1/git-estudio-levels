@@ -58,7 +58,7 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 - Cita creada desde el calendario con cliente nuevo "no aparece": no se reprodujo; se agregaron avisos y bloqueo si falta elegir al cliente. **Si Nico vuelve a verlo, pedir el paso exacto y el mensaje rojo, y revisar `handleCreate` en `src/app/dashboard/calendario/page.tsx` y `POST /api/appointments`.**
 - Fase 7 (ver arriba). Mi Billetera (vista del profesional) sigue con el cálculo antiguo. Libro de Remuneraciones/Previred (solo guía).
 - Correo de solicitud de insumos (Resend: dominio/`EMAIL_FROM`/spam; Pablo). Regenerar `MP_WEBHOOK_SECRET` y token `APP_USR` expuestos (Pablo).
-- Seguridad abierta (`docs/auditoria-rutas-api.md`): `comisiones/adjust`, `arriendo/adjust`, `wallet`, `loyalty`, `mercadopago*`, `tuu*`; `pos/checkout` aún confía en los totales del navegador (falta recálculo en servidor y verificar pago de Mercado Pago); `GET /api/clients/[id]` y `GET /api/clients` sin chequeo de rol; actualizar Next 14.1.3 (CVE).
+- Seguridad abierta (`docs/auditoria-rutas-api.md`; el 3 oct. se cerraron push, comisiones/arriendo adjust, wallet, loyalty rewards, clients POST/[id]/photos): `mercadopago*`, `tuu*`; `pos/checkout` aún confía en los totales del navegador (falta recálculo en servidor y verificar pago de Mercado Pago); `GET /api/clients/[id]` y `GET /api/clients` sin chequeo de rol; actualizar Next 14.1.3 (CVE).
 - Opcional si Nico lo pide: SQL para dar "Emitido por" a 4 ventas de prueba antiguas (datos irrecuperables, solo cosmético); plan Isapre en $ vs UF.
 - Fase 0 con Pablo: sitio de prueba en Vercel conectado a `rebooking-pruebas`; parche `0013` ya incluido en la rama.
 

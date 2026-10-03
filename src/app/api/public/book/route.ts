@@ -7,6 +7,7 @@ import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
 import { isOnVacation } from "@/lib/vacations";
 import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
+import { sendPush } from "@/lib/push";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -199,20 +200,14 @@ export async function POST(req: NextRequest) {
 
   // Notify the assigned barber AND the business's reception/admins by push. The old
   // call passed no recipient, so /api/push/send rejected it and nobody was notified.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
   try {
-    await fetch(`${appUrl}/api/push/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: barberId, // the professional who got the appointment
-        tenantId, // + reception/admins of this business
-        roles: ["admin", "receptionist"],
-        title: "Nueva Cita Agendada",
-        body: `${clientName} - ${serviceNames} con ${barber?.name || "Profesional"} (${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })})`,
-        url: "/dashboard/agenda",
-        tag: "new-appointment",
-      }),
+    await sendPush({
+      userId: barberId, // the professional who got the appointment
+      tenantId, // + reception/admins of this business
+      roles: ["admin", "receptionist"],
+      title: "Nueva Cita Agendada",
+      body: `${clientName} - ${serviceNames} con ${barber?.name || "Profesional"} (${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })})`,
+      url: "/dashboard/agenda",
     });
   } catch (e) {
     console.error("Error sending push:", e);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 import { todayInChile, dateStrOffset, chileDayBoundsUtc } from "@/lib/utils";
 
 const paymentMethodLabels: Record<string, string> = {
@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
   const barberId = searchParams.get("barberId");
 
   if (!barberId) return NextResponse.json({ error: "barberId required" }, { status: 400 });
+
+  // SEGURIDAD: antes no pedia sesion y devolvia ganancias, comisiones y movimientos de cualquier profesional.
+  // Ahora: el propio profesional, o admin/recepcion del mismo negocio (super_admin con cualquiera).
+  const access = await authorizeBarberManagement(barberId, { allowSelf: true });
+  if (!access.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   // Get barber info
   const { data: barber } = await supabase

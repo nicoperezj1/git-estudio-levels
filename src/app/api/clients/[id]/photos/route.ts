@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+
+// SEGURIDAD: antes ninguna de estas rutas pedia sesion: se podian ver, subir y borrar fotos de clientes de cualquier
+// negocio. Ahora el cliente debe ser del negocio del usuario logueado (el super_admin puede con cualquiera).
+async function authorizeClient(supabase: ReturnType<typeof createAdminSupabase>, clientId: string) {
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  if (!userId) return { ok: false as const, status: 401 };
+  if (role === "super_admin") return { ok: true as const, status: 200 };
+  const { data: client } = await supabase.from("clients").select("tenant_id").eq("id", clientId).single();
+  if (!client || client.tenant_id !== tenantId) return { ok: false as const, status: 403 };
+  return { ok: true as const, status: 200 };
+}
 
 // GET: List photos for a client
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createAdminSupabase();
+  const auth = await authorizeClient(supabase, params.id);
+  if (!auth.ok) return NextResponse.json([], { status: auth.status });
 
   const { data: photos } = await supabase
     .from("client_photos")
@@ -17,6 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // POST: Upload photo for a client
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createAdminSupabase();
+  const auth = await authorizeClient(supabase, params.id);
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: auth.status });
 
   const formData = await req.formData();
   const file = formData.get("file") as File;
@@ -76,6 +91,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 // DELETE: Remove a photo
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createAdminSupabase();
+  const auth = await authorizeClient(supabase, params.id);
+  if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: auth.status });
   const { searchParams } = new URL(req.url);
   const photoId = searchParams.get("photoId");
 
@@ -88,7 +105,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .from("client_photos")
     .select("url")
     .eq("id", photoId)
+    .eq("client_id", params.id)
     .single();
+  if (!photo) return NextResponse.json({ error: "Foto no encontrada" }, { status: 404 });
 
   if (photo?.url) {
     const path = photo.url.split("/cut-photos/")[1];
@@ -97,7 +116,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
   }
 
-  await supabase.from("client_photos").delete().eq("id", photoId);
+  await supabase.from("client_photos").delete().eq("id", photoId).eq("client_id", params.id);
 
   return NextResponse.json({ success: true });
 }

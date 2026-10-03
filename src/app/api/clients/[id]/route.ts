@@ -5,6 +5,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: antes no pedia sesion y devolvia la ficha, citas y pagos de cualquier cliente de cualquier negocio.
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
   const supabase = createAdminSupabase();
   const clientId = params.id;
 
@@ -15,7 +19,7 @@ export async function GET(
     .eq("id", clientId)
     .single();
 
-  if (!client) {
+  if (!client || (role !== "super_admin" && client.tenant_id !== tenantId)) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 

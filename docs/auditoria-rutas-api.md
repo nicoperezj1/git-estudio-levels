@@ -140,3 +140,8 @@ Observaciones (no se tocó nada):
 7. Rol en las rutas de (b) y observaciones de (a) (por ejemplo, `CRON_SECRET` en `cron/post-service`).
 
 Antes de empezar a arreglar: **confirmar qué páginas llaman a cada ruta**, porque algunas (por ejemplo `pos/checkout` desde el POS, `push/send` desde `notifications/client-arrived`) son llamadas servidor a servidor sin cookies y se romperían si solo se les exige sesión.
+
+## Actualización 3 oct. (noche): rutas cerradas
+Ahora exigen sesión y negocio: `push/send` (solo admin/recepción, solo a gente del mismo negocio), `push/subscribe` (el dueño de la suscripción es quien tiene la sesión), `notifications/client-arrived`, `comisiones/adjust` (POST y DELETE) y `arriendo/adjust` (sesión + PIN de un admin **del mismo negocio** con freno de intentos, ver `src/lib/admin-pin.ts`), `wallet` (el propio profesional o admin/recepción del negocio), `loyalty/rewards` (POST y DELETE), `clients` (POST), `clients/[id]` (GET y PATCH) y `clients/[id]/photos`.
+Los avisos del servidor (reserva online, depósito, cita creada, cliente llegó) ahora llaman a `sendPush()` de `src/lib/push.ts` directo, sin pasar por HTTP, así que cerrar `/api/push/send` no los rompe. Cuando exista la app móvil, el canal FCM se agrega en ese mismo archivo.
+Siguen abiertas: `mercadopago*`, `tuu*`, `pos/checkout` (totales del navegador) y `GET /api/clients` sin chequeo de rol (ya filtra por negocio).

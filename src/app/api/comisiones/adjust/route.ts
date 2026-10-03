@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { verifyAdminPin, barberInTenant } from "@/lib/admin-pin";
 
 // POST: Create manual commission adjustment (super admin only)
 export async function POST(req: NextRequest) {
@@ -11,17 +12,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "barberId, amount, reason y pin son obligatorios" }, { status: 400 });
   }
 
-  // Verify admin or super admin PIN
-  const { data: admin } = await supabase
-    .from("profiles")
-    .select("id, name")
-    .in("role", ["admin", "super_admin"])
-    .eq("personal_pin", pin)
-    .eq("active", true)
-    .single();
-
-  if (!admin) {
-    return NextResponse.json({ error: "PIN incorrecto o no tiene permisos" }, { status: 401 });
+  // SEGURIDAD: sesion + PIN de un administrador del MISMO negocio, y el profesional debe ser de ese negocio.
+  const auth = await verifyAdminPin(pin);
+  if (!auth.ok) return auth.response;
+  const admin = auth.admin;
+  if (!(await barberInTenant(barberId, auth.role, auth.tenantId))) {
+    return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
   }
 
   // Create manual transaction
@@ -39,6 +35,7 @@ export async function POST(req: NextRequest) {
       // the [AJUSTE MANUAL] tag in notes to make it clear this wasn't an actual cash sale.
       payment_method: "cash",
       barber_id: barberId,
+      tenant_id: auth.tenantId,
       notes: `[AJUSTE MANUAL] ${reason} — por ${admin.name}`,
     })
     .select()
@@ -72,30 +69,30 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "id y pin requeridos" }, { status: 400 });
   }
 
-  // Verify admin or super admin PIN
-  const { data: admin } = await supabase
-    .from("profiles")
-    .select("id, name")
-    .in("role", ["admin", "super_admin"])
-    .eq("personal_pin", pin)
-    .eq("active", true)
-    .single();
-
-  if (!admin) {
-    return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
-  }
+  // SEGURIDAD: sesion + PIN de un administrador del mismo negocio, y la transaccion debe ser de ese negocio.
+  const auth = await verifyAdminPin(pin);
+  if (!auth.ok) return auth.response;
+  const admin = auth.admin;
 
   // Get transaction info before deleting
   const { data: tx } = await supabase
     .from("transactions")
-    .select("total, barber_id, notes")
+    .select("total, barber_id, notes, tenant_id")
     .eq("id", transactionId)
     .single();
+  if (!tx) return NextResponse.json({ error: "Transacción no encontrada" }, { status: 404 });
+  // Los ajustes manuales antiguos se guardaron sin negocio: en ese caso se mira el del profesional.
+  const sameTenant = tx.tenant_id
+    ? tx.tenant_id === auth.tenantId
+    : !!tx.barber_id && (await barberInTenant(tx.barber_id, auth.role, auth.tenantId));
+  if (auth.role !== "super_admin" && !sameTenant) {
+    return NextResponse.json({ error: "Transacción no encontrada" }, { status: 404 });
+  }
 
   // Soft delete (mark as cancelled instead of hard delete)
   await supabase
     .from("transactions")
-    .update({ status: "cancelled", notes: `${tx?.notes || ""} [ANULADA por ${admin.name}]` })
+    .update({ status: "cancelled", notes: `${tx.notes || ""} [ANULADA por ${admin.name}]` })
     .eq("id", transactionId);
 
   // Log in audit
@@ -103,7 +100,7 @@ export async function DELETE(req: NextRequest) {
     action: "transaction_delete",
     entity_type: "transaction",
     entity_id: transactionId,
-    description: `Transaccion anulada: $${Number(tx?.total || 0).toLocaleString("es-CL")} — por ${admin.name}`,
+    description: `Transaccion anulada: $${Number(tx.total || 0).toLocaleString("es-CL")} — por ${admin.name}`,
     user_id: admin.id,
     user_name: admin.name,
     reversible: false,

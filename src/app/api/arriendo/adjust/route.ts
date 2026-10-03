@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { verifyAdminPin, barberInTenant } from "@/lib/admin-pin";
 
 // POST: Apply a manual rental adjustment (bonus or deduction) directly on the
 // professional's rental_records row for that month, with PIN verification.
@@ -18,17 +19,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "barberId, month, year, amount, reason y pin son obligatorios" }, { status: 400 });
   }
 
-  // Verify admin or super admin PIN
-  const { data: admin } = await supabase
-    .from("profiles")
-    .select("id, name")
-    .in("role", ["admin", "super_admin"])
-    .eq("personal_pin", pin)
-    .eq("active", true)
-    .single();
-
-  if (!admin) {
-    return NextResponse.json({ error: "PIN incorrecto o no tiene permisos" }, { status: 401 });
+  // SEGURIDAD: sesion + PIN de un administrador del MISMO negocio, y el profesional debe ser de ese negocio.
+  const auth = await verifyAdminPin(pin);
+  if (!auth.ok) return auth.response;
+  const admin = auth.admin;
+  if (!(await barberInTenant(barberId, auth.role, auth.tenantId))) {
+    return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
   }
 
   const { data: prof } = await supabase

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { tryConsumeQuota } from "@/lib/message-quota";
+import { sendPush } from "@/lib/push";
 
 /**
  * MercadoPago Webhook for deposit payments.
@@ -215,21 +216,15 @@ export async function POST(req: NextRequest) {
     // fired a push — so a professional booked via a paid deposit got no alert. Mirror the
     // same notification the public/dashboard booking flows send.
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
       const { data: barberRow } = await supabase.from("profiles").select("name, email").eq("id", barberId).single();
       const startDateForMsg = new Date(startDate);
-      await fetch(`${appUrl}/api/push/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: barberId,
-          tenantId,
-          roles: ["admin", "receptionist"],
-          title: "Nueva Cita Agendada",
-          body: `${clientName} - ${startDateForMsg.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })} con ${barberRow?.name || "Profesional"}`,
-          url: "/dashboard/agenda",
-          tag: "new-appointment",
-        }),
+      await sendPush({
+        userId: barberId,
+        tenantId,
+        roles: ["admin", "receptionist"],
+        title: "Nueva Cita Agendada",
+        body: `${clientName} - ${startDateForMsg.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })} con ${barberRow?.name || "Profesional"}`,
+        url: "/dashboard/agenda",
       });
       // Email the barber too (works even without browser notifications).
       if (barberRow?.email) {

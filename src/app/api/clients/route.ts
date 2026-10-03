@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, getCurrentTenantId, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentTenantId, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -49,9 +49,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes no pedia sesion y tomaba el negocio del cuerpo: cualquiera creaba clientes en cualquier negocio.
+  const session = await getCurrentUserRoleAndTenant();
+  if (!session.userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { name, email, phone, notes, tenantId, source, sourceDetail } = body;
+  const { name, email, phone, notes, source, sourceDetail } = body;
+  // El negocio sale de la sesion; resolveTenantForRequest valida (y corrige) lo que mande el navegador.
+  const { tenantId: tenantFromSession } = await resolveTenantForRequest(body.tenantId || null);
+  const tenantId = tenantFromSession && tenantFromSession !== "ALL" ? tenantFromSession : null;
 
   // Nico (29-sep): celular y correo son obligatorios — sin ellos no hay registro ni datos
   // del cliente. Se valida tambien aqui (no solo en los formularios).

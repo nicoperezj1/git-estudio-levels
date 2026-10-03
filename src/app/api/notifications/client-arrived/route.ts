@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, isManagerLevel } from "@/lib/supabase/server";
+import { sendPush } from "@/lib/push";
 
 // POST: Notify barber that their client has arrived
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes no pedia sesion (cualquiera podia mandarle avisos a un profesional). Ahora solo recepcion/admin
+  // y la cita debe ser de su negocio.
+  const { ok, role, tenantId } = await isManagerLevel();
+  if (!ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const supabase = createAdminSupabase();
   const { appointmentId, clientName, barberName } = await req.json();
 
@@ -13,26 +18,24 @@ export async function POST(req: NextRequest) {
   // Get appointment details to find the barber
   const { data: appt } = await supabase
     .from("appointments")
-    .select("barber_id, start_time")
+    .select("barber_id, start_time, tenant_id")
     .eq("id", appointmentId)
     .single();
 
   if (!appt?.barber_id) {
     return NextResponse.json({ error: "Cita sin profesional asignado" }, { status: 400 });
   }
+  if (role !== "super_admin" && appt.tenant_id !== tenantId) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
   // Send real push notification to barber
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://re-booking.cl";
-    await fetch(`${baseUrl}/api/push/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: appt.barber_id,
-        title: "Tu cliente llego!",
-        body: `${clientName} esta esperando.`,
-        url: "/dashboard/mi-agenda",
-      }),
+    await sendPush({
+      userId: appt.barber_id,
+      title: "Tu cliente llego!",
+      body: `${clientName} esta esperando.`,
+      url: "/dashboard/mi-agenda",
     });
   } catch (e) {
     console.error("Error sending push:", e);
