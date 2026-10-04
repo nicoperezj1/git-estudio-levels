@@ -43,3 +43,9 @@ Son 149 archivos. Incluye 1 dependencia nueva: `pdf-lib` (ya está en `package.j
 - Correo de solicitud de insumos: Resend lo acepta pero no llega. Revisar dominio verificado, la variable `EMAIL_FROM` (si no existe usa `no-reply@re-booking.cl`) y spam.
 - Regenerar `MP_WEBHOOK_SECRET` y el token `APP_USR` que quedaron expuestos.
 - Quedan abiertas las rutas `comisiones/adjust`, `arriendo/adjust`, `wallet`, `loyalty`, `mercadopago*`, `tuu*` (ver `docs/auditoria-rutas-api.md`).
+
+## Parte 2 (SOLO cuando Nico avise; todavía en pruebas)
+Rama `octubre` actualizada con: centro de avisos (campanita, avisos del admin al equipo), seguridad de citas/avisos/billetera/clientes, PIN con huella, fotos de clientes privadas y consentimiento de promociones. Trae **2 migraciones más** en `entrega-produccion/SQL-PARTE-2.sql` (100 y 101, aditivas), que van **después** de `SQL-PRODUCCION.sql` y antes del código nuevo. Todo viene apagado por defecto (el centro de avisos se enciende por negocio). Pasos extra tras desplegar, solo super admin:
+1. `GET /api/superadmin/pin-backfill` y luego `POST` (completa las huellas de los PIN existentes).
+2. `GET /api/superadmin/photos-migrate` y `POST` repetido hasta `pendientes: 0` (mueve las fotos antiguas de clientes al bucket privado).
+3. Opcional, más adelante: borrar el PIN en claro (ver `docs/legal/REVISION-TECNICA.md`).

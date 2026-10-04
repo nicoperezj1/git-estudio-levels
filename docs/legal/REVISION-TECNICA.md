@@ -19,3 +19,27 @@ Cosas que hay que arreglar o construir para que el sistema respalde lo que dicen
 | 13 | **Registros y avisos**: los correos de boleta y recordatorio incluyen datos del cliente. | `resend.ts` | Minimizar datos. | Revisar contenido y proveedor; ya se limita lo que sale en avisos push. | C |
 
 Nota: lo que diga la Política de Privacidad debe ser verdad el día que se publique. Los puntos 1 a 5 y 12 son los que más lo condicionan.
+
+
+## Estado al 4 oct. 2026
+
+| # | Estado |
+|---|---|
+| 1 PIN sin hash | **Etapa 1 hecha** (migración 101): se guarda también una huella HMAC y todas las rutas aceptan huella o valor. Falta la **etapa 2**: borrar el valor en claro (abajo). `temp_password` ya no se devuelve al navegador, pero sigue en la base hasta que la persona cambia su clave. |
+| 2 Fotos públicas | **Hecho** para fotos nuevas (bucket privado `client-photos`, enlaces de 1 hora). Las antiguas se mueven con `/api/superadmin/photos-migrate`. |
+| 3 Consentimiento | **Hecho en lo básico**: `marketing_consent`, `do_not_contact`, casilla sin marcar en la reserva online, edición en la ficha, y retención/mensajes los respetan. Falta decidir qué hacer con la base antigua (sin respuesta). |
+| 4 Aviso de privacidad | Texto breve en la reserva online; el enlace aparece al activar `NEXT_PUBLIC_LEGAL_PAGES_ENABLED=1`. |
+| 5 Aceptación de términos | Pendiente. |
+| 6, 7, 8, 9, 10 | Pendientes. |
+| 12 RLS abierta | Pendiente (lo más grande). |
+| Nuevo | Al borrar un negocio (`delete_tenant_cascade`) las tablas `notifications` y `notification_preferences` no se limpian: hay que sumarlas a esa función. |
+
+### Etapa 2 del PIN (solo cuando todos tengan huella y todo funcione)
+1. `GET /api/superadmin/pin-backfill` debe decir `sinHuella: 0`.
+2. Probar PIN en Standby, descuentos, apertura de caja, resolver problemas y cambio de rol (todo con huella).
+3. Respaldo de la base y luego, en el SQL Editor:
+```sql
+UPDATE profiles SET personal_pin = NULL WHERE personal_pin_hash IS NOT NULL;
+```
+4. Desde ahí nadie puede ver su PIN en Mi Perfil (aparece "----"); si lo olvidan, el administrador les pone uno nuevo en su ficha. Es el efecto esperado.
+5. Vuelta atrás: solo posible desde el respaldo; por eso el paso 3 va al final.
