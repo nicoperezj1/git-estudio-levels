@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pinOr } from "@/lib/pin";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 
 // "Apagar caja" (recepcion): oculta montos y acciones de la pantalla Caja; se vuelve a encender con el
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminSupabase();
   let q = supabase.from("profiles").select("id, name").in("role", ["receptionist", "admin", "super_admin"])
-    .eq("personal_pin", pin).eq("active", true).limit(1);
+    .or(await pinOr(supabase, pin)).eq("active", true).limit(1);
   if (role !== "super_admin") q = q.eq("tenant_id", tenantId as string);
   const { data } = await q;
   const who = data?.[0];

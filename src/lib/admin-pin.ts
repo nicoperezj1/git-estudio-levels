@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { pinOr } from "@/lib/pin";
 
 // Verifica el PIN de un administrador DEL MISMO NEGOCIO de quien hace la peticion (con sesion).
 // Antes las rutas de ajustes buscaban el PIN entre los administradores de TODOS los negocios y sin
@@ -25,8 +26,9 @@ export async function verifyAdminPin(pin: unknown): Promise<AdminPinResult> {
   const p = typeof pin === "string" ? pin : String(pin ?? "");
   if (!/^\d{4}$/.test(p)) return fail("El PIN debe ser de 4 dígitos", 400);
 
-  let q = createAdminSupabase().from("profiles").select("id, name")
-    .in("role", ["admin", "super_admin"]).eq("personal_pin", p).eq("active", true).limit(1);
+  const sb = createAdminSupabase();
+  let q = sb.from("profiles").select("id, name")
+    .in("role", ["admin", "super_admin"]).or(await pinOr(sb, p)).eq("active", true).limit(1);
   if (role !== "super_admin") {
     if (!tenantId) return fail("No autorizado", 403);
     q = q.eq("tenant_id", tenantId);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pinOr } from "@/lib/pin";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 
 // Punto (Nico, 25-sep): modificar/eliminar un movimiento desde Caja (misma tabla
@@ -26,7 +27,7 @@ async function authorize(pin?: string) {
       .from("profiles")
       .select("id")
       .in("role", ["admin", "super_admin"])
-      .eq("personal_pin", pin)
+      .or(await pinOr(supabase, pin))
       .eq("active", true)
       .eq("tenant_id", tenantId)
       .single();

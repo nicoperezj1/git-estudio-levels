@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pinOr } from "@/lib/pin";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 
 // POST: Register a sale manually into the cash/day, gated by the admin PIN.
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     .select("id, name")
     .eq("tenant_id", tenantId)
     .in("role", ["admin", "super_admin"])
-    .eq("personal_pin", String(pin))
+    .or(await pinOr(supabase, String(pin)))
     .maybeSingle();
 
   if (!admin) {

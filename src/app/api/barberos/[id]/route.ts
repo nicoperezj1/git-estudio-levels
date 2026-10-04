@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
+import { pinWriteFields } from "@/lib/pin";
 
 
 // El slug del profesional es unico POR NEGOCIO (migracion 079), asi el link queda limpio
@@ -57,7 +58,9 @@ export async function GET(
     const { data: t } = await supabase.from("tenants").select("slug").eq("id", data.tenant_id).single();
     tenantSlug = t?.slug ?? null;
   }
-  return NextResponse.json({ ...data, booking_slug: bookingSlug, tenant_slug: tenantSlug });
+  // Nunca se manda al navegador la huella del PIN ni la clave temporal.
+  const { personal_pin_hash: _h, temp_password: _t, ...safe } = data as any;
+  return NextResponse.json({ ...safe, booking_slug: bookingSlug, tenant_slug: tenantSlug });
 }
 
 // PATCH: Update professional profile (mode, rates, etc.)
@@ -88,6 +91,13 @@ export async function PATCH(
   const update: Record<string, any> = {};
   for (const key of auth.self ? selfEditableFields : allowedFields) {
     if (body[key] !== undefined) update[key] = body[key];
+  }
+
+  // PIN: se valida (4 dígitos o vacío) y se guarda junto con su huella.
+  if ("personal_pin" in update) {
+    const v = typeof update.personal_pin === "string" ? update.personal_pin.trim() : "";
+    if (v && !/^\d{4}$/.test(v)) return NextResponse.json({ error: "El PIN debe tener 4 dígitos." }, { status: 400 });
+    Object.assign(update, await pinWriteFields(supabase, v));
   }
 
   // Fecha de nacimiento: solo se acepta YYYY-MM-DD; vacio la borra.
@@ -127,7 +137,8 @@ export async function PATCH(
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  const { personal_pin_hash: _ph, temp_password: _tp, ...safeData } = (data || {}) as any;
+  return NextResponse.json(safeData);
 }
 
 // DELETE: Permanently purge a professional (auth account + profile row), freeing up

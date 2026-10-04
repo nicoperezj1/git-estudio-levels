@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pinOr } from "@/lib/pin";
 import { createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   const { data: matches } = await supabase
     .from("profiles")
     .select("id, name")
-    .eq("personal_pin", pin)
+    .or(await pinOr(supabase, pin))
     .eq("role", "barber")
     .eq("active", true)
     .eq("tenant_id", tenantId)

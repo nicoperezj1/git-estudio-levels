@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pinOr } from "@/lib/pin";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
 import { GET as cajaGET } from "../../caja/route";
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(declared) || declared < 0 || declared > 100_000_000) return NextResponse.json({ error: "Indica cuánto efectivo hay realmente en caja." }, { status: 400 });
 
   const supabase = createAdminSupabase();
-  let q = supabase.from("profiles").select("id, name").in("role", ["admin", "super_admin"]).eq("personal_pin", pin).eq("active", true).limit(1);
+  let q = supabase.from("profiles").select("id, name").in("role", ["admin", "super_admin"]).or(await pinOr(supabase, pin)).eq("active", true).limit(1);
   if (role !== "super_admin") q = q.eq("tenant_id", tenantId);
   const { data: admins } = await q;
   const admin = admins?.[0];

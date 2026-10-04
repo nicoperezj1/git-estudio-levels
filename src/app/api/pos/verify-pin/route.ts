@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { pinOr } from "@/lib/pin";
 
 // Freno contra adivinar el PIN (4 digitos = 10.000 combinaciones): maximo 8 intentos fallidos
 // cada 10 minutos por usuario. Es en memoria (mejor esfuerzo; en Vercel cada instancia lleva su
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     .from("profiles")
     .select("id, name")
     .in("role", ["admin", "super_admin"])
-    .eq("personal_pin", pin)
+    .or(await pinOr(supabase, pin))
     .eq("active", true)
     .limit(1);
   if (role !== "super_admin") {

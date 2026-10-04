@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pinOr } from "@/lib/pin";
 import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
 
 // PATCH: Change a user's role (requires admin PIN)
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .from("profiles")
     .select("id, name")
     .in("role", ["admin", "super_admin"])
-    .eq("personal_pin", pin)
+    .or(await pinOr(supabase, pin))
     .eq("id", auth.userId)
     .eq("active", true)
     .single();
