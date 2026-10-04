@@ -467,63 +467,62 @@ export default function CalendarioPage() {
   // or hasn't resolved), we still fall back to the logged-in user, so a block just
   // created for that column actually shows up instead of silently disappearing.
   const [blocksRefresh, setBlocksRefresh] = useState(0);
-  useEffect(() => {
-    const targets = (barbers.length > 0 ? barbers : (user?.id ? [{ id: user.id }] : [])) as Array<{ id: string }>;
-    if (targets.length === 0) { setBlocks([]); return; }
-    let cancelled = false;
-    // Los bloqueos de TODO el rango visible (1/3/7 dias puede cruzar de mes), para la vista
-    // de varios dias y para las tarjetas del celular.
-    const months = Array.from(new Set([rangeDates[0], rangeDates[rangeDates.length - 1]].map((d) => d.slice(0, 7))));
-    Promise.all(
-      targets.flatMap((b) =>
-        months.map((m) =>
-          fetch(`/api/barber/blocks?barberId=${b.id}&month=${m}`).then((r) => r.json()).catch(() => [])
-        )
-      )
-    ).then((results) => {
-      if (cancelled) return;
-      const allBlocks = results.flat().filter((bl: any) => bl && bl.date);
-      setBlocks(allBlocks.filter((bl: any) => bl.date === date));
-      setRangeBlocks(allBlocks.filter((bl: any) => rangeDates.includes(bl.date)));
-    });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barbers, date, blocksRefresh, user?.id, rangeDates.join(",")]);
+  // Bloqueos y horarios de TODOS los profesionales en una sola llamada
+  // (/api/calendar/barber-data). Antes eran 1 llamada por profesional y mes (bloqueos) mas
+  // 1 por profesional (horarios), y los horarios se pedian de nuevo en cada cambio de dia.
+  const barberTargetIds = (barbers.length > 0 ? barbers.map((b) => b.id) : (user?.id ? [user.id] : [])).join(",");
+  const rangeFrom = rangeDates[0] < date ? rangeDates[0] : date;
+  const rangeTo = rangeDates[rangeDates.length - 1] > date ? rangeDates[rangeDates.length - 1] : date;
 
-  // Load each barber's working hours for the viewed weekday, to grey out slots outside
-  // their shift. Weekday from the date string (avoid new Date(date) which shifts by TZ).
+  // Bloqueos: solo del rango visible; se vuelven a pedir al cambiar de dia o tras editar uno.
   useEffect(() => {
-    const targets = (barbers.length > 0 ? barbers : (user?.id ? [{ id: user.id }] : [])) as Array<{ id: string }>;
-    if (targets.length === 0) { setSchedules({}); return; }
-    const [y, m, d] = date.split("-").map(Number);
-    const weekday = new Date(y, m - 1, d).getDay(); // 0=Sun..6=Sat, local — no TZ shift
+    if (!barberTargetIds) { setBlocks([]); setRangeBlocks([]); return; }
     let cancelled = false;
-    Promise.all(
-      targets.map((b) =>
-        fetch(`/api/barber-schedule?barberId=${b.id}`)
-          .then((r) => r.json())
-          .then((rows: any[]) => ({ id: b.id, day: (Array.isArray(rows) ? rows : []).find((s) => s.day_of_week === weekday) }))
-          .catch(() => ({ id: b.id, day: null }))
-      )
-    ).then((results) => {
-      if (cancelled) return;
-      const map: Record<string, any> = {};
-      for (const r of results) {
-        if (r.day) {
-          map[r.id] = {
-            is_working: r.day.is_working !== false,
-            start_time: r.day.start_time || null,
-            end_time: r.day.end_time || null,
-            break_start: r.day.break_start || null,
-            break_end: r.day.break_end || null,
-          };
-        }
-      }
-      setSchedules(map);
-    });
+    fetch(`/api/calendar/barber-data?include=blocks&barberIds=${barberTargetIds}&from=${rangeFrom}&to=${rangeTo}`)
+      .then((r) => r.json())
+      .catch(() => ({ blocks: [] }))
+      .then((res) => {
+        if (cancelled) return;
+        const allBlocks = (Array.isArray(res?.blocks) ? res.blocks : []).filter((bl: any) => bl && bl.date);
+        setBlocks(allBlocks.filter((bl: any) => bl.date === date));
+        setRangeBlocks(allBlocks.filter((bl: any) => rangeDates.includes(bl.date)));
+      });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [barbers, date, user?.id]);
+  }, [barberTargetIds, date, blocksRefresh, rangeDates.join(",")]);
+
+  // Horarios: se piden UNA vez por grupo de profesionales (la semana completa); el dia
+  // visto se saca de ahi sin volver a la red. Dia de la semana desde el texto de la fecha
+  // (evitar new Date(date), que se corre por zona horaria).
+  const [allSchedules, setAllSchedules] = useState<Record<string, any[]>>({});
+  useEffect(() => {
+    if (!barberTargetIds) { setAllSchedules({}); return; }
+    let cancelled = false;
+    fetch(`/api/calendar/barber-data?include=schedules&barberIds=${barberTargetIds}`)
+      .then((r) => r.json())
+      .catch(() => ({ schedules: {} }))
+      .then((res) => { if (!cancelled) setAllSchedules(res?.schedules && typeof res.schedules === "object" ? res.schedules : {}); });
+    return () => { cancelled = true; };
+  }, [barberTargetIds]);
+
+  useEffect(() => {
+    const [y, m, d] = date.split("-").map(Number);
+    const weekday = new Date(y, m - 1, d).getDay(); // 0=Dom..6=Sab, local, sin corrimiento
+    const map: Record<string, any> = {};
+    for (const id of Object.keys(allSchedules)) {
+      const day = (allSchedules[id] || []).find((s: any) => s.day_of_week === weekday);
+      if (day) {
+        map[id] = {
+          is_working: day.is_working !== false,
+          start_time: day.start_time || null,
+          end_time: day.end_time || null,
+          break_start: day.break_start || null,
+          break_end: day.break_end || null,
+        };
+      }
+    }
+    setSchedules(map);
+  }, [allSchedules, date]);
 
   // Navigation
   const changeDate = (delta: number) => {
