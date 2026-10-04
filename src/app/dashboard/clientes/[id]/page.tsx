@@ -18,6 +18,8 @@ interface ClientData {
     phone: string | null;
     notes: string | null;
     created_at: string;
+    marketing_consent?: boolean | null;
+    do_not_contact?: boolean | null;
   };
   stats: {
     totalSpent: number;
@@ -94,14 +96,14 @@ export default function ClienteDetailPage() {
   // Editar datos del cliente (nombre, celular, correo, notas)
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", phone: "", email: "", notes: "" });
+  const [editForm, setEditForm] = useState<{ name: string; phone: string; email: string; notes: string; marketing_consent: boolean; do_not_contact: boolean }>({ name: "", phone: "", email: "", notes: "", marketing_consent: false, do_not_contact: false });
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
 
   const openEdit = () => {
     if (!data) return;
     const c = data.client;
-    setEditForm({ name: c.name || "", phone: c.phone || "", email: c.email || "", notes: c.notes || "" });
+    setEditForm({ name: c.name || "", phone: c.phone || "", email: c.email || "", notes: c.notes || "", marketing_consent: c.marketing_consent === true, do_not_contact: c.do_not_contact === true });
     setEditError("");
     setEditing(true);
   };
@@ -119,6 +121,7 @@ export default function ClienteDetailPage() {
       const r = await res.json().catch(() => ({}));
       if (!res.ok) { setEditError(r?.error || "No se pudo guardar"); return; }
       setData({ ...data, client: { ...data.client, ...r.client } });
+      if (r.warning) alert(r.warning);
       setEditing(false);
     } catch {
       setEditError("No se pudo guardar. Revisa tu conexión.");
@@ -366,6 +369,17 @@ export default function ClienteDetailPage() {
             <label className="block text-xs font-medium text-brand-gray">Notas
               <textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} className={`${inputClass} mt-1 w-full resize-y`} />
             </label>
+            <div className="space-y-2 rounded-xl bg-brand-light p-3">
+              <p className="text-xs font-semibold text-brand-dark">Mensajes y promociones</p>
+              <label className="flex items-start gap-2 text-xs text-brand-gray">
+                <input type="checkbox" checked={editForm.marketing_consent} onChange={(e) => setEditForm({ ...editForm, marketing_consent: e.target.checked })} className="mt-0.5 h-4 w-4" />
+                <span>La persona aceptó recibir promociones y novedades.</span>
+              </label>
+              <label className="flex items-start gap-2 text-xs text-brand-gray">
+                <input type="checkbox" checked={editForm.do_not_contact} onChange={(e) => setEditForm({ ...editForm, do_not_contact: e.target.checked })} className="mt-0.5 h-4 w-4" />
+                <span>Pidió no ser contactada (no se le envían mensajes de retención ni masivos).</span>
+              </label>
+            </div>
             {editError && <p className="text-xs text-red-500">{editError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => setEditing(false)} className={ghostButton}>Cancelar</button>

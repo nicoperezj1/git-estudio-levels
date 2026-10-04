@@ -49,6 +49,7 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [marketingConsent, setMarketingConsent] = useState(false); // casilla sin marcar por defecto
   const [clientPhone, setClientPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
@@ -286,6 +287,7 @@ export default function BookingPage() {
         clientPhone: clientPhone || null,
         notes: notes || null,
         autoAssigned,
+        marketingConsent,
       }),
     });
 
@@ -806,6 +808,15 @@ export default function BookingPage() {
                 />
               </div>
             </div>
+
+            <label className="mt-4 flex items-start gap-2 text-sm text-brand-gray">
+              <input type="checkbox" checked={marketingConsent} onChange={(e) => setMarketingConsent(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              <span>Quiero recibir promociones y novedades de {businessName || "este negocio"} (opcional).</span>
+            </label>
+            <p className="mt-2 text-xs text-brand-gray">
+              Usaremos tus datos para gestionar tu cita y avisarte sobre ella. {businessName || "El negocio"} es responsable de tus datos
+              {process.env.NEXT_PUBLIC_LEGAL_PAGES_ENABLED === "1" && (<> — <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="underline">Política de privacidad</a></>)}.
+            </p>
 
             {error && <p className="text-red-500 text-sm mt-3 text-center bg-red-50 rounded-lg py-2">{error}</p>}
 

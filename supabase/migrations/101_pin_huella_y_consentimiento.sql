@@ -18,3 +18,12 @@ SELECT table_name || '.' || column_name AS columna
 FROM information_schema.columns
 WHERE (table_name = 'profiles' AND column_name = 'personal_pin_hash')
    OR (table_name = 'clients' AND column_name IN ('marketing_consent', 'marketing_consent_at', 'do_not_contact'));
+
+-- (c) Fotos de clientes en un bucket PRIVADO. El bucket 'cut-photos' es publico a proposito (logos, avatares y fotos de
+-- servicios se ven en la reserva online), asi que las fotos de clientes se mueven a uno aparte, servido con links temporales.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('client-photos', 'client-photos', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Verificacion del bucket: debe devolver 1 fila con public = false.
+SELECT id, public FROM storage.buckets WHERE id = 'client-photos';

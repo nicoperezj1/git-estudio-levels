@@ -12,7 +12,7 @@ import { notify } from "@/lib/notify";
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { serviceIds, serviceId, barberId, date, startTime, clientName, clientEmail, clientPhone, notes } = body;
+  const { serviceIds, serviceId, barberId, date, startTime, clientName, clientEmail, clientPhone, notes, marketingConsent } = body;
 
   // Support both single serviceId and array serviceIds
   const ids: string[] = serviceIds || (serviceId ? [serviceId] : []);
@@ -80,6 +80,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: TENANT_SUSPENDED_MESSAGE, code: "tenant_suspended" }, { status: 403 });
   }
 
+  // Consentimiento para promociones (Ley 21.719, migracion 101): casilla SIN marcar por defecto. Un cliente nuevo queda con
+  // lo que eligio; uno que ya existia solo cambia si ahora acepta. Si la migracion aun no esta, se ignora.
+  const consentNew: Record<string, any> = { marketing_consent: marketingConsent === true, marketing_consent_at: new Date().toISOString() };
+  const insertClient = async (row: Record<string, any>) => {
+    let r = await supabase.from("clients").insert({ ...row, ...consentNew }).select("id").single();
+    if (r.error && /marketing_consent/i.test(r.error.message)) r = await supabase.from("clients").insert(row).select("id").single();
+    return r;
+  };
+
   let clientId: string;
   if (clientEmail) {
     // Reuse an existing client with this email in this business. Was using .single(),
@@ -98,22 +107,17 @@ export async function POST(req: NextRequest) {
       if (clientPhone) {
         await supabase.from("clients").update({ phone: clientPhone }).eq("id", clientId);
       }
+      if (marketingConsent === true) {
+        await supabase.from("clients").update(consentNew).eq("id", clientId); // si falta la migracion 101, no pasa nada
+      }
     } else {
       // Punto 10 (Pablo): cliente nuevo que se creo solo reservando por link -> origen "link".
       // Solo se marca al CREAR el cliente; uno que ya existia conserva su origen original.
-      const { data: newClient } = await supabase
-        .from("clients")
-        .insert({ name: clientName, email: clientEmail, phone: clientPhone || null, tenant_id: tenantId, acquisition_source: "link" })
-        .select("id")
-        .single();
+      const { data: newClient } = await insertClient({ name: clientName, email: clientEmail, phone: clientPhone || null, tenant_id: tenantId, acquisition_source: "link" });
       clientId = newClient!.id;
     }
   } else {
-    const { data: newClient } = await supabase
-      .from("clients")
-      .insert({ name: clientName, phone: clientPhone || null, tenant_id: tenantId, acquisition_source: "link" })
-      .select("id")
-      .single();
+    const { data: newClient } = await insertClient({ name: clientName, phone: clientPhone || null, tenant_id: tenantId, acquisition_source: "link" });
     clientId = newClient!.id;
   }
 

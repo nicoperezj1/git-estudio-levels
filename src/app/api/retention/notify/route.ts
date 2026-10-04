@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
   if (!client) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
+  // Ley 21.719: respetar a quien pidio no ser contactado o no acepto promociones (migracion 101; si falta, se omite).
+  const { data: pref } = await supabase.from("clients").select("marketing_consent, do_not_contact").eq("id", clientId).maybeSingle();
+  if ((pref as any)?.do_not_contact === true || (pref as any)?.marketing_consent === false) {
+    return NextResponse.json({ error: "Este cliente pidió no recibir mensajes o no aceptó promociones." }, { status: 409 });
+  }
 
   // SEGURIDAD: solo se puede notificar a clientes del propio negocio (antes bastaba con
   // conocer el id de cualquier cliente, incluso de otro negocio, y se gastaba SU cupo).

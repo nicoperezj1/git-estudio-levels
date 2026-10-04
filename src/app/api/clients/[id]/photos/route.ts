@@ -12,6 +12,13 @@ async function authorizeClient(supabase: ReturnType<typeof createAdminSupabase>,
   return { ok: true as const, status: 200 };
 }
 
+// Fotos nuevas: bucket PRIVADO "client-photos" (migracion 101), guardadas como "private:client-photos/<ruta>" y servidas
+// con link firmado temporal. Las antiguas (bucket publico "cut-photos") siguen funcionando hasta que se muevan con
+// /api/superadmin/photos-migrate. Si el bucket privado aun no existe, se sube al publico como antes.
+const PRIVATE_BUCKET = "client-photos";
+const PRIVATE_PREFIX = `private:${PRIVATE_BUCKET}/`;
+const SIGNED_SECONDS = 60 * 60;
+
 // GET: List photos for a client
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createAdminSupabase();
@@ -24,7 +31,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq("client_id", params.id)
     .order("created_at", { ascending: false });
 
-  return NextResponse.json(photos || []);
+  const out = await Promise.all((photos || []).map(async (p: any) => {
+    if (typeof p.url === "string" && p.url.startsWith(PRIVATE_PREFIX)) {
+      const { data: signed } = await supabase.storage.from(PRIVATE_BUCKET).createSignedUrl(p.url.slice(PRIVATE_PREFIX.length), SIGNED_SECONDS);
+      return { ...p, url: signed?.signedUrl || null };
+    }
+    return p;
+  }));
+  return NextResponse.json(out);
 }
 
 // POST: Upload photo for a client
@@ -50,23 +64,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
 
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from("cut-photos")
-    .upload(fileName, buffer, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+  let url: string;
+  let up = await supabase.storage.from(PRIVATE_BUCKET).upload(fileName, buffer, { contentType: file.type, upsert: false });
+  if (!up.error) {
+    url = `${PRIVATE_PREFIX}${fileName}`;
+  } else {
+    // Sin la migracion 101 (bucket privado inexistente): se sube al publico como antes.
+    const pub = await supabase.storage.from("cut-photos").upload(fileName, buffer, { contentType: file.type, upsert: false });
+    if (pub.error) return NextResponse.json({ error: pub.error.message }, { status: 500 });
+    url = supabase.storage.from("cut-photos").getPublicUrl(fileName).data.publicUrl;
   }
-
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from("cut-photos")
-    .getPublicUrl(fileName);
-
-  const url = urlData.publicUrl;
 
   // Save record
   const { data: photo, error } = await supabase
@@ -85,6 +92,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  if (photo && url.startsWith(PRIVATE_PREFIX)) {
+    const { data: signed } = await supabase.storage.from(PRIVATE_BUCKET).createSignedUrl(url.slice(PRIVATE_PREFIX.length), SIGNED_SECONDS);
+    return NextResponse.json({ ...photo, url: signed?.signedUrl || null });
+  }
   return NextResponse.json(photo);
 }
 
@@ -110,9 +121,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!photo) return NextResponse.json({ error: "Foto no encontrada" }, { status: 404 });
 
   if (photo?.url) {
-    const path = photo.url.split("/cut-photos/")[1];
-    if (path) {
-      await supabase.storage.from("cut-photos").remove([path]);
+    if (photo.url.startsWith(PRIVATE_PREFIX)) {
+      await supabase.storage.from(PRIVATE_BUCKET).remove([photo.url.slice(PRIVATE_PREFIX.length)]);
+    } else {
+      const path = photo.url.split("/cut-photos/")[1];
+      if (path) await supabase.storage.from("cut-photos").remove([path]);
     }
   }
 

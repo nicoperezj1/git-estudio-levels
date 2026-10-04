@@ -30,10 +30,18 @@ export async function getInactiveClients(
   tenantId: string,
   days: number
 ): Promise<{ total: number; inactive: RetentionClient[] }> {
-  const { data: clients } = await supabase
+  // Ley 21.719: no se escribe a quien pidio no ser contactado ni a quien rechazo las promociones (migracion 101).
+  // Si la migracion aun no esta, se trabaja como antes (sin esa marca).
+  let optedOut = new Set<string>();
+  let { data: clients, error: clientsErr } = await supabase
     .from("clients")
-    .select("id, name, email, phone, created_at")
+    .select("id, name, email, phone, created_at, marketing_consent, do_not_contact")
     .eq("tenant_id", tenantId);
+  if (clientsErr) {
+    ({ data: clients } = await supabase.from("clients").select("id, name, email, phone, created_at").eq("tenant_id", tenantId) as any);
+  } else {
+    optedOut = new Set((clients || []).filter((c: any) => c.do_not_contact === true || c.marketing_consent === false).map((c: any) => c.id));
+  }
   if (!clients || clients.length === 0) return { total: 0, inactive: [] };
 
   const { data: tenantRow } = await supabase
@@ -85,7 +93,7 @@ export async function getInactiveClients(
         hasUpcoming: upcoming.has(client.id),
       };
     })
-    .filter((c) => !c.hasUpcoming && c.daysSinceVisit >= days)
+    .filter((c) => !c.hasUpcoming && c.daysSinceVisit >= days && !optedOut.has(c.id))
     .sort((a, b) => b.daysSinceVisit - a.daysSinceVisit);
 
   return { total: clients.length, inactive };

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 // BORRADOR de la Política de Privacidad (Ley 21.719). Esta página NO es pública hasta que:
 //   1) un abogado revise y apruebe el texto,
 //   2) se completen los datos entre [corchetes] (razón social, RUT, correo de privacidad),
-//   3) se active la variable de entorno LEGAL_PAGES_ENABLED=1 en Vercel.
+//   3) se active la variable de entorno NEXT_PUBLIC_LEGAL_PAGES_ENABLED=1 en Vercel.
 // Mientras tanto responde 404. El texto de apoyo está en docs/legal/.
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ const SUBENCARGADOS = [
 ];
 
 export default function PrivacidadPage() {
-  if (process.env.LEGAL_PAGES_ENABLED !== "1") notFound();
+  if (process.env.NEXT_PUBLIC_LEGAL_PAGES_ENABLED !== "1") notFound();
   return (
     <div className="min-h-screen bg-white p-6 md:p-12 max-w-3xl mx-auto">
       <Link href="/landing" className="text-brand-blue text-sm hover:underline">← Volver</Link>

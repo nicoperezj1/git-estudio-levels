@@ -136,9 +136,24 @@ export async function PATCH(
   if (body.notes !== undefined) update.notes = body.notes ? String(body.notes) : null;
   if (Array.isArray(body.personality_tags)) update.personality_tags = body.personality_tags.map((t: any) => String(t)).slice(0, 30);
 
+  // Consentimiento para promociones y "no contactar" (Ley 21.719, migracion 101).
+  const consentKeys: string[] = [];
+  if (typeof body.marketing_consent === "boolean") {
+    update.marketing_consent = body.marketing_consent; update.marketing_consent_at = new Date().toISOString(); consentKeys.push("marketing_consent", "marketing_consent_at");
+  }
+  if (typeof body.do_not_contact === "boolean") { update.do_not_contact = body.do_not_contact; consentKeys.push("do_not_contact"); }
+
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
 
-  const { data, error } = await supabase.from("clients").update(update).eq("id", params.id).select().single();
+  let { data, error } = await supabase.from("clients").update(update).eq("id", params.id).select().single();
+  let warning: string | undefined;
+  if (error && consentKeys.length > 0 && /marketing_consent|do_not_contact/i.test(error.message)) {
+    // Falta la migracion 101: se guardan los demas cambios y se avisa.
+    for (const k of consentKeys) delete update[k];
+    warning = "Falta aplicar la migración 101: los datos se guardaron, pero no el consentimiento.";
+    if (Object.keys(update).length === 0) return NextResponse.json({ error: warning }, { status: 409 });
+    ({ data, error } = await supabase.from("clients").update(update).eq("id", params.id).select().single());
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, client: data });
+  return NextResponse.json({ success: true, client: data, warning });
 }
