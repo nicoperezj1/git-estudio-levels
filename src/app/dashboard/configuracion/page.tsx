@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { BookingRuleCard } from "@/components/settings/booking-rule-card";
+import { NotificationsCard } from "@/components/settings/notifications-card";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -995,6 +996,9 @@ export default function ConfiguracionPage() {
 
       {/* Preferencias de reserva (Fase 6): regla de "Primer profesional disponible". Solo administrador. */}
       {isAdmin && <BookingRuleCard />}
+
+      {/* Avisos y notificaciones (centro de avisos). Solo administrador. */}
+      {isAdmin && <NotificationsCard />}
 
       {/* Caja y Standby (Fase 5). Solo administrador. */}
       {isAdmin && cajaSec && (

@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
+import { useNotificationCenter } from "@/lib/use-notification-center";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { Role } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import {
@@ -122,6 +124,7 @@ const sections: NavSection[] = [
           { name: "Plan y facturación", href: "/dashboard/configuracion/facturacion", icon: CreditCard, minRole: "admin" },
         ],
       },
+      { name: "Avisos", href: "/dashboard/avisos", icon: Bell, minRole: "barber" },
       { name: "Mi Perfil", href: "/dashboard/mi-perfil", icon: UserCircle, minRole: "barber" },
     ],
   },
@@ -187,6 +190,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
   // datos cruzados. Se usa el tenant del contexto (que si respeta el override) cuando hay
   // uno activo, y se cae al valor del servidor en cualquier otro caso.
   const { tenant: overrideTenant, isOverriding, hasPlanFeature } = useTenant();
+  const notifCenter = useNotificationCenter();
   const effectiveTenantName = isOverriding && overrideTenant ? overrideTenant.name : tenantName;
   // Punto 15 (Pablo): el espacio de la foto en la esquina inferior izquierda siempre
   // mostraba solo iniciales, nunca la foto real, aunque el profesional ya tuviera una
@@ -210,12 +214,12 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
       // Inventario (read-only, changes gated behind the admin PIN).
       "/dashboard/caja", "/dashboard/barberos", "/dashboard/inventario", "/dashboard/solicitud",
       // Cada usuario (tambien recepcion) puede entrar a Mi Perfil a elegir su propio tema.
-      "/dashboard/mi-perfil",
+      "/dashboard/mi-perfil", "/dashboard/avisos",
     ],
     barber: [
       "/dashboard/standby", "/dashboard/mi-agenda", "/dashboard/calendario",
       "/dashboard/clientes", "/dashboard/mi-billetera",
-      "/dashboard/mi-perfil",
+      "/dashboard/mi-perfil", "/dashboard/avisos",
     ],
   };
 
@@ -227,6 +231,8 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
   const processItem = (item: NavItem): (NavItem & { locked?: boolean }) | null => {
     if (isSoloBusiness && SOLO_BUSINESS_HIDDEN_ROUTES.includes(item.href)) return null;
     if (TEMP_HIDDEN_ROUTES.includes(item.href)) return null;
+    // "Avisos" solo aparece si el negocio activó el centro de avisos.
+    if (item.href === "/dashboard/avisos" && !notifCenter.enabled) return null;
 
     // Seguridad/UX (Nico, 26-sep): "Super Admin" es un rol, no algo que se desbloquee
     // pagando un plan — antes, un admin/recepcion/profesional que no fuera super_admin
@@ -449,6 +455,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
           <img src="/logo-horizontal.png" alt="re-booking" className="h-7 w-auto dark:hidden" />
           <img src="/logo-horizontal-white.png" alt="re-booking" className="h-7 w-auto hidden dark:block" />
         </Link>
+        <NotificationBell className="ml-auto" />
       </div>
 
       {/* Mobile overlay */}
@@ -506,8 +513,9 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
 
         {/* Tenant name */}
         {!collapsed && effectiveTenantName && (
-          <div className="px-4 pt-3 pb-1">
+          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1">
             <p className="truncate text-[13px] font-semibold tracking-tight text-brand-dark">{effectiveTenantName}</p>
+            <NotificationBell className="flex-shrink-0" />
           </div>
         )}
 
