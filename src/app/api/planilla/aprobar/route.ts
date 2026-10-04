@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, isManagerLevel } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
+import { notify } from "@/lib/notify";
 
 // Aprobar un descuento por planilla con su CODIGO (recepcion o administrador). Recien aqui se
 // descuenta el stock y se anota en el libro del profesional (tipo "Descuento por planilla").
@@ -58,5 +59,10 @@ export async function POST(req: NextRequest) {
     created_by: userId, created_by_name: me?.name || null,
   });
   if (ledgerErr) console.error("planilla: no se pudo anotar en el libro del profesional:", ledgerErr.message);
+  // Aviso al profesional: se aprobó su descuento.
+  await notify({
+    tenantId, kind: "planilla_approved", userIds: [d.barber_id],
+    title: "Se aprobó tu descuento por planilla", body: `${d.product_name} x${d.quantity}`, url: "/dashboard/mi-billetera", createdBy: userId,
+  });
   return NextResponse.json({ success: true, total: Number(d.total), ledgerSaved: !ledgerErr, movementSaved: !movErr, movementError: movErr?.message || null, ledgerError: ledgerErr?.message || null });
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { tryConsumeQuota } from "@/lib/message-quota";
-import { sendPush } from "@/lib/push";
+import { notify } from "@/lib/notify";
 
 /**
  * MercadoPago Webhook for deposit payments.
@@ -218,9 +218,9 @@ export async function POST(req: NextRequest) {
     try {
       const { data: barberRow } = await supabase.from("profiles").select("name, email").eq("id", barberId).single();
       const startDateForMsg = new Date(startDate);
-      await sendPush({
-        userId: barberId,
-        tenantId,
+      await notify({
+        tenantId, kind: "appointment_new",
+        userIds: [barberId],
         roles: ["admin", "receptionist"],
         title: "Nueva Cita Agendada",
         body: `${clientName} - ${startDateForMsg.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })} con ${barberRow?.name || "Profesional"}`,

@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { newClientAppointmentIds } from "@/lib/new-client";
 
 // GET: Full appointment details for calendar popup
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  // SEGURIDAD: antes no pedia sesion y devolvia datos del cliente de cualquier cita.
+  const { userId, role, tenantId } = await getCurrentUserRoleAndTenant();
+  if (!userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
 
   // Get appointment with relations
   const { data: appt } = await supabase
     .from("appointments")
     .select(`
-      id, client_id, date, start_time, end_time, status, notes, created_at,
+      id, client_id, tenant_id, date, start_time, end_time, status, notes, created_at,
       client:clients(id, name, email, phone, loyalty_points, created_at),
       barber:profiles(id, name, avatar_url),
       services:appointment_services(price, service:services(id, name, duration))
@@ -18,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq("id", params.id)
     .single();
 
-  if (!appt) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!appt || (role !== "super_admin" && (appt as any).tenant_id !== tenantId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Check if client is new (first appointment)
   const client = appt.client as any;

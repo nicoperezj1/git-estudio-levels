@@ -1,0 +1,16 @@
+import { inQuietHours, NOTIFY_KINDS } from "../src/lib/notify";
+let fails = 0;
+const t = (name: string, got: unknown, want: unknown) => { if (got !== want) { fails++; console.log("FALLA", name, got, "esperado", want); } else console.log("ok", name); };
+t("silencio 22-08, 23:30", inQuietHours("23:30", "22:00", "08:00"), true);
+t("silencio 22-08, 03:00", inQuietHours("03:00", "22:00", "08:00"), true);
+t("silencio 22-08, 08:00 ya no", inQuietHours("08:00", "22:00", "08:00"), false);
+t("silencio 22-08, 12:00", inQuietHours("12:00", "22:00", "08:00"), false);
+t("silencio mismo día 13-15", inQuietHours("14:00", "13:00", "15:00"), true);
+t("silencio mismo día fuera", inQuietHours("16:00", "13:00", "15:00"), false);
+t("sin horario", inQuietHours("14:00", null, null), false);
+t("inicio=fin no silencia", inQuietHours("14:00", "10:00", "10:00"), false);
+t("planilla es esencial", NOTIFY_KINDS.planilla_created.essential, true);
+t("anuncio es esencial", NOTIFY_KINDS.announcement.essential, true);
+t("cita nueva se puede silenciar", NOTIFY_KINDS.appointment_new.essential, false);
+console.log(fails ? `${fails} fallas` : "TODO OK");
+process.exit(fails ? 1 : 0);

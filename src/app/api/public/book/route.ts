@@ -7,7 +7,7 @@ import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
 import { isOnVacation } from "@/lib/vacations";
 import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
-import { sendPush } from "@/lib/push";
+import { notify } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -201,10 +201,10 @@ export async function POST(req: NextRequest) {
   // Notify the assigned barber AND the business's reception/admins by push. The old
   // call passed no recipient, so /api/push/send rejected it and nobody was notified.
   try {
-    await sendPush({
-      userId: barberId, // the professional who got the appointment
-      tenantId, // + reception/admins of this business
-      roles: ["admin", "receptionist"],
+    await notify({
+      tenantId, kind: "appointment_new",
+      userIds: [barberId], // the professional who got the appointment
+      roles: ["admin", "receptionist"], // + reception/admins of this business
       title: "Nueva Cita Agendada",
       body: `${clientName} - ${serviceNames} con ${barber?.name || "Profesional"} (${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })})`,
       url: "/dashboard/agenda",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, isManagerLevel, resolveTenantForRequest } from "@/lib/supabase/server";
+import { notify } from "@/lib/notify";
 
 // Solicitud de insumos (Fase 4). Recepcion o administrador la levantan; le llega por correo al administrador y
 // queda en el Dashboard hasta que el administrador la borra a mano (se marca borrada, no se destruye).
@@ -75,6 +76,10 @@ export async function POST(req: NextRequest) {
       console.error("supply request email:", e);
     }
   }
+  await notify({
+    tenantId, kind: "supply_request", roles: ["admin"],
+    title: "Nueva solicitud de insumos", body: `${me?.name || "Recepción"}: ${items.length} producto${items.length === 1 ? "" : "s"}`, url: "/dashboard", createdBy: caller.userId,
+  });
   return NextResponse.json({ success: true, id: row.id, emailSent });
 }
 

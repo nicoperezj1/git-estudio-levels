@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, isManagerLevel } from "@/lib/supabase/server";
 import { computeProMonths } from "@/lib/ledger";
 import { todayInChile } from "@/lib/utils";
+import { notify } from "@/lib/notify";
 
 // Descuento por planilla: el profesional elige un producto y se genera un CODIGO. Recien cuando
 // recepcion o el administrador lo ingresa (ver ./aprobar) se descuenta el stock y se anota en el
@@ -59,7 +60,14 @@ export async function POST(req: NextRequest) {
       tenant_id: tenantId, barber_id: pro.id, barber_name: pro.name, product_id: prod.id, product_name: prod.name,
       quantity, unit_price: unit, total, code, over_limit: overLimit,
     }).select("id, code").single();
-    if (!error && data) return NextResponse.json({ success: true, code: data.code, total, overLimit });
+    if (!error && data) {
+      // Aviso a recepcion y administracion: hay un descuento por planilla por aprobar (sin montos en la pantalla bloqueada).
+      await notify({
+        tenantId, kind: "planilla_created", roles: ["admin", "receptionist"],
+        title: "Descuento por planilla por aprobar", body: `${pro.name}: ${prod.name} x${quantity}`, url: "/dashboard/caja", createdBy: userId,
+      });
+      return NextResponse.json({ success: true, code: data.code, total, overLimit });
+    }
     if (error && !/duplicate|unique/i.test(error.message)) {
       return NextResponse.json({ error: "Falta aplicar la migración 094 en la base de datos." }, { status: 409 });
     }

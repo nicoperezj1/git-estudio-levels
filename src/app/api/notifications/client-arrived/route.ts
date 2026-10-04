@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, isManagerLevel } from "@/lib/supabase/server";
-import { sendPush } from "@/lib/push";
+import { notify } from "@/lib/notify";
 
 // POST: Notify barber that their client has arrived
 export async function POST(req: NextRequest) {
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
 
   // Send real push notification to barber
   try {
-    await sendPush({
-      userId: appt.barber_id,
+    await notify({
+      tenantId: appt.tenant_id, kind: "client_arrived", userIds: [appt.barber_id],
       title: "Tu cliente llego!",
       body: `${clientName} esta esperando.`,
       url: "/dashboard/mi-agenda",

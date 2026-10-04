@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase, createAdminSupabase, resolveTenantForRequest } from "@/lib/supabase/server";
+import { createServerSupabase, createAdminSupabase, resolveTenantForRequest, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { notify } from "@/lib/notify";
 import { newClientAppointmentIds } from "@/lib/new-client";
 import { isSlotFull, exceededAfterInsert, getSlotCapacity } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
-import { sendPush } from "@/lib/push";
 
 export async function GET(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -50,16 +50,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // SEGURIDAD: antes no pedia sesion y tomaba el negocio del cuerpo: cualquiera creaba citas en cualquier negocio.
+  const session = await getCurrentUserRoleAndTenant();
+  if (!session.userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { clientId, barberId, date, startTime, endTime: customEndTime, serviceIds, notes, tenantId } = body;
+  const { clientId, barberId, date, startTime, endTime: customEndTime, serviceIds, notes } = body;
 
-  // Resolve tenant_id
-  let resolvedTenantId = tenantId;
-  if (!resolvedTenantId) {
-    // Get from barber's profile
-    const { data: barberProfile } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
-    resolvedTenantId = barberProfile?.tenant_id || null;
+  // El negocio sale del profesional, y debe ser el de quien crea la cita (super_admin con cualquiera).
+  const { data: barberProfile } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
+  const resolvedTenantId = barberProfile?.tenant_id || null;
+  if (!barberProfile) return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
+  if (session.role !== "super_admin" && resolvedTenantId !== session.tenantId) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   // Get services to calculate duration (if no custom end time). name is used for the
@@ -135,8 +138,8 @@ export async function POST(req: NextRequest) {
       supabase.from("profiles").select("name, email").eq("id", barberId).single(),
       clientId ? supabase.from("clients").select("name").eq("id", clientId).single() : Promise.resolve({ data: null }),
     ]);
-    await sendPush({
-      userId: barberId,
+    await notify({
+      tenantId: resolvedTenantId, kind: "appointment_new", userIds: [barberId],
       title: "Nueva Cita Agendada",
       body: `${client?.name || "Cliente"} - ${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`,
       url: "/dashboard/mi-agenda",

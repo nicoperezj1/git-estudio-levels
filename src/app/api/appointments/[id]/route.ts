@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { notify } from "@/lib/notify";
 import { getSlotCapacity, isSlotFull } from "@/lib/capacity";
 import { parseWallClock } from "@/lib/wallclock";
 
@@ -7,8 +8,22 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // SEGURIDAD: antes no pedia sesion: cualquiera podia cancelar o mover citas de cualquier negocio.
+  const session = await getCurrentUserRoleAndTenant();
+  if (!session.userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
+  const { data: before } = await supabase.from("appointments")
+    .select("tenant_id, barber_id, status, date, start_time, client:clients(name)").eq("id", params.id).maybeSingle();
+  if (!before) return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
+  if (session.role !== "super_admin" && (before as any).tenant_id !== session.tenantId) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   const body = await req.json();
+  // Si cambia de profesional, el nuevo debe ser del mismo negocio.
+  if (body.barber_id && body.barber_id !== (before as any).barber_id && session.role !== "super_admin") {
+    const { data: nb } = await supabase.from("profiles").select("tenant_id").eq("id", body.barber_id).maybeSingle();
+    if (nb?.tenant_id !== session.tenantId) return NextResponse.json({ error: "Profesional no encontrado" }, { status: 404 });
+  }
 
   // Build update object dynamically
   const update: Record<string, any> = {};
@@ -76,5 +91,23 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Aviso al profesional si le cancelan o le cambian la hora de una cita (quien lo hizo no se avisa a si mismo).
+  try {
+    const b: any = before;
+    const cancelled = update.status && ["cancelled", "no_show"].includes(update.status) && update.status !== b.status;
+    const moved = (update.start_time && update.start_time !== b.start_time) || (update.date && update.date !== b.date);
+    if (b.barber_id && (cancelled || moved)) {
+      const hhmm = String((update.start_time || b.start_time) || "").match(/(\d{2}:\d{2})/)?.[1] || "";
+      const who = b.client?.name || "Cliente";
+      await notify({
+        tenantId: b.tenant_id, kind: "appointment_changed", userIds: [b.barber_id],
+        title: cancelled ? "Cita cancelada" : "Cita cambiada de hora",
+        body: `${who}${hhmm ? ` - ${hhmm}` : ""}`, url: "/dashboard/mi-agenda", createdBy: session.userId,
+      });
+    }
+  } catch (e) {
+    console.error("aviso de cambio de cita:", e);
+  }
   return NextResponse.json(data);
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, isManagerLevel } from "@/lib/supabase/server";
+import { notify } from "@/lib/notify";
 
 // "Reportar problema": nota libre (ej. "faltan $10.000") que le llega al administrador. Cualquiera con
 // sesion del negocio puede reportar; ver y resolver es de administracion/recepcion.
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
   });
   if (error && /shown_cash|consent/i.test(error.message)) ({ error } = await supabase.from("problem_reports").insert(base)); // sin 097
   if (error) return NextResponse.json({ error: "Falta aplicar la migración 094 en la base de datos." }, { status: 409 });
+  await notify({
+    tenantId, kind: "cash_problem", roles: ["admin"],
+    title: "Se reportó un problema de caja", body: `${me?.name || "Alguien"}: ${note.slice(0, 120)}`, url: "/dashboard", createdBy: userId,
+  });
   return NextResponse.json({ success: true });
 }
 
