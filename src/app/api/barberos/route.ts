@@ -137,7 +137,17 @@ export async function POST(req: NextRequest) {
     if (authError.message.includes("already") || authError.message.includes("exists")) {
       return NextResponse.json({ error: "Ya existe una cuenta con ese email. Usa otro email o edita el profesional existente." }, { status: 409 });
     }
-    return NextResponse.json({ error: authError.message }, { status: 500 });
+    // Queda el detalle completo en los registros de Vercel. Antes, cuando el sistema de acceso devolvia un error sin
+    // texto, el usuario veia solo "{}" y no habia forma de saber que pasaba.
+    console.error("[barberos] createUser fallo:", JSON.stringify({ message: authError.message, status: (authError as any).status, code: (authError as any).code, name: authError.name }));
+    const raw = String(authError.message || "").trim();
+    const readable = !raw || raw === "{}" || raw === "[object Object]";
+    return NextResponse.json({
+      error: readable
+        ? `No se pudo crear el acceso del usuario (el sistema de acceso respondió con un error sin detalle${(authError as any).status ? `, código ${(authError as any).status}` : ""}). Intenta de nuevo en un minuto; si sigue igual, avisa a soporte con la hora exacta.`
+        : raw,
+      code: (authError as any).code || null,
+    }, { status: 500 });
   }
 
   // Update phone and tenant in profile

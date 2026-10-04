@@ -68,22 +68,32 @@ export default function BarberosPage() {
     fetchBarbers();
   }, [tenantLoading, tenant?.id]);
 
+  const [creatingMember, setCreatingMember] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/barberos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...formData, tenantId: getActiveTenantId() }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.error || "Error al crear miembro", "error");
-      return;
+    if (creatingMember) return; // evita crear dos veces con un doble toque
+    setCreatingMember(true);
+    try {
+      const res = await fetch("/api/barberos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, tenantId: getActiveTenantId() }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        const msg = typeof data?.error === "string" && data.error.trim() && data.error.trim() !== "{}" ? data.error : `No se pudo crear el miembro (error ${res.status}). Intenta de nuevo; si sigue igual, avisa a soporte.`;
+        showToast(msg, "error");
+        return;
+      }
+      showToast("Miembro creado. Se envio email con credenciales.", "success");
+      setShowModal(false);
+      setFormData({ name: "", email: "", phone: "", birthDate: "", password: "", role: "barber" });
+      fetchBarbers();
+    } catch {
+      showToast("No se pudo conectar con el servidor. Revisa tu internet e intenta de nuevo.", "error");
+    } finally {
+      setCreatingMember(false);
     }
-    showToast("Miembro creado. Se envio email con credenciales.", "success");
-    setShowModal(false);
-    setFormData({ name: "", email: "", phone: "", birthDate: "", password: "", role: "barber" });
-    fetchBarbers();
   };
 
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -323,8 +333,8 @@ export default function BarberosPage() {
                 <button type="button" onClick={() => setShowModal(false)}
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
                 <button type="submit"
-                  disabled={!formData.name.trim() || !formData.email.trim()}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
+                  disabled={!formData.name.trim() || !formData.email.trim() || creatingMember}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">{creatingMember ? "Guardando…" : "Guardar"}</button>
               </div>
             </form>
           </div>
