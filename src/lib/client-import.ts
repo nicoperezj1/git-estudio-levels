@@ -1,5 +1,6 @@
 // Lectura de archivos de clientes (CSV/Excel) para la importacion masiva.
-// Tolera: separador coma, punto y coma o tabulador (Excel en Chile guarda con ';'), comillas con
+// Tolera: separador coma, punto y coma, tabulador o ESPACIOS (columnas separadas por 2+ espacios, o un solo
+// espacio entre Nombre/Correo/Telefono/RUT), (Excel en Chile guarda con ';'), comillas con
 // comas adentro, BOM, saltos \r\n, tildes en los titulos, "Nombre" + "Apellido" en columnas
 // separadas y celdas con el texto literal "null" que escriben algunos exportadores (Setmore).
 
@@ -22,11 +23,42 @@ const norm = (h: unknown) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** Archivos de texto "separados por espacios" (sin coma, punto y coma ni tabulador). Devuelve null si no aplica. */
+function parseSpaceSeparated(t: string): string[][] | null {
+  const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+  const head = norm(lines[0]);
+  if (!/nombre|name|cliente/.test(head) || !/correo|email|mail|telefono|fono|celular|phone|rut/.test(head)) return null;
+
+  // Columnas separadas por 2 o mas espacios (alineadas): se corta ahi y listo.
+  if (/\S {2,}\S/.test(lines[0])) return lines.map((l) => l.split(/ {2,}/).map((c) => c.trim()));
+
+  // Un solo espacio entre todo: Nombre Correo Telefono RUT. Se reconoce por la forma de cada dato.
+  const rutRe = /^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$/;
+  const rows: string[][] = [["Nombre", "Correo", "Telefono", "RUT"]];
+  for (const l of lines.slice(1)) {
+    const tokens = l.split(/\s+/);
+    const isData = (tk: string) => tk.includes("@") || /^\+?\d[\d-]*$/.test(tk);
+    const firstData = tokens.findIndex(isData);
+    const nameTokens = firstData === -1 ? tokens : tokens.slice(0, firstData);
+    const rest = firstData === -1 ? [] : tokens.slice(firstData);
+    const email = rest.find((tk) => tk.includes("@")) || "";
+    const rut = rest.find((tk) => rutRe.test(tk)) || "";
+    const phone = rest.filter((tk) => !tk.includes("@") && tk !== rut).join(" ");
+    rows.push([nameTokens.join(" "), email, phone, rut]);
+  }
+  return rows;
+}
+
 /** Divide texto CSV en filas de celdas respetando comillas. */
 export function parseCsvText(text: string): string[][] {
   const t = text.replace(/^﻿/, "");
   const firstLine = t.split(/\r?\n/, 1)[0] || "";
   const count = (ch: string) => firstLine.split(ch).length - 1;
+  if (![";", "\t", ","].some((ch) => count(ch) > 0)) {
+    const spaced = parseSpaceSeparated(t);
+    if (spaced) return spaced;
+  }
   const delim = [";", "\t", ","].sort((a, b) => count(b) - count(a))[0];
 
   const rows: string[][] = [];
@@ -65,6 +97,9 @@ function cleanPhone(v: unknown): string {
 /** Convierte una tabla (primera fila = titulos) en clientes. */
 export function rowsToClients(table: unknown[][]): ParseResult {
   if (table.length < 2) return { clients: [], error: "El archivo no tiene filas de clientes (solo titulos o esta vacio).", totalRows: 0, withoutName: 0 };
+  if (table[0].length === 1 && String(table[0][0] ?? "").trim().split(/\s+/).length >= 3) {
+    return { clients: [], error: "No pude separar las columnas del archivo (parece una sola columna). Guardalo como CSV o Excel con una columna por dato: Nombre, Correo, Telefono y RUT.", totalRows: 0, withoutName: 0 };
+  }
   const headers = table[0].map(norm);
   const find = (pred: (h: string) => boolean) => headers.findIndex(pred);
 
