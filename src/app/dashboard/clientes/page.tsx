@@ -216,7 +216,7 @@ export default function ClientesPage() {
                   try {
                     const res = await fetch("/api/clients/import", {
                       method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ clients: batch }),
+                      body: JSON.stringify({ clients: batch, tenantId: tenant?.id }), // el superadmin importa al negocio que esta viendo
                     });
                     const data = await res.json().catch(() => ({} as any));
                     if (!res.ok) {
