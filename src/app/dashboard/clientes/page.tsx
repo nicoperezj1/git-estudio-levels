@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyIcons } from "@/components/ui/empty-state";
+import { parseCsvText, rowsToClients } from "@/lib/client-import";
 
 interface Client {
   id: string;
@@ -175,113 +176,79 @@ export default function ClientesPage() {
           {canImportExport && <>
           <label className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm cursor-pointer">
             Importar CSV/Excel
-            <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={async (e) => {
-              const file = e.target.files?.[0];
+            <input type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={async (e) => {
+              const input = e.target;
+              const file = input.files?.[0];
               if (!file) return;
+              try {
+                // Leer el archivo (CSV o Excel) a una tabla y convertirla en clientes.
+                let table: unknown[][];
+                if (/\.(xlsx|xls)$/i.test(file.name)) {
+                  const XLSX = (await import("xlsx")).default;
+                  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+                  // Hoja "Clientes" si existe; si no, la primera.
+                  const sheetName = workbook.SheetNames.find((n) => /cliente/i.test(n)) || workbook.SheetNames[0];
+                  const sheet = workbook.Sheets[sheetName];
+                  table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true }) as unknown[][];
+                } else {
+                  table = parseCsvText(await file.text());
+                }
+                const parsed = rowsToClients(table);
+                if (parsed.error) { showToast(parsed.error, "error"); return; }
+                const clients = parsed.clients;
+                if (clients.length === 0) { showToast("No se encontraron clientes con nombre en el archivo.", "error"); return; }
+                const extra = parsed.withoutName > 0 ? ` (${parsed.withoutName} filas sin nombre se omiten)` : "";
+                if (!confirm(`Se encontraron ${clients.length} clientes${extra}. Importar?`)) return;
 
-              let clients: Array<{ name: string; email: string | null; phone: string | null }> = [];
+                setImporting(true);
+                setProgressTotal(clients.length);
+                setProgressCurrent(0);
+                setImportProgress(`Importando 0 de ${clients.length} clientes...`);
 
-              // Algunos exportadores (ej. Setmore) escriben el texto literal "null"/"undefined"
-              // en celdas vacias en vez de dejarlas en blanco. Sin este filtro, esos valores
-              // terminaban concatenados al nombre (ej. "Agustin null").
-              const cleanField = (v: unknown): string => {
-                const s = String(v ?? "").trim();
-                return /^(null|undefined|n\/a|nan)$/i.test(s) ? "" : s;
-              };
-
-              if (file.name.endsWith(".csv")) {
-                // Parse CSV
-                const text = await file.text();
-                const lines = text.split("\n").filter(Boolean);
-                const headers = lines[0].toLowerCase().split(",").map((h: string) => h.trim().replace(/"/g, ""));
-                const nameIdx = headers.findIndex((h: string) => h.includes("nombre") || h === "name" || h === "full name");
-                const firstNameIdx = headers.findIndex((h: string) => h === "first name" || h === "first_name" || h.includes("primer"));
-                const lastNameIdx = headers.findIndex((h: string) => h === "last name" || h === "last_name" || h.includes("apellido"));
-                const emailIdx = headers.findIndex((h: string) => h.includes("email") || h.includes("correo") || h.includes("e-mail"));
-                const phoneIdx = headers.findIndex((h: string) => h.includes("telefono") || h.includes("phone") || h.includes("fono") || h.includes("mobile") || h.includes("celular"));
-                
-                if (nameIdx === -1 && firstNameIdx === -1) { alert("Archivo debe tener columna Nombre (o First Name)"); return; }
-                
-                clients = lines.slice(1).map((line: string) => {
-                  const cols = line.split(",").map((c: string) => c.trim().replace(/"/g, ""));
-                  let name = "";
-                  if (nameIdx !== -1) {
-                    name = cleanField(cols[nameIdx]);
-                  } else {
-                    // Concatenate First Name + Last Name (Setmore format)
-                    const first = cleanField(cols[firstNameIdx]);
-                    const last = lastNameIdx !== -1 ? cleanField(cols[lastNameIdx]) : "";
-                    name = `${first} ${last}`.trim();
+                // Lotes chicos para no pasar el tiempo maximo del servidor.
+                const batchSize = 50;
+                let imported = 0;
+                let skipped = 0;
+                let failed = 0;
+                let lastError = "";
+                for (let i = 0; i < clients.length; i += batchSize) {
+                  const batch = clients.slice(i, i + batchSize);
+                  try {
+                    const res = await fetch("/api/clients/import", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ clients: batch }),
+                    });
+                    const data = await res.json().catch(() => ({} as any));
+                    if (!res.ok) {
+                      failed += batch.length;
+                      lastError = typeof data?.error === "string" && data.error ? data.error : `error ${res.status}`;
+                    } else {
+                      imported += data.imported || 0;
+                      skipped += data.skipped || 0;
+                      failed += data.failed || 0;
+                      if (data.lastError) lastError = data.lastError;
+                    }
+                  } catch {
+                    failed += batch.length;
+                    lastError = "sin conexion con el servidor";
                   }
-                  return { name, email: cleanField(cols[emailIdx]) || null, phone: cleanField(cols[phoneIdx]) || null };
-                }).filter((c: any) => c.name);
-              } else {
-                // Parse Excel
-                const XLSX = (await import("xlsx")).default;
-                const buffer = await file.arrayBuffer();
-                const workbook = XLSX.read(buffer, { type: "array" });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-                if (rows.length === 0) { alert("Archivo vacio"); return; }
-                // Detect columns by header name
-                const headers = Object.keys(rows[0]).map((h) => h.toLowerCase());
-                const nameKey = Object.keys(rows[0]).find((k) => k.toLowerCase().includes("nombre") || k.toLowerCase() === "name" || k.toLowerCase() === "full name");
-                const firstNameKey = Object.keys(rows[0]).find((k) => k.toLowerCase() === "first name" || k.toLowerCase() === "first_name" || k.toLowerCase().includes("primer"));
-                const lastNameKey = Object.keys(rows[0]).find((k) => k.toLowerCase() === "last name" || k.toLowerCase() === "last_name" || k.toLowerCase().includes("apellido"));
-                const emailKey = Object.keys(rows[0]).find((k) => k.toLowerCase().includes("email") || k.toLowerCase().includes("correo") || k.toLowerCase().includes("e-mail"));
-                const phoneKey = Object.keys(rows[0]).find((k) => k.toLowerCase().includes("telefono") || k.toLowerCase().includes("phone") || k.toLowerCase().includes("fono") || k.toLowerCase().includes("celular") || k.toLowerCase().includes("mobile"));
-                
-                if (!nameKey && !firstNameKey) { alert("Excel debe tener columna Nombre (o First Name)"); return; }
-                
-                clients = rows.map((row: any) => {
-                  let name = "";
-                  if (nameKey) {
-                    name = cleanField(row[nameKey]);
-                  } else {
-                    const first = cleanField(row[firstNameKey!]);
-                    const last = lastNameKey ? cleanField(row[lastNameKey]) : "";
-                    name = `${first} ${last}`.trim();
-                  }
-                  return {
-                    name,
-                    email: emailKey ? cleanField(row[emailKey]) || null : null,
-                    phone: phoneKey ? cleanField(row[phoneKey]) || null : null,
-                  };
-                }).filter((c) => c.name);
+                  setProgressCurrent(Math.min(i + batchSize, clients.length));
+                  setImportProgress(`Importando... ${Math.min(i + batchSize, clients.length)} de ${clients.length}`);
+                }
+
+                const msg = `${imported} importados, ${skipped} repetidos omitidos` + (failed ? `, ${failed} con error (${lastError})` : "");
+                showToast(msg, failed && !imported ? "error" : "success");
+                fetchClients("");
+              } catch (err: any) {
+                console.error("[import clientes]", err);
+                showToast(`No se pudo leer el archivo: ${err?.message || "formato no reconocido"}. Prueba guardandolo como CSV o Excel (.xlsx).`, "error");
+              } finally {
+                setImporting(false);
+                setImportProgress("");
+                setProgressCurrent(0);
+                setProgressTotal(0);
+                input.value = "";
               }
-
-              if (clients.length === 0) { alert("No se encontraron clientes en el archivo"); return; }
-              if (!confirm(`Se encontraron ${clients.length} clientes. Importar?`)) return;
-
-              setImporting(true);
-              setProgressTotal(clients.length);
-              setProgressCurrent(0);
-              setImportProgress(`Importando 0 de ${clients.length} clientes...`);
-
-              // Import in batches of 100
-              const batchSize = 100;
-              let imported = 0;
-              let skipped = 0;
-              for (let i = 0; i < clients.length; i += batchSize) {
-                const batch = clients.slice(i, i + batchSize);
-                const res = await fetch("/api/clients/import", {
-                  method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ clients: batch }),
-                });
-                const data = await res.json();
-                imported += data.imported || 0;
-                skipped += data.skipped || 0;
-                setProgressCurrent(Math.min(i + batchSize, clients.length));
-                setImportProgress(`Importando... ${Math.min(i + batchSize, clients.length)} de ${clients.length}`);
-              }
-
-              setImporting(false);
-              setImportProgress("");
-              setProgressCurrent(0);
-              setProgressTotal(0);
-              showToast(`${imported} importados, ${skipped} duplicados omitidos`, "success");
-              fetchClients("");
-              e.target.value = "";
             }} />
           </label>
           <a href="/api/clients/export" download

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Negocio no encontrado" }, { status: 404 });
 
   const [{ data: barbers }, { data: services }] = await Promise.all([
-    supabase.from("profiles").select("id, name, avatar_url").eq("role", "barber").eq("active", true).eq("tenant_id", tenant.id),
+    supabase.from("profiles").select("id, name, avatar_url").or("role.eq.barber,and(role.in.(admin,super_admin),also_attends_clients.eq.true)").eq("active", true).eq("tenant_id", tenant.id),
     supabase.from("services").select("id, name, description, price, duration").eq("active", true).eq("tenant_id", tenant.id).in("id", serviceIds),
   ]);
   if (!services || services.length !== serviceIds.length) return NextResponse.json({ error: "Servicio no válido" }, { status: 400 });

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   const barberQuery = supabase
     .from("profiles")
     .select("id, name, avatar_url")
-    .eq("role", "barber")
+    .or("role.eq.barber,and(role.in.(admin,super_admin),also_attends_clients.eq.true)")
     .eq("active", true)
     .eq("tenant_id", tenantId);
   const { data: barbers } = await barberQuery;

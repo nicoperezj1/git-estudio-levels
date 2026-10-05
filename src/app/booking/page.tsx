@@ -148,6 +148,8 @@ export default function BookingPage() {
         if (!match && barberSlug) {
           match = data.find((b: any) => nameToSlug(b.name) === barberSlug);
         }
+        // Negocio con un solo profesional: no hay nada que elegir, se salta ese paso.
+        if (!match && !profSlugParam && !barberSlug && data.length === 1) match = data[0];
         if (match) {
           setSelectedBarber(match);
           setStep("service");
@@ -421,9 +423,11 @@ export default function BookingPage() {
         {step === "service" && (
           // pb-28 leaves room so the sticky "Continuar" bar never covers the last service.
           <div className="pb-28">
-            <button onClick={() => setStep("barber")} className="text-brand-gray hover:text-brand-blue text-sm mb-4 flex items-center gap-1">
-              ← Volver
-            </button>
+            {barbers.length !== 1 && (
+              <button onClick={() => setStep("barber")} className="text-brand-gray hover:text-brand-blue text-sm mb-4 flex items-center gap-1">
+                ← Volver
+              </button>
+            )}
             <h2 className="text-2xl font-bold mb-2">Servicios de {selectedBarber?.name}</h2>
             <p className="text-brand-gray mb-6">Selecciona uno o mas servicios</p>
             <div className="space-y-3">
