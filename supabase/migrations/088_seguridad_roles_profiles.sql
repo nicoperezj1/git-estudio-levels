@@ -14,7 +14,7 @@
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name, email, role)
+  INSERT INTO public.profiles (id, name, email, role)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
@@ -25,7 +25,9 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+-- Ojo: SET search_path = public es obligatorio (lo traia la 073). Sin eso, el servicio de acceso de Supabase ejecuta esta
+-- funcion con otro search_path y falla al crear usuarios ("Database error creating new user").
 
 -- ---------- 2) Un usuario solo puede editar su propia fila, y no las columnas sensibles ----------
 DROP POLICY IF EXISTS "profiles_update_own" ON profiles;
