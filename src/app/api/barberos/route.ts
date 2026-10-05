@@ -168,19 +168,24 @@ export async function POST(req: NextRequest) {
 
     // Use upsert: if trigger already created the profile, update it.
     // If not, create it with all the data.
-    const { error: profileError } = await adminSupabase
-      .from("profiles")
-      .upsert({
-        id: authData.user.id,
-        name,
-        email,
-        role: userRole,
-        phone: phone || null,
-        tenant_id: resolvedTenantId || null,
-        active: true,
-        booking_slug: bookingSlug,
-        birth_date: birthDate,
-      }, { onConflict: "id" });
+    const profileRow: Record<string, any> = {
+      id: authData.user.id,
+      name,
+      email,
+      role: userRole,
+      phone: phone || null,
+      tenant_id: resolvedTenantId || null,
+      active: true,
+      booking_slug: bookingSlug,
+      birth_date: birthDate,
+    };
+    let { error: profileError } = await adminSupabase.from("profiles").upsert(profileRow, { onConflict: "id" });
+    // Tolera que falte la migracion 080 (birth_date): reintenta sin esa columna en vez de fallar.
+    if (profileError && /birth_date/i.test(profileError.message || "")) {
+      console.error("[barberos] falta la migracion 080 (birth_date); creando sin fecha de nacimiento");
+      delete profileRow.birth_date;
+      ({ error: profileError } = await adminSupabase.from("profiles").upsert(profileRow, { onConflict: "id" }));
+    }
 
     // If the profile couldn't be created, we'd be left with an orphaned auth user
     // (can log in but has no role/tenant → treated wrong by the app). Roll back the
