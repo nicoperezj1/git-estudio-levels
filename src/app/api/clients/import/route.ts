@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   // Limpiar, descartar filas sin nombre y repetidos dentro del mismo archivo.
   const seenEmails = new Set<string>();
   let skipped = 0;
-  const rows: Array<{ name: string; email: string | null; phone: string | null; notes: string | null; tenant_id: string }> = [];
+  const rows: Array<{ name: string; email: string | null; phone: string | null; rut: string | null; notes: string | null; tenant_id: string }> = [];
   for (const c of clients) {
     const name = typeof c?.name === "string" ? c.name.trim() : "";
     if (!name) { skipped++; continue; }
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
       name,
       email,
       phone: c.phone != null && String(c.phone).trim() ? String(c.phone).trim() : null,
+      rut: typeof c.rut === "string" && c.rut.trim() ? c.rut.trim() : null,
       notes: typeof c.notes === "string" && c.notes.trim() ? c.notes.trim() : null,
       tenant_id: targetTenantId,
     });
@@ -69,7 +70,13 @@ export async function POST(req: NextRequest) {
   let failed = 0;
   let lastError = "";
   if (toInsert.length > 0) {
-    const { error: bulkErr } = await supabase.from("clients").insert(toInsert);
+    let bulkErr = (await supabase.from("clients").insert(toInsert)).error;
+    // Tolera que falte la columna rut (migracion 035): reintenta sin ella.
+    if (bulkErr && /\brut\b/i.test(bulkErr.message || "")) {
+      console.error("[clients/import] falta la columna rut; importando sin RUT");
+      toInsert = toInsert.map(({ rut, ...rest }) => ({ ...rest, rut: undefined as any }));
+      bulkErr = (await supabase.from("clients").insert(toInsert)).error;
+    }
     if (!bulkErr) {
       imported = toInsert.length;
     } else {

@@ -186,7 +186,9 @@ export default function ClientesPage() {
                 if (/\.(xlsx|xls)$/i.test(file.name)) {
                   const XLSX = (await import("xlsx")).default;
                   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-                  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                  // Hoja "Clientes" si existe; si no, la primera.
+                  const sheetName = workbook.SheetNames.find((n) => /cliente/i.test(n)) || workbook.SheetNames[0];
+                  const sheet = workbook.Sheets[sheetName];
                   table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true }) as unknown[][];
                 } else {
                   table = parseCsvText(await file.text());

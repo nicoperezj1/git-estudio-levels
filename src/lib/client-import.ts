@@ -3,7 +3,7 @@
 // comas adentro, BOM, saltos \r\n, tildes en los titulos, "Nombre" + "Apellido" en columnas
 // separadas y celdas con el texto literal "null" que escriben algunos exportadores (Setmore).
 
-export type ImportClient = { name: string; email: string | null; phone: string | null };
+export type ImportClient = { name: string; email: string | null; phone: string | null; rut?: string | null };
 
 export type ParseResult = { clients: ImportClient[]; error?: string; totalRows: number; withoutName: number };
 
@@ -58,7 +58,8 @@ function cleanPhone(v: unknown): string {
   if (typeof v === "number" && isFinite(v)) return String(Math.round(v));
   let s = clean(v);
   if (/^\d+(\.\d+)?e\+?\d+$/i.test(s)) s = String(Math.round(Number(s)));
-  return s;
+  // "+56" solo (sin numero) o basura muy corta no sirve como telefono.
+  return s.replace(/\D/g, "").length < 8 ? "" : s;
 }
 
 /** Convierte una tabla (primera fila = titulos) en clientes. */
@@ -72,6 +73,7 @@ export function rowsToClients(table: unknown[][]): ParseResult {
   const lastIdx = find((h) => h === "last name" || h === "apellido" || h === "apellidos" || h === "primer apellido");
   const last2Idx = find((h) => h === "segundo apellido");
   const anyNameIdx = find((h) => h.includes("nombre") || h.includes("name"));
+  const rutIdx = find((h) => h === "rut" || h === "run" || h === "rut cliente");
   const emailIdx = find((h) => h.includes("email") || h.includes("correo") || h.includes("mail"));
   const phoneIdx = find((h) => h.includes("telefono") || h.includes("phone") || h.includes("fono") || h.includes("celular") || h.includes("movil") || h.includes("mobile") || h.includes("whatsapp"));
 
@@ -92,6 +94,7 @@ export function rowsToClients(table: unknown[][]): ParseResult {
       name,
       email: emailIdx !== -1 ? clean(r[emailIdx]).toLowerCase() || null : null,
       phone: phoneIdx !== -1 ? cleanPhone(r[phoneIdx]) || null : null,
+      rut: rutIdx !== -1 ? clean(r[rutIdx]) || null : null,
     });
   }
   return { clients, totalRows: table.length - 1, withoutName };
