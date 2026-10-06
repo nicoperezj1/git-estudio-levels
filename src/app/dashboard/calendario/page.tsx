@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { buildConfirmWhatsAppUrl } from "@/lib/whatsapp-confirm";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun, SlidersHorizontal } from "lucide-react";
 import { Segmented, primaryButton } from "@/components/ui/premium";
 import { useBackToClose } from "@/lib/use-back-to-close";
 
@@ -130,6 +130,8 @@ export default function CalendarioPage() {
   // computador, con scroll horizontal). "Tarjetas" es la alternativa en lista, y la eleccion
   // de cada persona se recuerda en su equipo.
   const [mobileGrid, setMobileGrid] = useState(true);
+  // Celular: los controles secundarios (vista, profesional, rango) quedan plegados tras "Filtros".
+  const [showFilters, setShowFilters] = useState(false);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("calendar_mobile_view");
@@ -973,10 +975,10 @@ export default function CalendarioPage() {
   return (
     <div className="p-4 md:p-6 space-y-4 animate-fade-in">
       {/* Cabecera premium (mismo look del Dashboard) */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="flex items-center justify-between gap-3 md:items-end">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-brand-dark md:text-3xl">Calendario</h1>
-          <p className="mt-0.5 text-sm text-brand-gray first-letter:uppercase">
+          <h1 className="hidden text-2xl font-bold tracking-tight text-brand-dark md:block md:text-3xl">Calendario</h1>
+          <p className="text-base font-semibold text-brand-dark first-letter:uppercase md:mt-0.5 md:text-sm md:font-normal md:text-brand-gray">
             {multiDay && rangeDays > 1 ? (
               <>
                 {new Date(rangeDates[0] + "T12:00:00").toLocaleDateString("es-CL", { day: "numeric", month: "short" })}
@@ -990,7 +992,7 @@ export default function CalendarioPage() {
             )}
           </p>
         </div>
-        <button onClick={handleAgendarClick} className={`${primaryButton} w-full md:w-auto`}>
+        <button onClick={handleAgendarClick} className={`${primaryButton} shrink-0`}>
           <Plus className="h-4 w-4" strokeWidth={2.5} /> Agendar
         </button>
       </div>
@@ -1015,9 +1017,24 @@ export default function CalendarioPage() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+          className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 md:flex-none"
         />
 
+        <button
+          type="button"
+          aria-label="Filtros"
+          aria-expanded={showFilters}
+          onClick={() => setShowFilters((v) => !v)}
+          className={`relative flex h-11 w-11 items-center justify-center rounded-xl border transition-colors md:hidden ${showFilters ? "border-brand-blue bg-brand-blue/10 text-brand-blue" : "border-gray-200 bg-white text-brand-gray"}`}
+        >
+          <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
+          {(professionalFilter || fullDay || view === "lista" || !mobileGrid || rangeDays !== 1) && !showFilters && (
+            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-blue" />
+          )}
+        </button>
+
+        {/* Resto de controles: siempre visibles en pantallas medianas; en celular, tras "Filtros". */}
+        <div className={`${showFilters ? "contents" : "hidden"} md:contents`}>
         <div className="hidden h-6 w-px bg-gray-100 md:block" />
 
         <Segmented
@@ -1084,6 +1101,7 @@ export default function CalendarioPage() {
             ))}
           </select>
         )}
+        </div>
       </div>
 
       {/* Celular: tira de dias + chips de profesional + agenda por tarjetas (la grilla de
