@@ -111,7 +111,8 @@ export default function DashboardPage() {
 
   if (loading) return <Spinner />;
 
-  const firstName = user?.name?.split(" ")[0] || "Usuario";
+  // Si el perfil no tiene nombre guardado, el nombre es el correo: se usa solo lo anterior a la @.
+  const firstName = (user?.name?.includes("@") ? user.name.split("@")[0] : user?.name?.split(" ")[0]) || "Usuario";
   // El titulo de fecha debe reflejar el dia elegido, no siempre "hoy" del navegador.
   const selectedDateLabel = new Intl.DateTimeFormat("es-CL", {
     weekday: "long",

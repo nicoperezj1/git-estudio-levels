@@ -162,9 +162,9 @@ export default function ClientesPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Clientes</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canSeeMetrics && (
             <button
               onClick={() => router.push("/dashboard/clientes/metricas")}
@@ -174,7 +174,7 @@ export default function ClientesPage() {
             </button>
           )}
           {canImportExport && <>
-          <label className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm cursor-pointer">
+          <label className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm cursor-pointer whitespace-nowrap">
             Importar CSV/Excel
             <input type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={async (e) => {
               const input = e.target;
