@@ -563,3 +563,22 @@
   .sale-card-in, .sale-ring, .sale-glow, .sale-rise { animation: none; opacity: 1; }
   .sale-ring, .sale-glow { display: none; }
 }
+
+/* Solo dentro de la app movil: sin menu ni vista previa al mantener apretado un enlace o una imagen. */
+html.rb-app a,
+html.rb-app img,
+html.rb-app button {
+  -webkit-touch-callout: none;
+}
+html.rb-app a,
+html.rb-app img {
+  -webkit-user-drag: none;
+}
+/* Enlaces, botones y menus no se seleccionan al mantener apretado (los textos y campos si, para poder copiar). */
+html.rb-app a,
+html.rb-app button,
+html.rb-app nav,
+html.rb-app [role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+}

@@ -16,7 +16,8 @@ const config: CapacitorConfig = {
   // La web reconoce a la app por esta marca en el user agent (ver src/middleware.ts):
   // dentro de la app no hay pagina de presentacion ni registro, se parte en el login.
   appendUserAgent: "RebookingApp",
-  ios: { contentInset: "always" },
+  // Sin vista previa ni menu al mantener apretado un enlace (Abrir enlace, Copiar enlace...).
+  ios: { contentInset: "always", allowsLinkPreview: false },
 };
 
 export default config;
