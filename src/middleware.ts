@@ -58,8 +58,19 @@ async function isSuspendedStaff(request: NextRequest): Promise<boolean> {
   }
 }
 
+// Paginas publicas que la app movil no muestra (presentacion, registro de negocios, planes).
+const APP_HIDDEN_PAGES = ["/", "/landing", "/signup", "/registro", "/suscribirse"];
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // App movil (Capacitor): arranca en el login. En la web de siempre no cambia nada.
+  if (
+    (request.headers.get("user-agent") || "").includes("RebookingApp") &&
+    APP_HIDDEN_PAGES.includes(pathname)
+  ) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   // Bloqueo en el servidor: un negocio suspendido no puede usar la API (salvo lo necesario para pagar).
   if (pathname.startsWith("/api/")) {
@@ -84,5 +95,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/api/:path*"],
+  matcher: ["/", "/landing", "/signup", "/registro", "/suscribirse", "/dashboard/:path*", "/login", "/api/:path*"],
 };
