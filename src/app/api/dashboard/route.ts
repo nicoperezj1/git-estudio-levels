@@ -109,79 +109,66 @@ export async function GET(req: NextRequest) {
   // Helper to add tenant filter (skip for super_admin "ALL")
   const withTenant = (query: any) => (tenantId && tenantId !== "ALL") ? query.eq("tenant_id", tenantId) : query;
 
-  // Today appointments count
-  const { count: todayApptCount } = await withTenant(supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("date", todayStr));
+  // Todas las consultas se lanzan juntas (antes eran ~17 seguidas, una tras otra).
+  const countAppts = (date: string, statuses?: string[]) => {
+    let q = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("date", date);
+    if (statuses) q = q.in("status", statuses);
+    return withTenant(q);
+  };
+  const incomeIn = (startUtc: string, endUtc: string) =>
+    withTenant(supabase
+      .from("transactions")
+      .select("total")
+      .eq("type", "income")
+      .eq("status", "completed")
+      .gte("created_at", startUtc)
+      .lt("created_at", endUtc));
+  const newClientsIn = (startUtc: string, endUtc: string) =>
+    withTenant(supabase
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", startUtc)
+      .lt("created_at", endUtc));
 
-  // Yesterday appointments count (for comparison)
-  const { count: yesterdayApptCount } = await withTenant(supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("date", yesterdayStr));
+  // Punto 9 (Pablo): grafico de ventas con 4 ventanas (7 dias / 1 mes / 3 meses / 12
+  // meses) para ver el crecimiento del negocio de forma comoda, en vez de siempre la
+  // ultima semana. Todo el rango se trae en UNA sola consulta y se agrupa en memoria
+  // por balde (en vez de una consulta por dia).
+  const requestedRange = searchParams.get("range");
+  const chartRange: ChartRange = (CHART_RANGES as readonly string[]).includes(requestedRange || "")
+    ? (requestedRange as ChartRange)
+    : "7d";
+  const chartBuckets = buildChartBuckets(todayStr, chartRange);
+  const chartRangeStartUtc = chartBuckets[0].startUtc;
+  const chartRangeEndUtc = chartBuckets[chartBuckets.length - 1].endUtcExclusive;
 
-  // Today income
-  const { data: todayTx } = await withTenant(supabase
+  // Crecimiento: total del rango elegido vs el mismo largo de dias inmediatamente
+  // anterior (ej. estos ultimos 30 dias vs los 30 dias previos a esos).
+  const rangeSpanDays = daysBetween(chartBuckets[0].date, chartBuckets[chartBuckets.length - 1].endDate);
+  const prevRangeStartDate = dateStrOffset(chartBuckets[0].date, -rangeSpanDays);
+  const prevRangeStartUtc = chileDayBoundsUtc(prevRangeStartDate).startUtc;
+  const prevRangeEndUtc = chartBuckets[0].startUtc;
+
+  // Top servicios (ultimos 30 dias). transaction_items no tiene created_at: se filtra por
+  // la transaccion padre (que si tiene created_at y tenant_id) y se recorren los items en
+  // memoria. El mismo query alimenta "Productos mas vendidos" (cada item es o un
+  // service_id o un product_id, nunca ambos). La ventana termina en el dia elegido.
+  const topServicesQuery = withTenant(supabase
     .from("transactions")
-    .select("total")
+    .select("items:transaction_items(description, quantity, service_id, product_id)")
     .eq("type", "income")
     .eq("status", "completed")
-    .gte("created_at", todayBounds.startUtc)
-    .lt("created_at", todayBounds.endUtc));
-  const todayIncome = (todayTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
-
-  // Yesterday income
-  const { data: yesterdayTx } = await withTenant(supabase
-    .from("transactions")
-    .select("total")
-    .eq("type", "income")
-    .eq("status", "completed")
-    .gte("created_at", yesterdayBounds.startUtc)
-    .lt("created_at", yesterdayBounds.endUtc));
-  const yesterdayIncome = (yesterdayTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
-
-  // New clients today
-  const { count: newClientsToday } = await withTenant(supabase
-    .from("clients")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", todayBounds.startUtc)
+    .gte("created_at", chileDayBoundsUtc(dateStrOffset(todayStr, -30)).startUtc)
     .lt("created_at", todayBounds.endUtc));
 
-  const { count: newClientsYesterday } = await withTenant(supabase
-    .from("clients")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", yesterdayBounds.startUtc)
-    .lt("created_at", yesterdayBounds.endUtc));
+  // Aviso de stock bajo: se trae el catalogo activo y se filtra en memoria (el cliente
+  // de Supabase no puede comparar dos columnas entre si en un filtro).
+  const productsForStockQuery = withTenant(supabase
+    .from("products")
+    .select("id, name, stock, min_stock")
+    .eq("active", true));
 
-  // Rescheduled today
-  const { count: rescheduledToday } = await withTenant(supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("date", todayStr)
-    .eq("status", "confirmed"));
-
-  const { count: rescheduledYesterday } = await withTenant(supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("date", yesterdayStr)
-    .eq("status", "confirmed"));
-
-  // Cancellations today
-  const { count: cancelledToday } = await withTenant(supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("date", todayStr)
-    .in("status", ["cancelled", "no_show"]));
-
-  const { count: cancelledYesterday } = await withTenant(supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("date", yesterdayStr)
-    .in("status", ["cancelled", "no_show"]));
-
-  // Today's agenda (upcoming appointments)
-  const { data: todayAppointments } = await withTenant(supabase
+  const todayAppointmentsQuery = withTenant(supabase
     .from("appointments")
     .select(`
       id, start_time, end_time, status,
@@ -194,29 +181,50 @@ export async function GET(req: NextRequest) {
     .order("start_time", { ascending: true })
     .limit(8));
 
-  // Top services (last 30 days).
-  // Punto 7 (Pablo): "Top servicios" no mostraba datos. transaction_items no tiene
-  // columna created_at (nunca se agrego en ninguna migracion) — el filtro
-  // .gte("created_at", ...) contra esa tabla fallaba en Postgrest y, como solo se
-  // desestructuraba `data` (no `error`), la respuesta vacia se tomaba silenciosamente
-  // como "sin datos". Ademas faltaba el filtro de tenant, lo que habria mezclado los
-  // servicios de otros negocios. Se filtra por la transaccion padre (que si tiene
-  // created_at y tenant_id) y se recorren sus items en memoria.
-  // Punto (Nico, 25-sep): mismo query tambien alimenta "Productos mas vendidos" — cada
-  // item de una transaccion es o un service_id o un product_id (nunca ambos), asi que se
-  // separan en dos mapas de conteo dentro de la misma pasada.
-  let topServicesQuery = supabase
+  const chartTxQuery = withTenant(supabase
     .from("transactions")
-    .select("items:transaction_items(description, quantity, service_id, product_id)")
+    .select("total, created_at")
     .eq("type", "income")
     .eq("status", "completed")
-    // Window ends at the selected day (todayStr), not always the real "now" — so
-    // picking a past date shows that day's own trailing 30-day window, not a mix that
-    // includes days after it.
-    .gte("created_at", chileDayBoundsUtc(dateStrOffset(todayStr, -30)).startUtc)
-    .lt("created_at", todayBounds.endUtc);
-  topServicesQuery = withTenant(topServicesQuery);
-  const { data: txWithItems } = await topServicesQuery;
+    .gte("created_at", chartRangeStartUtc)
+    .lt("created_at", chartRangeEndUtc));
+
+  const [
+    { count: todayApptCount },
+    { count: yesterdayApptCount },
+    { data: todayTx },
+    { data: yesterdayTx },
+    { count: newClientsToday },
+    { count: newClientsYesterday },
+    { count: rescheduledToday },
+    { count: rescheduledYesterday },
+    { count: cancelledToday },
+    { count: cancelledYesterday },
+    { data: todayAppointments },
+    { data: txWithItems },
+    { data: allActiveProducts },
+    { data: chartTxRaw },
+    { data: prevChartTx },
+  ] = await Promise.all([
+    countAppts(todayStr),
+    countAppts(yesterdayStr),
+    incomeIn(todayBounds.startUtc, todayBounds.endUtc),
+    incomeIn(yesterdayBounds.startUtc, yesterdayBounds.endUtc),
+    newClientsIn(todayBounds.startUtc, todayBounds.endUtc),
+    newClientsIn(yesterdayBounds.startUtc, yesterdayBounds.endUtc),
+    countAppts(todayStr, ["confirmed"]),
+    countAppts(yesterdayStr, ["confirmed"]),
+    countAppts(todayStr, ["cancelled", "no_show"]),
+    countAppts(yesterdayStr, ["cancelled", "no_show"]),
+    todayAppointmentsQuery,
+    topServicesQuery,
+    productsForStockQuery,
+    chartTxQuery,
+    incomeIn(prevRangeStartUtc, prevRangeEndUtc),
+  ]);
+
+  const todayIncome = (todayTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
+  const yesterdayIncome = (yesterdayTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
 
   const serviceMap: Record<string, number> = {};
   const productSalesMap: Record<string, number> = {};
@@ -238,50 +246,16 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 9);
 
-  // Punto (Nico, 25-sep): aviso de stock bajo para el Dashboard — productos con
-  // stock <= min_stock, los mas criticos primero (mayor deficit = stock - min_stock mas
-  // negativo). Se trae el catalogo activo del negocio y se filtra/ordena en memoria: el
-  // cliente de Supabase no permite comparar dos columnas entre si en un filtro .lte().
-  let productsForStockQuery = supabase
-    .from("products")
-    .select("id, name, stock, min_stock")
-    .eq("active", true);
-  productsForStockQuery = withTenant(productsForStockQuery);
-  const { data: allActiveProducts } = await productsForStockQuery;
   const lowStock = (allActiveProducts || [])
     .filter((p: any) => Number(p.stock) <= Number(p.min_stock))
     .sort((a: any, b: any) => (Number(a.stock) - Number(a.min_stock)) - (Number(b.stock) - Number(b.min_stock)))
     .slice(0, 9)
     .map((p: any) => ({ id: p.id, name: p.name, stock: Number(p.stock), minStock: Number(p.min_stock) }));
 
-  // Calculate percentage changes
   const calcChange = (today: number, yesterday: number): number => {
     if (yesterday === 0) return today > 0 ? 100 : 0;
     return Math.round(((today - yesterday) / yesterday) * 100);
   };
-
-  // Punto 9 (Pablo): grafico de ventas con 4 ventanas (7 dias / 1 mes / 3 meses / 12
-  // meses) para ver el crecimiento del negocio de forma comoda, en vez de siempre la
-  // ultima semana. Todo el rango se trae en UNA sola consulta y se agrupa en memoria
-  // por balde (en vez de una consulta por dia), para que 12 meses no dispare ~365
-  // queries secuenciales.
-  const requestedRange = searchParams.get("range");
-  const chartRange: ChartRange = (CHART_RANGES as readonly string[]).includes(requestedRange || "")
-    ? (requestedRange as ChartRange)
-    : "7d";
-  const chartBuckets = buildChartBuckets(todayStr, chartRange);
-  const chartRangeStartUtc = chartBuckets[0].startUtc;
-  const chartRangeEndUtc = chartBuckets[chartBuckets.length - 1].endUtcExclusive;
-
-  let chartTxQuery = supabase
-    .from("transactions")
-    .select("total, created_at")
-    .eq("type", "income")
-    .eq("status", "completed")
-    .gte("created_at", chartRangeStartUtc)
-    .lt("created_at", chartRangeEndUtc);
-  chartTxQuery = withTenant(chartTxQuery);
-  const { data: chartTxRaw } = await chartTxQuery;
 
   const chartData = chartBuckets.map((b) => {
     const total = (chartTxRaw || [])
@@ -290,23 +264,6 @@ export async function GET(req: NextRequest) {
     return { label: b.label, date: b.date, total };
   });
   const chartTotal = chartData.reduce((s, d) => s + d.total, 0);
-
-  // Crecimiento: total del rango elegido vs el mismo largo de dias inmediatamente
-  // anterior (ej. estos ultimos 30 dias vs los 30 dias previos a esos).
-  const rangeSpanDays = daysBetween(chartBuckets[0].date, chartBuckets[chartBuckets.length - 1].endDate);
-  const prevRangeStartDate = dateStrOffset(chartBuckets[0].date, -rangeSpanDays);
-  const prevRangeStartUtc = chileDayBoundsUtc(prevRangeStartDate).startUtc;
-  const prevRangeEndUtc = chartBuckets[0].startUtc;
-
-  let prevChartTxQuery = supabase
-    .from("transactions")
-    .select("total")
-    .eq("type", "income")
-    .eq("status", "completed")
-    .gte("created_at", prevRangeStartUtc)
-    .lt("created_at", prevRangeEndUtc);
-  prevChartTxQuery = withTenant(prevChartTxQuery);
-  const { data: prevChartTx } = await prevChartTxQuery;
   const prevChartTotal = (prevChartTx || []).reduce((s: number, t: any) => s + Number(t.total), 0);
   const chartGrowth = calcChange(chartTotal, prevChartTotal);
 

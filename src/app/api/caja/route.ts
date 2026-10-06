@@ -134,10 +134,12 @@ export async function GET(req: NextRequest) {
   const openingAmount = register ? Number(register.opening_amount) : 0;
   // Retiros a la caja fuerte (reduccion de efectivo): salen de la caja, asi que se restan.
   const specific = !!tenantId && tenantId !== "ALL";
-  const wd = specific ? await getWithdrawals(supabase, tenantId as string, date) : { total: 0, rows: [] };
-  const cashCap = specific ? await getCashCap(supabase, tenantId as string) : null;
   // Ajustes de caja: lo que el administrador declaro como efectivo real al revisar un reporte (puede sumar o restar).
-  const adj = specific ? await getAdjustments(supabase, tenantId as string, date) : { total: 0, rows: [] };
+  const [wd, cashCap, adj] = await Promise.all([
+    specific ? getWithdrawals(supabase, tenantId as string, date) : Promise.resolve({ total: 0, rows: [] as any[] }),
+    specific ? getCashCap(supabase, tenantId as string) : Promise.resolve(null),
+    specific ? getAdjustments(supabase, tenantId as string, date) : Promise.resolve({ total: 0, rows: [] as any[] }),
+  ]);
   const expectedCash = openingAmount + cashIncome - cashExpense - wd.total + adj.total;
 
   return NextResponse.json({
@@ -295,8 +297,10 @@ export async function PATCH(req: NextRequest) {
     .filter((t: any) => t.type === "expense" && isCashLike(t))
     .reduce((sum: number, t: any) => sum + Number(cashAmountOf(t)), 0);
 
-  const closeWd = await getWithdrawals(supabase, tenantId, today);
-  const closeAdj = await getAdjustments(supabase, tenantId, today);
+  const [closeWd, closeAdj] = await Promise.all([
+    getWithdrawals(supabase, tenantId, today),
+    getAdjustments(supabase, tenantId, today),
+  ]);
   const expectedAmount = Number(register.opening_amount) + cashIncome - cashExpense - closeWd.total + closeAdj.total;
   const difference = (closingAmount || 0) - expectedAmount;
 
