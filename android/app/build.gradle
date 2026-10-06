@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+// Firma de la version para Google Play. La llave NO esta en el repositorio: se lee de
+// ~/Library/re-booking-keys/keystore.properties (o de la ruta en la variable REBOOKING_KEYSTORE_PROPERTIES).
+def keystorePropsFile = new File(System.getenv('REBOOKING_KEYSTORE_PROPERTIES') ?: "${System.getProperty('user.home')}/Library/re-booking-keys/keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) { keystorePropsFile.withInputStream { keystoreProps.load(it) } }
+
 android {
     namespace = "cl.rebooking.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +22,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystoreProps.containsKey('storeFile')) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystoreProps.containsKey('storeFile')) { signingConfig signingConfigs.release }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -1,9 +1,9 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 // La app carga la misma web de re-booking dentro de una vista nativa.
-// Pruebas: CAP_SERVER_URL=http://localhost:3000 (simulador de iPhone) o la direccion de la vista previa.
-// Produccion: https://re-booking.cl (se fija al preparar la version para las tiendas).
-const serverUrl = process.env.CAP_SERVER_URL || "http://localhost:3000";
+// Por defecto (version para las tiendas): produccion.
+// Pruebas en el simulador: CAP_SERVER_URL=http://localhost:3001 npx cap sync   (o la direccion de la vista previa).
+const serverUrl = process.env.CAP_SERVER_URL || "https://www.re-booking.cl";
 
 const config: CapacitorConfig = {
   appId: "cl.rebooking.app",
