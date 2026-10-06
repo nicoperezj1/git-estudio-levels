@@ -45,11 +45,35 @@ export function createAdminSupabase() {
 
 // Resolve the current caller's role + tenant for server-side authorization checks.
 // Uses getUser() (validated) and falls back to getSession(). Returns nulls if unknown.
-export async function getCurrentUserRoleAndTenant(): Promise<{
-  userId: string | null;
-  role: string | null;
-  tenantId: string | null;
-}> {
+type CallerInfo = { userId: string | null; role: string | null; tenantId: string | null };
+
+// Memoria corta (10 s) del resultado, por sesion. Una sola pantalla dispara varias rutas
+// a la vez y cada una repetia getUser() (llamada de red a Supabase Auth) + la consulta del
+// perfil, y varias rutas lo llaman dos veces (isManagerLevel + resolveTenantForRequest).
+// La clave incluye las cookies de sesion (con el token), asi que no se puede falsear; un
+// cambio de rol o un cierre de sesion tarda como maximo 10 s en notarse en la misma
+// instancia. Solo se guardan sesiones validas (nunca "no autorizado").
+const CALLER_TTL_MS = 10_000;
+const callerCache = new Map<string, { at: number; value: CallerInfo }>();
+
+export async function getCurrentUserRoleAndTenant(): Promise<CallerInfo> {
+  let key = "";
+  try {
+    key = cookies().toString();
+  } catch {}
+  if (key) {
+    const hit = callerCache.get(key);
+    if (hit && Date.now() - hit.at < CALLER_TTL_MS) return hit.value;
+  }
+  const value = await loadCallerRoleAndTenant();
+  if (key && value.userId) {
+    if (callerCache.size > 200) callerCache.clear();
+    callerCache.set(key, { at: Date.now(), value });
+  }
+  return value;
+}
+
+async function loadCallerRoleAndTenant(): Promise<CallerInfo> {
   try {
     const supabase = createServerSupabase();
     let userId: string | null = null;
