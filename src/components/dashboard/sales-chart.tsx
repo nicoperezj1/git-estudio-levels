@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export type ChartRange = "7d" | "1m" | "3m" | "12m";
@@ -35,6 +36,8 @@ const RANGE_OPTIONS: { value: ChartRange; label: string }[] = [
 export function SalesChart({ data, range, onRangeChange, total, growth, loading }: SalesChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [isHovering, setIsHovering] = useState(false);
+  // Total y variacion vs el periodo anterior quedan plegados tras la flecha junto a "Ventas".
+  const [showSummary, setShowSummary] = useState(false);
 
   const maxValue = Math.max(...data.map((d) => d.total), 1);
   const hoveredPoint = hoveredIndex !== null ? data[hoveredIndex] : null;
@@ -55,41 +58,50 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
       onMouseLeave={handleContainerLeave}
       className="group relative bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-3.5 md:p-6 backdrop-blur-sm transition-all duration-500 hover:border-brand-blue/20 hover:shadow-lg hover:shadow-brand-blue/5"
     >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 md:gap-4 md:mb-6">
+      {/* Header: solo "Ventas" y una flecha; el total y la variacion se despliegan al tocarla */}
+      <div className="mb-3 md:mb-6">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
-          <div>
-            <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">Ventas</h3>
-            <div className="relative h-5 flex items-center">
-              <span
-                className={cn(
-                  "text-xs font-medium tabular-nums transition-all duration-300 ease-out",
-                  isHovering && hoveredPoint ? "text-brand-blue opacity-100" : "text-brand-gray opacity-90"
-                )}
-              >
-                {isHovering && hoveredPoint
-                  ? `${hoveredPoint.label}: ${formatCurrency(hoveredPoint.total)}`
-                  : `Total: ${formatCurrency(total)}`}
-              </span>
-            </div>
-          </div>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">Ventas</h3>
+          <button
+            type="button"
+            aria-label={showSummary ? "Ocultar detalle de ventas" : "Ver detalle de ventas"}
+            aria-expanded={showSummary}
+            onClick={() => setShowSummary((v) => !v)}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-brand-gray transition-colors hover:bg-brand-light hover:text-brand-dark"
+          >
+            <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", showSummary && "rotate-180")} strokeWidth={2.25} />
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span
-            className={cn(
-              "text-xs font-semibold px-2 py-1 rounded-full",
-              isPositive ? "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10" : "text-red-500 bg-red-50 dark:text-red-400 dark:bg-red-500/10"
+        {(showSummary || (isHovering && hoveredPoint)) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 pl-[18px]">
+            <span
+              className={cn(
+                "text-xs font-medium tabular-nums transition-all duration-300 ease-out",
+                isHovering && hoveredPoint ? "text-brand-blue" : "text-brand-gray"
+              )}
+            >
+              {isHovering && hoveredPoint
+                ? `${hoveredPoint.label}: ${formatCurrency(hoveredPoint.total)}`
+                : `Total: ${formatCurrency(total)}`}
+            </span>
+            {showSummary && (
+              <span
+                className={cn(
+                  "text-xs font-semibold px-2 py-1 rounded-full",
+                  isPositive ? "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10" : "text-red-500 bg-red-50 dark:text-red-400 dark:bg-red-500/10"
+                )}
+              >
+                {isPositive ? "+" : ""}
+                {growth}% vs periodo anterior
+              </span>
             )}
-          >
-            {isPositive ? "+" : ""}
-            {growth}% vs periodo anterior
-          </span>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Range toggle */}
