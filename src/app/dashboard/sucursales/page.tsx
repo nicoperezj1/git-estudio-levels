@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
+import { useTenant } from "@/lib/tenant-context";
 import { MoreVertical, MapPin, Phone, Mail, Clock, Pencil, Trash2 } from "lucide-react";
 
 interface Branch {
@@ -25,15 +26,21 @@ export default function SucursalesPage() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", address: "", phone: "", email: "", open_time: "10:00", close_time: "21:00" });
   const { showToast } = useToast();
+  const { tenant, loading: tenantLoading } = useTenant();
+  // El superadmin "viendo como" otro negocio debe listar/editar solo ese negocio.
+  const tq = tenant?.id ? `?tenantId=${tenant.id}` : "";
 
   const fetchBranches = async () => {
     setLoading(true);
-    const res = await fetch("/api/branches");
+    const res = await fetch(`/api/branches${tq}`);
     setBranches(await res.json());
     setLoading(false);
   };
 
-  useEffect(() => { fetchBranches(); }, []);
+  useEffect(() => {
+    if (tenantLoading) return;
+    fetchBranches();
+  }, [tenant?.id, tenantLoading]);
 
   const openNew = () => {
     setEditingBranch(null);
@@ -58,7 +65,7 @@ export default function SucursalesPage() {
 
   const handleDelete = async (b: Branch) => {
     if (!confirm(`Eliminar sucursal "${b.name}"?`)) return;
-    await fetch(`/api/branches/${b.id}`, { method: "DELETE" });
+    await fetch(`/api/branches/${b.id}${tq}`, { method: "DELETE" });
     showToast("Sucursal eliminada", "success");
     fetchBranches();
     setMenuOpen(null);
@@ -71,14 +78,14 @@ export default function SucursalesPage() {
       await fetch(`/api/branches/${editingBranch.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, tenantId: tenant?.id }),
       });
       showToast("Sucursal actualizada", "success");
     } else {
       await fetch("/api/branches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, tenantId: tenant?.id }),
       });
       showToast("Sucursal creada", "success");
     }
