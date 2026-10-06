@@ -579,7 +579,7 @@ export default function ConfiguracionPage() {
   // configure instead of showing forms that can't identify the business.
   if (!tenantId) {
     return (
-      <div className="p-4 md:p-6 space-y-4 animate-fade-in max-w-3xl">
+      <div className="p-3 md:p-6 space-y-3 md:space-y-4 animate-fade-in max-w-3xl">
         <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Configuracion</h1>
         <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 md:p-6 space-y-4">
           <div>
@@ -611,7 +611,7 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in max-w-3xl">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in max-w-3xl">
       <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Configuracion</h1>
 
       {/* Preferencias de reservas: banner, logo, Google Maps y tipo de vista */}

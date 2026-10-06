@@ -284,7 +284,7 @@ export default function TerminalPosPage() {
   // instead of showing empty forms that can't save.
   if (!tenantId) {
     return (
-      <div className="p-4 md:p-6 space-y-4 animate-fade-in max-w-3xl">
+      <div className="p-3 md:p-6 space-y-3 md:space-y-4 animate-fade-in max-w-3xl">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Terminal POS</h1>
           <p className="text-sm text-brand-gray">Configura la maquina de cobro con tarjeta que usa el Punto de Venta</p>
@@ -327,7 +327,7 @@ export default function TerminalPosPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in max-w-3xl">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in max-w-3xl">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Terminal POS</h1>
         <p className="text-sm text-brand-gray">Configura la maquina de cobro con tarjeta que usa el Punto de Venta</p>

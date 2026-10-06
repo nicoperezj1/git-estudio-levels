@@ -27,7 +27,7 @@ export default function PagosPage() {
   const isConfigured = config.commerce_code && config.api_key;
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900">Terminal de Pagos</h1>
 
       {/* Status Card */}

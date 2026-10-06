@@ -69,7 +69,7 @@ export default function SolicitudPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-8 animate-fade-in">
+    <div className="mx-auto max-w-3xl space-y-3 md:space-y-6 p-3 md:p-8 animate-fade-in">
       <PageHeader title="Solicitud de insumos" subtitle={`Indica qué insumos necesitas y cuánto. ${today.charAt(0).toUpperCase()}${today.slice(1)}.`} />
 
       <Panel title="Insumos" subtitle="Existencias actuales y cantidad a solicitar">

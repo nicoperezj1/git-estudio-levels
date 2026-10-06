@@ -34,7 +34,7 @@ export default function RemuneracionesPage() {
   const [tab, setTab] = useState<Tab>("liquidaciones");
   const [month, setMonth] = useState(todayInChile().slice(0, 7));
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4 animate-fade-in">
+    <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-3 md:space-y-4 animate-fade-in">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Remuneraciones</h1>

@@ -155,7 +155,7 @@ export default function EditProfessionalPage() {
   // schedule. Everything else (work mode, rates, PIN, email/phone, delete) stays hidden.
   if (scheduleOnly) {
     return (
-      <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-6 animate-fade-in">
+      <div className="p-3 md:p-6 max-w-2xl mx-auto space-y-3 md:space-y-6 animate-fade-in">
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-blue-600">← Volver</button>
 
         {/* Photo + name */}
@@ -217,7 +217,7 @@ export default function EditProfessionalPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="p-3 md:p-6 max-w-2xl mx-auto space-y-3 md:space-y-6 animate-fade-in">
       <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-blue-600">← Volver</button>
 
       <div className="flex items-center gap-4">

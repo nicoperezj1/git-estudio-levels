@@ -33,7 +33,7 @@ export default function SesionesPage() {
   }, []);
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+    <div className="p-3 md:p-6 max-w-5xl mx-auto space-y-3 md:space-y-5">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Sesiones de Login</h1>
         <p className="text-sm text-brand-gray">Historial de accesos al sistema por profesional</p>

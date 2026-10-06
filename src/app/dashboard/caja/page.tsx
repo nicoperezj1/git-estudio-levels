@@ -492,7 +492,7 @@ export default function CajaPage() {
   }).format(new Date(`${selectedDate}T12:00:00Z`));
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-4xl mx-auto">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <ReceptionistGreeting className="mb-0.5" />

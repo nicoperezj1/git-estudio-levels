@@ -172,7 +172,7 @@ export default function FacturacionPage() {
   const hasActiveSubscription = (!!subscription?.mp_preapproval_id || isAnnualOneTime) && !isCancelled;
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-6">
+    <div className="p-3 md:p-6 max-w-2xl space-y-3 md:space-y-6">
       <div>
         <h1 className="text-xl font-bold text-brand-dark">Plan y facturación</h1>
         <p className="text-sm text-brand-gray mt-1">Administra tu suscripción a re-booking.</p>

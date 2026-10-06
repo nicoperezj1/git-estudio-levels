@@ -249,7 +249,7 @@ export default function SuperAdminTenantsPage() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://re-booking.cl";
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-3 md:space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Empresas</h1>

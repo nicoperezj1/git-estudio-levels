@@ -94,7 +94,7 @@ export default function ReportesPage() {
   const chartMax = Math.max(...comparison.map((c) => Math.max(c.income, c.expenses)), 1);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8 animate-fade-in">
+    <div className="mx-auto max-w-7xl space-y-3 md:space-y-6 p-3 md:p-8 animate-fade-in">
       <PageHeader
         title="Cierre mensual"
         subtitle="Resultado del mes: ingresos, egresos y utilidad del salón."

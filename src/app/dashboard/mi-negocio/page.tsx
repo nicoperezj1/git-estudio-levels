@@ -16,7 +16,7 @@ const ITEMS = [
 
 export default function MiNegocioPage() {
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4 animate-fade-in">
+    <div className="p-3 md:p-6 max-w-3xl mx-auto space-y-3 md:space-y-4 animate-fade-in">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Mi negocio</h1>
         <p className="text-sm text-brand-gray">Lo que administras de tu negocio.</p>

@@ -973,7 +973,7 @@ export default function CalendarioPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 animate-fade-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-4 animate-fade-in">
       {/* Cabecera premium (mismo look del Dashboard) */}
       <div className="flex items-center justify-between gap-3 md:items-end">
         <div>

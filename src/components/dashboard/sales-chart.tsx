@@ -53,10 +53,10 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
     <div
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={handleContainerLeave}
-      className="group relative bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 md:p-6 backdrop-blur-sm transition-all duration-500 hover:border-brand-blue/20 hover:shadow-lg hover:shadow-brand-blue/5"
+      className="group relative bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-3.5 md:p-6 backdrop-blur-sm transition-all duration-500 hover:border-brand-blue/20 hover:shadow-lg hover:shadow-brand-blue/5"
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 md:gap-4 md:mb-6">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -93,7 +93,7 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
       </div>
 
       {/* Range toggle */}
-      <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-3 md:mb-6">
         <div className="flex items-center gap-1 bg-brand-light rounded-2xl border border-gray-100 p-1 w-fit">
           {RANGE_OPTIONS.map((opt) => (
             <button
@@ -122,7 +122,7 @@ export function SalesChart({ data, range, onRangeChange, total, growth, loading 
       ) : data.every((d) => d.total === 0) ? (
         <div className="h-40 flex items-center justify-center text-sm text-brand-gray">Sin ventas en este periodo</div>
       ) : (
-        <div className="flex items-end gap-1 h-40">
+        <div className="flex items-end gap-1 h-28 md:h-40">
           {data.map((item, index) => {
             const heightPx = Math.max((item.total / maxValue) * 152, item.total > 0 ? 4 : 2);
             const isHovered = hoveredIndex === index;

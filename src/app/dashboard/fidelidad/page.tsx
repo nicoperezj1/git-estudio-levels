@@ -142,7 +142,7 @@ export default function FidelidadPage() {
   if (loading) return <Spinner />;
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Programa de Fidelidad</h1>
         <p className="text-gray-500 text-sm">1 punto por cada ${config.points_per_clp.toLocaleString("es-CL")} gastados</p>

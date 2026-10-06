@@ -62,7 +62,7 @@ export default function HorariosPage() {
   if (loading) return <div className="p-6 text-center text-brand-gray">Cargando...</div>;
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-5">
+    <div className="p-3 md:p-6 max-w-2xl mx-auto space-y-3 md:space-y-5">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Horarios de Atencion</h1>
         <p className="text-sm text-brand-gray">Configura los horarios en que los clientes pueden agendar</p>
