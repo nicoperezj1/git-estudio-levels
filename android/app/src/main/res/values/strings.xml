@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">re-booking</string>
+    <string name="title_activity_main">re-booking</string>
+    <string name="package_name">cl.rebooking.app</string>
+    <string name="custom_url_scheme">cl.rebooking.app</string>
+</resources>
