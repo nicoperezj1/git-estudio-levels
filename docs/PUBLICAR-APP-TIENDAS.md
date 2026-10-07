@@ -67,3 +67,29 @@ Claude no puede pagar ni ingresar datos de tarjeta ni documentos de la empresa.
 3. (Claude) Avisos push nativos y Face ID (para Apple 4.2).
 4. (Tú) Abrir cuentas y pagar. D-U-N-S primero (tarda).
 5. (Tú + Claude) Subir `.aab` a Google Play y Archive en Xcode → TestFlight → revisión.
+
+## 10. Tu lista para llegar y pagar (7 oct.)
+**A. Llevar el código a producción (en este orden)**
+1. Prueba rápida en `localhost:3000` (crear, mover y cancelar una cita) y **Merge** del PR #5 (`release/paquete-2`).
+2. Abre https://github.com/pdencina/barberia/pull/new/release/movil-y-cuenta → **Create pull request** (debe mostrar 13 commits) → **Merge**. Trae: Mi Agenda/Clientes/Calendario/Dashboard compactos, flecha de Ventas, eliminar cuenta, pantalla de Plan y facturación para la app, política de privacidad apagada.
+3. Revisa re-booking.cl en tu celular (login, dashboard, calendario).
+
+**B. Textos y datos (tú / abogado)**
+1. Correo de soporte → en Vercel: variable `NEXT_PUBLIC_SUPPORT_EMAIL`.
+2. Abogado: completa los `[corchetes]` de `src/app/privacidad/page.tsx` (razón social, RUT, dirección, correo de privacidad, plazos) y revisa `docs/legal/`.
+3. Cuando esté aprobado: en Vercel pon `NEXT_PUBLIC_LEGAL_PAGES_ENABLED=1`. La política queda en `https://www.re-booking.cl/privacidad` (es la URL que piden las tiendas).
+
+**C. Cuenta demo para los revisores (en producción, tú)**
+1. Entra como superadmin → **Empresas** → crea un negocio "re-booking Demo".
+2. Dentro de ese negocio crea 1 administrador con un correo tuyo (por ejemplo `demo@...`) y una clave larga.
+3. Carga 2 profesionales, 3 servicios, 5 clientes y 3 citas de ejemplo.
+4. Guarda correo y clave: se pegan en el formulario de revisión de Apple y Google (nunca en el repositorio).
+
+**D. Cuentas (tú, aquí se paga)**
+1. D-U-N-S → Apple Developer (USD 99/año) y Google Play Console (USD 25).
+2. Con Google: crear app, subir `app-tiendas/re-booking-android-1.0.aab`, política y `/eliminar-cuenta`.
+3. Con Apple: sección 5 (Xcode, Archive, TestFlight).
+
+**E. Lo que sigue pendiente de construir**
+- Avisos push nativos (necesitan tu cuenta de Apple para la llave APNs y un proyecto de Firebase) y Face ID/huella. Reducen el riesgo de rechazo 4.2 de Apple.
+- Capturas de pantalla de las fichas (se sacan al final, con la cuenta demo en producción).
