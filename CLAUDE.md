@@ -71,6 +71,14 @@ Pasos en `docs/PRUEBAS-3-OCT-NOCHE.md` (sección "Segunda tanda", secciones E a 
 ## 7b. Próximo proyecto: app móvil (propuesta, sin aprobar)
 Plan completo en `docs/PLAN-APP-MOVIL.html` (también publicado como página): Capacitor sobre la misma app Next.js, disposición móvil por rol, centro de notificaciones (`notifications`, `notification_preferences`, `device_tokens`, FCM + web-push), Fase 0 de seguridad (cerrar `/api/push/send`, que hoy no pide sesión) y cumplimiento de la Ley 21.719 antes del 1 dic. 2026 (política de privacidad que hoy no existe, contrato de encargo, canal de derechos). Decisiones pendientes al final del plan.
 
+## 7c. Estado al 7 oct. 2026 (tarde) — LÉELO PRIMERO
+- **En producción (`pdencina/barberia` `main`):** PR #3 (importador), #4 (reserva), #5 (seguridad de rutas, caja/dashboard rápidos, Sucursales en "Viendo como") y #6 (móvil compacto, **Eliminar mi cuenta**, `/eliminar-cuenta`, pantalla de plan para la app, política de privacidad **apagada**, Face ID, `vercel.json` con funciones en **pdx1**). Nico mergea él mismo (a Claude el permiso le bloquea el clic de Merge).
+- **Migraciones 100 y 101 NO están en producción** (nada en producción las usa aún; el código las tolera). Correrlas solo cuando se despliegue la campanita/PIN con huella/fotos privadas, con respaldo (Supabase hace uno diario) y OK explícito de Nico.
+- **Medición en producción (Nico con sesión en Chrome, 7 oct.):** región ahora `gru1 -> pdx1`. Dashboard ~430-600 ms (antes 650-930), caja ~370-480 ms (antes 900-1.130), clientes/profesionales/servicios ~320-470 ms (sin cambio claro). Piso ~320 ms: falta mover la base a São Paulo o aceptar ese piso.
+- **App móvil (Capacitor):** rama `app/respaldo` en el repo de Nico (copia sin el archivo de workflow) y `app/capacitor-base` local en el scratchpad. Probada en el simulador de iPhone; Android compila y está firmado (`app-tiendas/re-booking-android-1.0.aab`, fuera de git). Llave de firma en `~/Library/re-booking-keys/` (Nico debe respaldarla; nunca imprimir su clave). Guía completa: `docs/PUBLICAR-APP-TIENDAS.md` (rama de la app), sección 10.
+- **Falta para publicar (Nico):** D-U-N-S y cuentas Apple (USD 99/año) y Google (USD 25), cuenta demo en producción, política de privacidad revisada por abogado y `NEXT_PUBLIC_LEGAL_PAGES_ENABLED=1`, `NEXT_PUBLIC_SUPPORT_EMAIL` en Vercel. **Falta construir (Claude):** avisos push nativos (necesitan llave APNs de Apple y proyecto Firebase) y capturas de las fichas. Antes de archivar en Xcode: `npx cap sync ios` SIN `CAP_SERVER_URL`.
+- **Cuidado:** el token de Claude no tiene el permiso `workflow`; los push que incluyan `.github/workflows` se rechazan (por eso existe `app/respaldo`).
+
 ## 8. Commits
 Terminar cada mensaje de commit con:
 ```
