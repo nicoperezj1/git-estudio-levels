@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useIsNativeApp } from "@/lib/native-app";
 
-export function PushNotificationPrompt() {
+function PushNotificationPromptInner() {
   const [permission, setPermission] = useState<string>("default");
   const [show, setShow] = useState(false);
   const { user } = useAuth();
@@ -80,7 +81,7 @@ export function PushNotificationPrompt() {
  * want — e.g. Vicente, who said appointment alerts weren't arriving because he'd never
  * completed the subscription. Drop it anywhere in the dashboard (e.g. Mi Agenda).
  */
-export function PushNotificationButton() {
+function PushNotificationButtonInner() {
   const [permission, setPermission] = useState<string>("default");
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
@@ -154,4 +155,18 @@ export function PushNotificationButton() {
       {busy ? "Activando..." : "Activar notificaciones"}
     </button>
   );
+}
+
+// Dentro de la app movil todavia no hay avisos nativos: no se muestra un boton que no funciona
+// (se activara con el push nativo, Fase 3 del plan de la app).
+export function PushNotificationPrompt() {
+  const inApp = useIsNativeApp();
+  if (inApp) return null;
+  return <PushNotificationPromptInner />;
+}
+
+export function PushNotificationButton() {
+  const inApp = useIsNativeApp();
+  if (inApp) return null;
+  return <PushNotificationButtonInner />;
 }

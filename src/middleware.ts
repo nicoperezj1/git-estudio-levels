@@ -72,6 +72,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // La app no muestra planes ni pagos de suscripcion (se gestionan en la web).
+  if (
+    (request.headers.get("user-agent") || "").includes("RebookingApp") &&
+    pathname.startsWith("/dashboard/configuracion/facturacion")
+  ) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   // Bloqueo en el servidor: un negocio suspendido no puede usar la API (salvo lo necesario para pagar).
   if (pathname.startsWith("/api/")) {
     if (SUSPENDED_ALLOWED_API.some((p) => pathname === p || pathname.startsWith(p + "/"))) {

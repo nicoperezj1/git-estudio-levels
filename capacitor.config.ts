@@ -8,10 +8,12 @@ const serverUrl = process.env.CAP_SERVER_URL || "https://www.re-booking.cl";
 const config: CapacitorConfig = {
   appId: "cl.rebooking.app",
   appName: "re-booking",
-  webDir: "public",
+  // Solo la pantalla "Sin conexion" va dentro de la app; el resto se carga desde la web.
+  webDir: "app-www",
   server: {
     url: serverUrl,
     cleartext: serverUrl.startsWith("http://"),
+    errorPath: "offline.html",
   },
   // La web reconoce a la app por esta marca en el user agent (ver src/middleware.ts):
   // dentro de la app no hay pagina de presentacion ni registro, se parte en el login.

@@ -245,7 +245,7 @@ export default function LoginPage() {
 
       {/* Version + Landing link */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center">
-        <a href="/landing" className="text-xs text-brand-gray hover:text-brand-blue transition-colors">
+        <a href="/landing" className="rb-hide-in-app text-xs text-brand-gray hover:text-brand-blue transition-colors">
           Conoce re-booking →
         </a>
         <p className="text-[10px] text-brand-gray/50 mt-1">v1.0</p>

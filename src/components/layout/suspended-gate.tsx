@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useIsNativeApp } from "@/lib/native-app";
 
 // Bloquea el uso del panel cuando el negocio esta suspendido por falta de pago.
 // Solo deja abierta la pantalla de "Plan y facturacion" para que el administrador regularice.
@@ -14,6 +15,7 @@ export function SuspendedGate({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const inApp = useIsNativeApp();
 
   if (!suspended || pathname?.startsWith("/dashboard/configuracion/facturacion")) {
     return <>{children}</>;
@@ -28,7 +30,7 @@ export function SuspendedGate({
           Suspendimos el acceso de este negocio porque no pudimos cobrar la suscripción. Tus datos están a salvo:
           apenas se regularice el pago, todo vuelve a funcionar.
         </p>
-        {isAdmin ? (
+        {isAdmin && !inApp ? (
           <a
             href="/dashboard/configuracion/facturacion"
             className="inline-block mt-6 px-5 py-2.5 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700"

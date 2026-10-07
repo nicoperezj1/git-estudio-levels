@@ -582,3 +582,10 @@ html.rb-app [role="button"] {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Solo dentro de la app movil: sin planes, pagos ni marketing (reglas de Apple y Google). */
+html.rb-app a[href^="/dashboard/configuracion/facturacion"],
+html.rb-app a[href^="/suscribirse"],
+html.rb-app .rb-hide-in-app {
+  display: none !important;
+}
