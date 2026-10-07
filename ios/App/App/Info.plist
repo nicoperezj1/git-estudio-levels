@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>re-booking usa la cámara para que puedas tomar la foto de tu perfil o de un cliente.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>re-booking usa Face ID para proteger el acceso a tu negocio.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>re-booking necesita acceder a tus fotos para que puedas elegir la foto de tu perfil o de un cliente, o cargar un archivo.</string>
 	<key>UIApplicationSceneManifest</key>

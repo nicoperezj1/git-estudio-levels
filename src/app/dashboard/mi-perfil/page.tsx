@@ -7,6 +7,8 @@ import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useIsNativeApp } from "@/lib/native-app";
+import { biometricAvailable, biometricLockEnabled, biometricVerify, setBiometricLockEnabled } from "@/lib/biometric";
 import { Copy, Camera, Sun, Moon, Monitor, Trash2 } from "lucide-react";
 
 export default function MiPerfilPage() {
@@ -19,6 +21,28 @@ export default function MiPerfilPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
   const router = useRouter();
+  // Bloqueo con Face ID / huella (solo dentro de la app, si el telefono lo permite).
+  const inApp = useIsNativeApp();
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioOn, setBioOn] = useState(false);
+  useEffect(() => {
+    if (!inApp) return;
+    biometricAvailable().then(setBioAvailable);
+    setBioOn(biometricLockEnabled());
+  }, [inApp]);
+  const toggleBio = async () => {
+    if (bioOn) {
+      setBiometricLockEnabled(false);
+      setBioOn(false);
+      return;
+    }
+    // Al activarlo se confirma una vez, para no dejar a nadie fuera por error.
+    const ok = await biometricVerify("Confirma para activar el bloqueo");
+    if (ok) {
+      setBiometricLockEnabled(true);
+      setBioOn(true);
+    }
+  };
   // Eliminar mi cuenta (requisito de Apple y Google): se confirma con la contrasena.
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -267,6 +291,26 @@ export default function MiPerfilPage() {
         </div>
         <p className="text-[10px] text-brand-gray text-center">Si necesitas cambiarlo, pídelo a tu administrador.</p>
       </div>
+
+      {inApp && bioAvailable && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-brand-dark">Bloqueo con Face ID / huella</p>
+              <p className="text-xs text-brand-gray">Pide tu identidad al abrir la app o al volver a ella.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={bioOn}
+              onClick={toggleBio}
+              className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors ${bioOn ? "bg-brand-blue" : "bg-gray-300"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${bioOn ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Eliminar cuenta */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
