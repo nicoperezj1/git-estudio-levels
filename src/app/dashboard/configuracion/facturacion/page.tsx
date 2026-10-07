@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useIsNativeApp } from "@/lib/native-app";
+import { Monitor } from "lucide-react";
 
 interface Plan {
   plan: string;
@@ -26,7 +28,7 @@ function fmt(n: number) {
   return "$" + Math.round(n || 0).toLocaleString("es-CL");
 }
 
-export default function FacturacionPage() {
+function FacturacionContent() {
   const { showToast } = useToast();
   const [tenant, setTenant] = useState<{ plan: string; max_professionals: number; status: string } | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -355,4 +357,26 @@ export default function FacturacionPage() {
       )}
     </div>
   );
+}
+
+// Dentro de la app movil no se gestionan planes ni pagos (reglas de Apple y Google): se avisa y listo.
+// Sin precios, sin botones de pago y sin enlaces.
+export default function FacturacionPage() {
+  const inApp = useIsNativeApp();
+  if (inApp) {
+    return (
+      <div className="flex items-center justify-center px-6 py-20">
+        <div className="w-full max-w-sm space-y-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue">
+            <Monitor className="h-7 w-7" strokeWidth={1.75} />
+          </div>
+          <h1 className="text-lg font-bold text-brand-dark">Plan y facturación</h1>
+          <p className="text-sm text-brand-gray">
+            La gestión del plan y la facturación no está disponible en la app. Ingresa a re-booking desde un computador para hacerlo.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return <FacturacionContent />;
 }
