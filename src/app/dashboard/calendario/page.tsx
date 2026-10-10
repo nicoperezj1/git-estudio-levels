@@ -379,6 +379,8 @@ export default function CalendarioPage() {
   
   // Popup form
   const [selectedService, setSelectedService] = useState("");
+  // Servicios del profesional elegido en el popup, del mas pedido al menos pedido (null = aun no carga: se usan todos).
+  const [barberServices, setBarberServices] = useState<Service[] | null>(null);
   const [selectedClient, setSelectedClient] = useState("");
   const [eventName, setEventName] = useState("");
   // Cupos que ocupa el bloqueo nuevo (0 = todo el horario). Solo con cupos por bloque.
@@ -414,6 +416,22 @@ export default function CalendarioPage() {
       setClients([]);
     });
   }, [tenant?.id, tenantLoading]);
+
+  useEffect(() => {
+    if (!showPopup || !popupData.barberId) { setBarberServices(null); return; }
+    let cancelled = false;
+    setBarberServices(null);
+    fetch(`/api/services/for-barber?barberId=${popupData.barberId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((list) => {
+        if (cancelled || !Array.isArray(list) || list.length === 0) return;
+        setBarberServices(list);
+        // Lo mas pedido por ese profesional queda elegido de entrada.
+        setSelectedService((cur) => (list.some((x: Service) => x.id === cur) && cur ? cur : list[0].id));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [showPopup, popupData.barberId]);
 
   // Fetch appointments once tenant context is resolved — do NOT gate on barbers,
   // otherwise a barber with an empty/slow barbers list would spin forever.
@@ -2058,7 +2076,7 @@ export default function CalendarioPage() {
                     <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm">
                       <option value="">Seleccione un servicio</option>
-                      {services.map((s) => (
+                      {(barberServices || services).map((s) => (
                         <option key={s.id} value={s.id}>{s.name} — {formatCurrency(Number(s.price))} ({s.duration}min)</option>
                       ))}
                     </select>
