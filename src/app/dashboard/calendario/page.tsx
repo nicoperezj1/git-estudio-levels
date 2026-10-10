@@ -284,7 +284,7 @@ export default function CalendarioPage() {
     const res = await fetch(`/api/appointments/${apptId}/details`);
     const data = await res.json();
     setApptDetails(data);
-    setApptNoteDraft(data.notes || "");
+    setApptNoteDraft(data.staff_note || "");
     setNoteOpen(false);
     // Pre-fill edit form with current values
     setEditDate(data.date || "");
@@ -301,7 +301,7 @@ export default function CalendarioPage() {
       const res = await fetch(`/api/appointments/${selectedApptId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: notes || null }),
+        body: JSON.stringify({ staff_note: notes || null }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -310,7 +310,7 @@ export default function CalendarioPage() {
       }
       showToast("Nota guardada", "success");
       setNoteOpen(false);
-      setApptDetails((prev: any) => (prev ? { ...prev, notes: notes || null } : prev));
+      setApptDetails((prev: any) => (prev ? { ...prev, staff_note: notes || null } : prev));
       await fetchAppointments();
     } catch {
       showToast("No se pudo guardar la nota", "error");
@@ -1342,7 +1342,7 @@ export default function CalendarioPage() {
                             <p className="mt-0.5 truncate text-xs text-brand-gray">
                               {a.services?.map((sv: any) => sv.service?.name).join(", ") || "Sin servicio"}
                             </p>
-                            {a.notes && <p className="mt-0.5 truncate text-xs italic text-brand-gray">{a.notes}</p>}
+                            {a.staff_note && <p className="mt-0.5 truncate text-xs italic text-brand-gray">{a.staff_note}</p>}
                             {!professionalFilter && (
                               <div className="mt-1.5 flex items-center gap-1.5">
                                 <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ${col.bg} ${col.text}`}>
@@ -1526,7 +1526,7 @@ export default function CalendarioPage() {
                               <span className="truncate">{appt.client?.name || "Cliente"}</span>
                               {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded-sm bg-emerald-500 px-[3px] py-px text-[6px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
                             </p>
-                            <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}{appt.notes && <span className="italic opacity-100"> · {appt.notes}</span>}</p>
+                            <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}{appt.staff_note && <span className="italic opacity-100"> · {appt.staff_note}</span>}</p>
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
                               <span className={`shrink-0 text-[7px] font-semibold px-1 py-px rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
@@ -1796,7 +1796,7 @@ export default function CalendarioPage() {
                             <span className="truncate">{appt.client?.name || "Cliente"}</span>
                             {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded-sm bg-emerald-500 px-[3px] py-px text-[6px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
                           </p>
-                        <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}{appt.notes && <span className="italic opacity-100"> · {appt.notes}</span>}</p>
+                        <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}{appt.staff_note && <span className="italic opacity-100"> · {appt.staff_note}</span>}</p>
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-[9px] opacity-50 truncate" data-timelabel>{timeLabel}</p>
                           {/* Status badge — visible confirmation state on the block itself. */}
@@ -2306,14 +2306,14 @@ export default function CalendarioPage() {
                         <button type="button" onClick={saveApptNote} disabled={savingNote} className="rounded-lg bg-brand-blue px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-60">
                           {savingNote ? "..." : "Guardar"}
                         </button>
-                        <button type="button" onClick={() => { setApptNoteDraft(apptDetails.notes || ""); setNoteOpen(false); }} className="text-xs text-brand-gray hover:text-brand-dark">
+                        <button type="button" onClick={() => { setApptNoteDraft(apptDetails.staff_note || ""); setNoteOpen(false); }} className="text-xs text-brand-gray hover:text-brand-dark">
                           Cancelar
                         </button>
                       </div>
                     ) : (
                       <button type="button" onClick={() => setNoteOpen(true)} className="flex w-full items-center gap-2 text-left text-sm text-brand-gray hover:text-brand-dark">
-                        <span className="text-base leading-none">{apptDetails.notes ? "✎" : "+"}</span>
-                        {apptDetails.notes ? <span className="italic text-brand-dark">{apptDetails.notes}</span> : "Agregar nota"}
+                        <span className="text-base leading-none">{apptDetails.staff_note ? "✎" : "+"}</span>
+                        {apptDetails.staff_note ? <span className="italic text-brand-dark">{apptDetails.staff_note}</span> : "Agregar nota"}
                       </button>
                     )}
 

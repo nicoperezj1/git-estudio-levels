@@ -53,8 +53,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     );
   }
 
+  // Nota del equipo (migracion 105): si la columna aun no existe, simplemente no hay nota.
+  const { data: sn } = await supabase.from("appointments").select("staff_note").eq("id", params.id).maybeSingle();
+
   return NextResponse.json({
     ...appt,
+    staff_note: (sn as any)?.staff_note ?? null,
     isNewClient,
     totalVisits,
     lastServices,
