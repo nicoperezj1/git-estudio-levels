@@ -73,6 +73,7 @@ export function StatCard({
   hero = false,
   delta,
   className = "",
+  labelAction,
 }: {
   label: string;
   value: ReactNode;
@@ -82,6 +83,8 @@ export function StatCard({
   hero?: boolean;
   delta?: { value: number; invert?: boolean; suffix?: string };
   className?: string;
+  /** Solo en la tarjeta destacada: boton junto al titulo (ej. ojito para ocultar el monto). */
+  labelAction?: ReactNode;
 }) {
   if (hero) {
     return (
@@ -91,7 +94,7 @@ export function StatCard({
         <span className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
         <span className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
         <div className="relative flex items-start justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/80">{label}</p>
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-white/80">{label}{labelAction}</p>
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/25 md:h-9 md:w-9">
             <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
           </div>

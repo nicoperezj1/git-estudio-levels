@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
 import { SalesChart, type ChartRange, type ChartPoint } from "@/components/dashboard/sales-chart";
 import { ProductCarousel, type CarouselItem } from "@/components/dashboard/product-carousel";
-import { PackageX, ShoppingBag, CalendarCheck, Wallet, UserPlus, RefreshCw, CalendarX, CalendarDays } from "lucide-react";
+import { Eye, EyeOff, SlidersHorizontal, PackageX, ShoppingBag, CalendarCheck, Wallet, UserPlus, RefreshCw, CalendarX, CalendarDays } from "lucide-react";
 import { PageHeader, StatCard, Panel, Segmented } from "@/components/ui/premium";
 import { BusinessQuoteNote } from "@/components/dashboard/business-quote-note";
 import { SuperAdminDashboard } from "@/components/dashboard/superadmin-dashboard";
@@ -51,6 +51,37 @@ interface DashboardData {
   chartGrowth: number;
 }
 
+const HIDDEN_KEY = "dashboard_hidden_sections";
+const AMOUNT_KEY = "dashboard_hide_amount";
+
+function readLS(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writeLS(key: string, v: string) {
+  try { localStorage.setItem(key, v); } catch { /* sin almacenamiento: solo dura la sesion */ }
+}
+
+// Envoltorio para ocultar cajas del Dashboard (solo en este navegador; no borra nada).
+function Sec({ id, hidden, editing, onToggle, className = "", children }: {
+  id: string; hidden: Set<string>; editing: boolean; onToggle: (id: string) => void; className?: string; children: ReactNode;
+}) {
+  const isHidden = hidden.has(id);
+  if (isHidden && !editing) return null;
+  if (!editing) return <div className={`${className} [&>*]:h-full`}>{children}</div>;
+  return (
+    <div className={`relative ${className} ${isHidden ? "opacity-40" : ""}`}>
+      <div className="[&>*]:h-full">{children}</div>
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-gray-900/85 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg hover:bg-gray-900"
+      >
+        {isHidden ? <><Eye className="h-3 w-3" /> Mostrar</> : <><EyeOff className="h-3 w-3" /> Ocultar</>}
+      </button>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +93,23 @@ export default function DashboardPage() {
   // para ir viendo el crecimiento del negocio de forma comoda.
   const [chartRange, setChartRange] = useState<ChartRange>("7d");
   const [chartLoading, setChartLoading] = useState(false);
+  // Personalizar: cajas ocultas + ojito del monto. Se guardan solo en este navegador.
+  const [hiddenSecs, setHiddenSecs] = useState<Set<string>>(new Set());
+  const [hideAmount, setHideAmount] = useState(false);
+  const [editingLayout, setEditingLayout] = useState(false);
+  useEffect(() => {
+    try { setHiddenSecs(new Set(JSON.parse(readLS(HIDDEN_KEY) || "[]"))); } catch { /* ignorar */ }
+    setHideAmount(readLS(AMOUNT_KEY) === "1");
+  }, []);
+  const toggleSec = (id: string) => setHiddenSecs((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    writeLS(HIDDEN_KEY, JSON.stringify(Array.from(next)));
+    return next;
+  });
+  const secProps = { hidden: hiddenSecs, editing: editingLayout, onToggle: toggleSec };
+  const resetSecs = () => { setHiddenSecs(new Set()); writeLS(HIDDEN_KEY, "[]"); setHideAmount(false); writeLS(AMOUNT_KEY, "0"); };
+  const toggleAmount = () => setHideAmount((v) => { writeLS(AMOUNT_KEY, v ? "0" : "1"); return !v; });
   const { user, effectiveRole, isAtLeast } = useAuth();
   const { tenant, loading: tenantLoading, isOverriding } = useTenant();
   // Super Admin (sin "Entrar" a una empresa): ve el panel de plataforma, no el de un negocio.
@@ -171,6 +219,19 @@ export default function DashboardPage() {
         subtitle={isToday ? "Aquí tienes el resumen de tu negocio hoy." : `Resumen de tu negocio del ${selectedDateLabel}.`}
         actions={
           <>
+            <button
+              type="button"
+              onClick={() => setEditingLayout((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-sm font-medium transition md:py-2 ${editingLayout ? "border-brand-blue bg-brand-blue text-white" : "border-gray-100 bg-white text-brand-gray hover:text-brand-dark"}`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {editingLayout ? "Listo" : "Personalizar"}
+            </button>
+            {editingLayout && (
+              <button type="button" onClick={resetSecs} className="rounded-2xl border border-gray-100 bg-white px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-dark md:py-2">
+                Restaurar todo
+              </button>
+            )}
             {/* Punto 8: selector de fecha, para consultar el Dashboard de un dia anterior */}
             <Segmented
               value={dayValue}
@@ -196,14 +257,21 @@ export default function DashboardPage() {
 
       {/* Stat Cards: Ventas destacada + 4 metricas */}
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-6">
+        <Sec id="ventas" className="col-span-2" {...secProps}>
         <StatCard
           hero
-          className="col-span-2"
+          labelAction={
+            <button type="button" onClick={toggleAmount} title={hideAmount ? "Mostrar monto" : "Ocultar monto"} className="rounded-full p-1 text-white/80 hover:bg-white/20 hover:text-white">
+              {hideAmount ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          }
           label={isToday ? "Ventas hoy" : "Ventas"}
-          value={formatCurrency(data.stats.ventasHoy)}
+          value={hideAmount ? "$ ••••••" : formatCurrency(data.stats.ventasHoy)}
           Icon={Wallet}
           delta={{ value: data.stats.ventasChange, suffix: "vs dia anterior" }}
         />
+        </Sec>
+        <Sec id="reservas" {...secProps}>
         <StatCard
           label={isToday ? "Reservas hoy" : "Reservas"}
           value={data.stats.reservasHoy}
@@ -211,6 +279,8 @@ export default function DashboardPage() {
           tone="teal"
           delta={{ value: data.stats.reservasChange }}
         />
+        </Sec>
+        <Sec id="clientes" {...secProps}>
         <StatCard
           label="Clientes nuevos"
           value={data.stats.clientesNuevos}
@@ -218,6 +288,8 @@ export default function DashboardPage() {
           tone="green"
           delta={{ value: data.stats.clientesChange }}
         />
+        </Sec>
+        <Sec id="reagend" {...secProps}>
         <StatCard
           label="Reagendamientos"
           value={data.stats.reagendamientos}
@@ -225,6 +297,8 @@ export default function DashboardPage() {
           tone="violet"
           delta={{ value: data.stats.reagendamientosChange }}
         />
+        </Sec>
+        <Sec id="cancel" {...secProps}>
         <StatCard
           label="Cancelaciones"
           value={data.stats.cancelaciones}
@@ -232,14 +306,16 @@ export default function DashboardPage() {
           tone="red"
           delta={{ value: data.stats.cancelacionesChange, invert: true }}
         />
+        </Sec>
       </div>
 
       {/* Cumpleanos del mes (solo admin; no se muestra si no hay) */}
-      {isAtLeast("admin") && <ProblemReportsCard />}
-      {isAtLeast("admin") && <BookingRuleCard />}
-      {isAtLeast("admin") && <SupplyRequestsCard tenantId={tenant?.id} />}
-      {isAtLeast("admin") && <BirthdaysCard tenantId={tenant?.id} />}
+      {isAtLeast("admin") && <Sec id="problemas" className="empty:hidden" {...secProps}><ProblemReportsCard /></Sec>}
+      {isAtLeast("admin") && <Sec id="reglaReservas" className="empty:hidden" {...secProps}><BookingRuleCard /></Sec>}
+      {isAtLeast("admin") && <Sec id="insumos" className="empty:hidden" {...secProps}><SupplyRequestsCard tenantId={tenant?.id} /></Sec>}
+      {isAtLeast("admin") && <Sec id="cumples" className="empty:hidden" {...secProps}><BirthdaysCard tenantId={tenant?.id} /></Sec>}
 
+      <Sec id="grafico" {...secProps}>
       <SalesChart
         data={data.chartData || []}
         range={chartRange}
@@ -248,26 +324,32 @@ export default function DashboardPage() {
         growth={data.chartGrowth || 0}
         loading={chartLoading}
       />
+      </Sec>
 
       {/* Aviso de stock bajo + Productos mas vendidos — carruseles de 3 por vista */}
       <div className="grid grid-cols-1 gap-3 md:gap-6 lg:grid-cols-2">
+        <Sec id="stockBajo" {...secProps}>
         <ProductCarousel
           title="Stock bajo"
           icon={<PackageX className="h-4 w-4" />}
           emptyMessage="Todo el inventario esta dentro de su stock minimo."
           items={lowStockItems}
         />
+        </Sec>
+        <Sec id="masVendidos" {...secProps}>
         <ProductCarousel
           title="Mas vendidos (ultimos 30 dias)"
           icon={<ShoppingBag className="h-4 w-4" />}
           emptyMessage="Sin ventas de productos en este periodo."
           items={topProductItems}
         />
+        </Sec>
       </div>
 
       {/* Main content: Agenda + Top Services */}
       <div className="grid grid-cols-1 gap-3 md:gap-6 lg:grid-cols-5">
         {/* Agenda del dia elegido (por defecto, hoy) */}
+        <Sec id="agenda" className="lg:col-span-3" {...secProps}>
         <Panel
           className="lg:col-span-3"
           title={isToday ? "Agenda de hoy" : "Agenda de ese dia"}
@@ -314,8 +396,10 @@ export default function DashboardPage() {
             </div>
           )}
         </Panel>
+        </Sec>
 
         {/* Top Servicios */}
+        <Sec id="topServicios" className="lg:col-span-2" {...secProps}>
         <Panel
           className="lg:col-span-2"
           title="Top servicios"
@@ -355,9 +439,10 @@ export default function DashboardPage() {
             </div>
           )}
         </Panel>
+        </Sec>
       </div>
       {/* Frase de negocios (solo admin): franja discreta al final */}
-      {isAtLeast("admin") && <BusinessQuoteNote />}
+      {isAtLeast("admin") && <Sec id="frase" {...secProps}><BusinessQuoteNote /></Sec>}
     </div>
   );
 }
