@@ -259,6 +259,8 @@ export default function CalendarioPage() {
 
   const [selectedApptId, setSelectedApptId] = useState<string | null>(null);
   const [apptDetails, setApptDetails] = useState<any>(null);
+  const [apptNoteDraft, setApptNoteDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const [apptTab, setApptTab] = useState<"detalles" | "historial">("detalles");
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [editingApptTime, setEditingApptTime] = useState(false);
@@ -281,11 +283,37 @@ export default function CalendarioPage() {
     const res = await fetch(`/api/appointments/${apptId}/details`);
     const data = await res.json();
     setApptDetails(data);
+    setApptNoteDraft(data.notes || "");
     // Pre-fill edit form with current values
     setEditDate(data.date || "");
     setEditStartTime(data.start_time?.match(/(\d{2}:\d{2})/)?.[1] || "10:00");
     setEditEndTime(data.end_time?.match(/(\d{2}:\d{2})/)?.[1] || "11:00");
     setLoadingDetails(false);
+  };
+
+  const saveApptNote = async () => {
+    if (!selectedApptId) return;
+    setSavingNote(true);
+    try {
+      const notes = apptNoteDraft.trim();
+      const res = await fetch(`/api/appointments/${selectedApptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: notes || null }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || "No se pudo guardar la nota", "error");
+        return;
+      }
+      showToast("Nota guardada", "success");
+      setApptDetails((prev: any) => (prev ? { ...prev, notes: notes || null } : prev));
+      await fetchAppointments();
+    } catch {
+      showToast("No se pudo guardar la nota", "error");
+    } finally {
+      setSavingNote(false);
+    }
   };
 
   const updateApptStatus = async (status: string) => {
@@ -1311,6 +1339,7 @@ export default function CalendarioPage() {
                             <p className="mt-0.5 truncate text-xs text-brand-gray">
                               {a.services?.map((sv: any) => sv.service?.name).join(", ") || "Sin servicio"}
                             </p>
+                            {a.notes && <p className="mt-0.5 truncate text-xs italic text-brand-gray">{a.notes}</p>}
                             {!professionalFilter && (
                               <div className="mt-1.5 flex items-center gap-1.5">
                                 <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ${col.bg} ${col.text}`}>
@@ -1492,12 +1521,13 @@ export default function CalendarioPage() {
                           >
                             <p className="flex items-center gap-1 text-[11px] font-bold">
                               <span className="truncate">{appt.client?.name || "Cliente"}</span>
-                              {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded bg-emerald-500 px-1 py-px text-[8px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+                              {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded-sm bg-emerald-500 px-[3px] py-px text-[6px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
                             </p>
                             <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
+{appt.notes && <p className="truncate text-[9px] italic opacity-80">{appt.notes}</p>}
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
-                              <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
+                              <span className={`shrink-0 text-[7px] font-semibold px-1 py-px rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
                                 {(statusBadge[appt.status] || statusBadge.scheduled).label}
                               </span>
                             </div>
@@ -1762,13 +1792,14 @@ export default function CalendarioPage() {
                       >
                         <p className="flex items-center gap-1 text-[11px] font-bold">
                             <span className="truncate">{appt.client?.name || "Cliente"}</span>
-                            {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded bg-emerald-500 px-1 py-px text-[8px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+                            {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded-sm bg-emerald-500 px-[3px] py-px text-[6px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
                           </p>
                         <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
+{appt.notes && <p className="truncate text-[9px] italic opacity-80">{appt.notes}</p>}
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-[9px] opacity-50 truncate" data-timelabel>{timeLabel}</p>
                           {/* Status badge — visible confirmation state on the block itself. */}
-                          <span className={`shrink-0 text-[8px] font-bold px-1 py-0.5 rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
+                          <span className={`shrink-0 text-[7px] font-semibold px-1 py-px rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
                             {(statusBadge[appt.status] || statusBadge.scheduled).label}
                           </span>
                         </div>
@@ -2257,6 +2288,29 @@ export default function CalendarioPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25" />
                       </svg>
                       <p className="text-sm text-brand-dark">{apptDetails.barber?.name}</p>
+                    </div>
+
+                    {/* Notas de la cita (cortas): se ven tambien en la caja del calendario */}
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-brand-gray">Notas</label>
+                      <textarea
+                        value={apptNoteDraft}
+                        onChange={(e) => setApptNoteDraft(e.target.value)}
+                        rows={2}
+                        maxLength={200}
+                        placeholder="Agregar nota (opcional)"
+                        className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
+                      />
+                      {apptNoteDraft.trim() !== (apptDetails.notes || "").trim() && (
+                        <button
+                          type="button"
+                          onClick={saveApptNote}
+                          disabled={savingNote}
+                          className="mt-1.5 rounded-xl bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                        >
+                          {savingNote ? "Guardando..." : "Guardar nota"}
+                        </button>
+                      )}
                     </div>
 
                     {/* Actions */}
