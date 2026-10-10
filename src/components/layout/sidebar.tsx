@@ -32,6 +32,9 @@ interface NavItem {
   // del plan contratado (no del rol). Cuando el plan del negocio no incluye esta feature,
   // el item se muestra bloqueado con la misma insignia "PRO" que ya existia para roles.
   feature?: string;
+  // Basic es 1 profesional con agenda, mensajes y reportes basicos (tabla de precios): estos
+  // modulos se muestran bloqueados solo en Basic. Starter/Pro/Enterprise no cambian.
+  basicLocked?: boolean;
 }
 
 interface NavSection {
@@ -45,7 +48,7 @@ const sections: NavSection[] = [
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, minRole: "admin" },
       { name: "Mi Agenda", href: "/dashboard/mi-agenda", icon: CalendarCheck, minRole: "barber" },
-      { name: "Standby", href: "/dashboard/standby", icon: Zap, minRole: "barber" },
+      { name: "Standby", href: "/dashboard/standby", icon: Zap, minRole: "barber", basicLocked: true },
     ],
   },
   {
@@ -62,7 +65,7 @@ const sections: NavSection[] = [
         ],
       },
       { name: "Agenda", href: "/dashboard/agenda", icon: Calendar, minRole: "receptionist" },
-      { name: "Punto de Venta", href: "/dashboard/pos", icon: ShoppingCart, minRole: "receptionist" },
+      { name: "Punto de Venta", href: "/dashboard/pos", icon: ShoppingCart, minRole: "receptionist", basicLocked: true },
       { name: "Solicitud de insumos", href: "/dashboard/solicitud", icon: ClipboardList, minRole: "receptionist", feature: "inventory" },
       { name: "Caja", href: "/dashboard/caja", icon: Wallet, minRole: "admin", feature: "cash_register" },
     ],
@@ -76,8 +79,8 @@ const sections: NavSection[] = [
         // Metricas, Fidelidad y Retencion anidadas bajo Clientes.
         children: [
           { name: "Métricas", href: "/dashboard/clientes/metricas", icon: BarChart3, minRole: "receptionist" },
-          { name: "Fidelidad", href: "/dashboard/fidelidad", icon: Star, minRole: "admin", feature: "loyalty" },
-          { name: "Retención", href: "/dashboard/retencion", icon: Heart, minRole: "admin" },
+          { name: "Fidelidad", href: "/dashboard/fidelidad", icon: Star, minRole: "admin", feature: "loyalty", basicLocked: true },
+          { name: "Retención", href: "/dashboard/retencion", icon: Heart, minRole: "admin", basicLocked: true },
         ],
       },
       { name: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircle, minRole: "admin" },
@@ -87,11 +90,11 @@ const sections: NavSection[] = [
   {
     title: "Finanzas",
     items: [
-      { name: "Ingresos/Egresos", href: "/dashboard/finanzas", icon: DollarSign, minRole: "admin" },
-      { name: "Boletas", href: "/dashboard/boletas", icon: Receipt, minRole: "admin" },
+      { name: "Ingresos/Egresos", href: "/dashboard/finanzas", icon: DollarSign, minRole: "admin", basicLocked: true },
+      { name: "Boletas", href: "/dashboard/boletas", icon: Receipt, minRole: "admin", basicLocked: true },
       { name: "Facturas", href: "/dashboard/facturas", icon: FileText, minRole: "admin", feature: "invoices" },
       { name: "Cierre Mensual", href: "/dashboard/reportes", icon: ClipboardList, minRole: "admin" },
-      { name: "Mi Billetera", href: "/dashboard/mi-billetera", icon: PiggyBank, minRole: "barber" },
+      { name: "Mi Billetera", href: "/dashboard/mi-billetera", icon: PiggyBank, minRole: "barber", basicLocked: true },
     ],
   },
   {
@@ -105,21 +108,21 @@ const sections: NavSection[] = [
         // Fase 6: lo que se administra del negocio, junto en un solo menu.
         children: [
           { name: "Vacaciones", href: "/dashboard/vacaciones", icon: Plane, minRole: "admin" },
-          { name: "Comisiones", href: "/dashboard/comisiones", icon: Percent, minRole: "barber", feature: "commissions" },
-          { name: "Arriendo", href: "/dashboard/arriendo", icon: KeyRound, minRole: "admin", feature: "rental" },
+          { name: "Comisiones", href: "/dashboard/comisiones", icon: Percent, minRole: "barber", feature: "commissions", basicLocked: true },
+          { name: "Arriendo", href: "/dashboard/arriendo", icon: KeyRound, minRole: "admin", feature: "rental", basicLocked: true },
           { name: "Servicios", href: "/dashboard/servicios", icon: Tag, minRole: "admin" },
-          { name: "Proveedores", href: "/dashboard/proveedores", icon: Truck, minRole: "admin" },
+          { name: "Proveedores", href: "/dashboard/proveedores", icon: Truck, minRole: "admin", basicLocked: true },
           { name: "Remuneraciones", href: "/dashboard/remuneraciones", icon: FileText, minRole: "super_admin" }, // oculto a los negocios hasta terminar las pruebas
         ],
       },
       { name: "Precios", href: "/dashboard/precios", icon: Tag, minRole: "super_admin" },
       { name: "Galería", href: "/dashboard/galeria", icon: Image, minRole: "admin" },
-      { name: "Pagos", href: "/dashboard/pagos", icon: CreditCard, minRole: "admin" },
+      { name: "Pagos", href: "/dashboard/pagos", icon: CreditCard, minRole: "admin", basicLocked: true },
       {
         name: "Configuración", href: "/dashboard/configuracion", icon: Settings, minRole: "admin",
         // Terminal POS e Inventario son hijos de Configuracion (Comisiones, Arriendo, Servicios y Proveedores ahora viven en Mi negocio).
         children: [
-          { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin", feature: "pos" },
+          { name: "Terminal POS", href: "/dashboard/terminal-pos", icon: CreditCard, minRole: "admin", feature: "pos", basicLocked: true },
           { name: "Inventario", href: "/dashboard/inventario", icon: Package, minRole: "admin", feature: "inventory" },
           { name: "Plan y facturación", href: "/dashboard/configuracion/facturacion", icon: CreditCard, minRole: "admin" },
         ],
@@ -249,7 +252,9 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     // Item 34 (Nico, 26-sep): "matriz de accesos por plan" — ademas del rol, un item puede
     // requerir una feature que el plan del negocio no incluya (ej. Caja en Basic/Starter).
     // super_admin sin tenant activo (hasPlanFeature devuelve true sin tenant) ve todo.
-    const planLocked = !!item.feature && !hasPlanFeature(item.feature);
+    const planLocked =
+      (!!item.feature && !hasPlanFeature(item.feature)) ||
+      (!!item.basicLocked && overrideTenant?.plan === "basic");
     const locked = roleLocked || planLocked;
 
     // Para roles con whitelist explicita (receptionist/barber): un item bloqueado POR ROL
