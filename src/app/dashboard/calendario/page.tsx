@@ -1525,8 +1525,9 @@ export default function CalendarioPage() {
                             <p className="flex items-center gap-1 text-[11px] font-bold">
                               <span className="truncate">{appt.client?.name || "Cliente"}</span>
                               {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded-sm bg-emerald-500 px-[3px] py-px text-[6px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+{appt.staff_note && <span title={appt.staff_note} className="min-w-0 max-w-[65%] truncate rounded bg-black/10 px-1.5 py-px text-[9px] font-bold leading-tight dark:bg-white/15">{appt.staff_note}</span>}
                             </p>
-                            <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}{appt.staff_note && <span className="italic opacity-100"> · {appt.staff_note}</span>}</p>
+                            <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-[9px] opacity-50 truncate">{timeLabel}</p>
                               <span className={`shrink-0 text-[7px] font-semibold px-1 py-px rounded ${(statusBadge[appt.status] || statusBadge.scheduled).cls}`}>
@@ -1795,8 +1796,9 @@ export default function CalendarioPage() {
                         <p className="flex items-center gap-1 text-[11px] font-bold">
                             <span className="truncate">{appt.client?.name || "Cliente"}</span>
                             {appt.is_new_client && <span title="Cliente nuevo" className="shrink-0 rounded-sm bg-emerald-500 px-[3px] py-px text-[6px] font-extrabold uppercase leading-none tracking-wide text-white">Nuevo</span>}
+{appt.staff_note && <span title={appt.staff_note} className="min-w-0 max-w-[65%] truncate rounded bg-black/10 px-1.5 py-px text-[9px] font-bold leading-tight dark:bg-white/15">{appt.staff_note}</span>}
                           </p>
-                        <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}{appt.staff_note && <span className="italic opacity-100"> · {appt.staff_note}</span>}</p>
+                        <p className="text-[9px] truncate opacity-70">{appt.services?.map((s: any) => s.service?.name).join(", ")}</p>
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-[9px] opacity-50 truncate" data-timelabel>{timeLabel}</p>
                           {/* Status badge — visible confirmation state on the block itself. */}
