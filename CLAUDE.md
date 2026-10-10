@@ -21,6 +21,8 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 9. Informar con honestidad: qué se probó y qué no (en la web no había navegador ni base de datos; en la Mac sí puede correrse la app).
 
 ## 3. Repos, ramas y cómo llega el código a producción
+> **Desde el 10 oct. Pablo ya no despliega: lo hace Nico** (respaldo → SQL en Supabase de producción `ulucmbuvupulwplsrcnx` → PR a `main` de `pdencina/barberia` que Nico mergea → Vercel). Pablo solo revisa cada semana. Guía: `entrega-produccion/DESPLEGAR-YO.md`. Claude sube la rama de entrega (parte de `main`, no de la rama de trabajo, para evitar conflictos; el token no sube `.github/workflows`) y deja el SQL en un `.sql` con verificación. Lo de abajo que dice "Pablo corre/mergea" léelo como "Nico".
+
 - Repo de Nico: `https://github.com/nicoperezj1/git-estudio-levels`, rama de trabajo **`claude/hopeful-mayer-jtqlh4`** (todo el trabajo está ahí).
 - Carpeta local de Nico en la Mac: **`~/barberia`**. OJO: su `origin` apunta al repo de **Pablo**, no al de Nico. Por eso siempre se usa la URL completa:
   - Traer: `git fetch https://github.com/nicoperezj1/git-estudio-levels.git claude/hopeful-mayer-jtqlh4 && git checkout -B claude/hopeful-mayer-jtqlh4 FETCH_HEAD`
