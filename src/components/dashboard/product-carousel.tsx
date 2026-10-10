@@ -57,9 +57,9 @@ export function ProductCarousel({ title, icon, items, emptyMessage, loading }: P
     <div
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-5 transition-all duration-500 hover:border-brand-blue/20 hover:shadow-lg hover:shadow-brand-blue/5"
+      className="bg-white dark:bg-brand-white rounded-2xl border border-gray-100 dark:border-white/10 p-3.5 md:p-5 transition-all duration-500 hover:border-brand-blue/20 hover:shadow-lg hover:shadow-brand-blue/5"
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2 md:mb-4">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">{icon}</span>
           <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">{title}</h3>
@@ -85,7 +85,7 @@ export function ProductCarousel({ title, icon, items, emptyMessage, loading }: P
       {loading ? (
         <div className="h-[104px] flex items-center justify-center text-sm text-brand-gray">Cargando...</div>
       ) : items.length === 0 ? (
-        <div className="h-[104px] flex items-center justify-center text-sm text-brand-gray text-center px-4">{emptyMessage}</div>
+        <div className="h-12 md:h-[104px] flex items-center justify-center text-sm text-brand-gray text-center px-4">{emptyMessage}</div>
       ) : (
         <div className="overflow-hidden">
           <div
@@ -93,11 +93,11 @@ export function ProductCarousel({ title, icon, items, emptyMessage, loading }: P
             style={{ transform: `translateX(-${page * 100}%)` }}
           >
             {pages.map((pageItems, pageIdx) => (
-              <div key={pageIdx} className="w-full flex-shrink-0 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div key={pageIdx} className="w-full flex-shrink-0 grid grid-cols-1 gap-2 md:gap-3 sm:grid-cols-3">
                 {pageItems.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-gray-100 dark:border-white/10 bg-brand-light/40 p-3.5 flex flex-col gap-1.5 min-h-[96px] transition-all hover:-translate-y-0.5 hover:border-brand-blue/30"
+                    className="rounded-2xl border border-gray-100 dark:border-white/10 bg-brand-light/40 p-3.5 flex flex-col gap-1.5 md:min-h-[96px] transition-all hover:-translate-y-0.5 hover:border-brand-blue/30"
                   >
                     <p className="text-xs font-semibold text-brand-dark leading-tight line-clamp-2">{item.primary}</p>
                     <span

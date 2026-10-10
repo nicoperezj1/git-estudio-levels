@@ -5,7 +5,11 @@ import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { Copy, Camera, Sun, Moon, Monitor } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useIsNativeApp } from "@/lib/native-app";
+import { biometricAvailable, biometricLockEnabled, biometricVerify, setBiometricLockEnabled } from "@/lib/biometric";
+import { Copy, Camera, Sun, Moon, Monitor, Trash2 } from "lucide-react";
 
 export default function MiPerfilPage() {
   const { user } = useAuth();
@@ -16,6 +20,60 @@ export default function MiPerfilPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
+  const router = useRouter();
+  // Bloqueo con Face ID / huella (solo dentro de la app, si el telefono lo permite).
+  const inApp = useIsNativeApp();
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioOn, setBioOn] = useState(false);
+  useEffect(() => {
+    if (!inApp) return;
+    biometricAvailable().then(setBioAvailable);
+    setBioOn(biometricLockEnabled());
+  }, [inApp]);
+  const toggleBio = async () => {
+    if (bioOn) {
+      setBiometricLockEnabled(false);
+      setBioOn(false);
+      return;
+    }
+    // Al activarlo se confirma una vez, para no dejar a nadie fuera por error.
+    const ok = await biometricVerify("Confirma para activar el bloqueo");
+    if (ok) {
+      setBiometricLockEnabled(true);
+      setBioOn(true);
+    }
+  };
+  // Eliminar mi cuenta (requisito de Apple y Google): se confirma con la contrasena.
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch("/api/profile/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(result.error || "No se pudo eliminar la cuenta.");
+        return;
+      }
+      try { localStorage.removeItem("tenant_override"); } catch {}
+      await createClient().auth.signOut();
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setDeleteError("No se pudo eliminar la cuenta. Revisa tu conexión.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Tema propio: claro, oscuro o "igual que el negocio" (null). Se aplica al instante
   // desde TenantProvider y se guarda en el perfil del usuario.
@@ -109,7 +167,7 @@ export default function MiPerfilPage() {
     : `${origin}/booking${tenantSlug ? `?tenant=${tenantSlug}` : ""}`;
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-6 animate-fade-in">
+    <div className="p-3 md:p-6 max-w-2xl space-y-3 md:space-y-6 animate-fade-in">
       <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Mi Perfil</h1>
 
       {/* Basic info */}
@@ -233,6 +291,76 @@ export default function MiPerfilPage() {
         </div>
         <p className="text-[10px] text-brand-gray text-center">Si necesitas cambiarlo, pídelo a tu administrador.</p>
       </div>
+
+      {inApp && bioAvailable && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-brand-dark">Bloqueo con Face ID / huella</p>
+              <p className="text-xs text-brand-gray">Pide tu identidad al abrir la app o al volver a ella.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={bioOn}
+              onClick={toggleBio}
+              className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors ${bioOn ? "bg-brand-blue" : "bg-gray-300"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${bioOn ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Eliminar cuenta */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+        <button
+          type="button"
+          onClick={() => { setShowDelete(true); setDeletePassword(""); setDeleteError(""); }}
+          className="flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700"
+        >
+          <Trash2 className="h-4 w-4" /> Eliminar mi cuenta
+        </button>
+      </div>
+
+      {showDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-bold text-brand-dark">Eliminar mi cuenta</h3>
+            <p className="text-sm text-brand-gray">
+              Perderás el acceso a re-booking y se borrarán tus datos personales (nombre, correo, teléfono y foto).
+              Las citas y ventas del negocio se conservan, sin tus datos. Esto no se puede deshacer.
+            </p>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              placeholder="Escribe tu contraseña para confirmar"
+              autoComplete="current-password"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-red-400"
+            />
+            {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDelete(false)}
+                disabled={deleting}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={!deletePassword || deleting}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

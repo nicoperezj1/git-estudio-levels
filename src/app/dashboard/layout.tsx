@@ -11,6 +11,7 @@ import { PushNotificationPrompt } from "@/components/push-notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { CommandPalette } from "@/components/command-palette";
 import { QuickActions } from "@/components/quick-actions";
+import { AppLock } from "@/components/app-lock";
 
 export default async function DashboardLayout({
   children,
@@ -73,6 +74,7 @@ export default async function DashboardLayout({
         serverName={profile?.name || user.email || ""}
         serverTenantId={profile?.tenant_id || null}
       >
+        <AppLock />
         <div className="flex h-screen dark:bg-gray-950">
           <Sidebar userName={profile?.name || user.email || ""} userRole={profile?.role || "barber"} tenantName={tenantName} isSoloBusiness={isSoloBusiness} />
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950 pt-[4.5rem] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pt-0 lg:pb-0">

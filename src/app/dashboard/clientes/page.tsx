@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { MoreVertical } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
@@ -24,6 +25,8 @@ export default function ClientesPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", notes: "", source: "walk_in", sourceDetail: "" });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -161,22 +164,56 @@ export default function ClientesPage() {
   // client base by accident. Bulk delete of everything is no longer exposed in the UI.
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Clientes</h1>
-        <div className="flex gap-2">
-          {canSeeMetrics && (
-            <button
-              onClick={() => router.push("/dashboard/clientes/metricas")}
-              className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-            >
-              📊 Métricas
-            </button>
-          )}
-          {canImportExport && <>
-          <label className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm cursor-pointer">
-            Importar CSV/Excel
-            <input type="file" accept=".csv,.xlsx,.xls,.txt" className="hidden" onChange={async (e) => {
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowModal(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+            Nuevo
+          </button>
+          {(canSeeMetrics || canImportExport) && (
+            <div className="relative">
+              <button
+                aria-label="Más opciones"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((v) => !v)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+              {moreOpen && (
+                <>
+                  <button aria-label="Cerrar" className="fixed inset-0 z-20 cursor-default" onClick={() => setMoreOpen(false)} />
+                  <div className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                    {canSeeMetrics && (
+                      <button
+                        onClick={() => { setMoreOpen(false); router.push("/dashboard/clientes/metricas"); }}
+                        className="block w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        📊 Métricas
+                      </button>
+                    )}
+                    {canImportExport && (
+                      <>
+                        <button
+                          onClick={() => { setMoreOpen(false); importInputRef.current?.click(); }}
+                          className="block w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Importar CSV/Excel
+                        </button>
+                        <a
+                          href="/api/clients/export" download onClick={() => setMoreOpen(false)}
+                          className="block w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Exportar
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              <input type="file" accept=".csv,.xlsx,.xls,.txt" ref={importInputRef} className="hidden" onChange={async (e) => {
               const input = e.target;
               const file = input.files?.[0];
               if (!file) return;
@@ -250,16 +287,8 @@ export default function ClientesPage() {
                 input.value = "";
               }
             }} />
-          </label>
-          <a href="/api/clients/export" download
-            className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">
-            Exportar
-          </a>
-          </>}
-          <button onClick={() => setShowModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
-            Nuevo
-          </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -111,7 +111,8 @@ export default function DashboardPage() {
 
   if (loading) return <Spinner />;
 
-  const firstName = user?.name?.split(" ")[0] || "Usuario";
+  // Si el perfil no tiene nombre guardado, el nombre es el correo: se usa solo lo anterior a la @.
+  const firstName = (user?.name?.includes("@") ? user.name.split("@")[0] : user?.name?.split(" ")[0]) || "Usuario";
   // El titulo de fecha debe reflejar el dia elegido, no siempre "hoy" del navegador.
   const selectedDateLabel = new Intl.DateTimeFormat("es-CL", {
     weekday: "long",
@@ -123,7 +124,7 @@ export default function DashboardPage() {
   // If no data (no tenant or empty), show empty dashboard
   if (!data) {
     return (
-      <div className="p-4 md:p-6 animate-fade-in">
+      <div className="p-3 md:p-6 animate-fade-in">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-brand-dark tracking-tight">Hola, {firstName}</h1>
           <p className="text-brand-gray text-sm mt-1">Tu dashboard esta vacio. Agrega servicios y clientes para empezar.</p>
@@ -163,7 +164,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
+    <div className="mx-auto max-w-7xl space-y-3 md:space-y-6 p-3 md:p-8">
       {/* Header */}
       <PageHeader
         title={`Hola, ${firstName}`}
@@ -179,7 +180,7 @@ export default function DashboardPage() {
                 { value: "yesterday", label: "Ayer" },
               ]}
             />
-            <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-brand-gray transition focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10">
+            <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3 py-1.5 text-sm text-brand-gray md:px-3.5 md:py-2 transition focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10">
               <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
               <input
                 type="date"
@@ -194,7 +195,7 @@ export default function DashboardPage() {
       />
 
       {/* Stat Cards: Ventas destacada + 4 metricas */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-6">
         <StatCard
           hero
           className="col-span-2"
@@ -249,7 +250,7 @@ export default function DashboardPage() {
       />
 
       {/* Aviso de stock bajo + Productos mas vendidos — carruseles de 3 por vista */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:gap-6 lg:grid-cols-2">
         <ProductCarousel
           title="Stock bajo"
           icon={<PackageX className="h-4 w-4" />}
@@ -265,7 +266,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Main content: Agenda + Top Services */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 md:gap-6 lg:grid-cols-5">
         {/* Agenda del dia elegido (por defecto, hoy) */}
         <Panel
           className="lg:col-span-3"
@@ -292,7 +293,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={appt.id}
-                    className="group flex items-center gap-4 rounded-2xl border border-transparent p-3 transition-colors hover:border-brand-blue/20 hover:bg-brand-blue/[0.04]"
+                    className="group flex items-center gap-3 rounded-2xl border border-transparent p-2 transition-colors md:gap-4 md:p-3 hover:border-brand-blue/20 hover:bg-brand-blue/[0.04]"
                   >
                     <span className="w-[58px] flex-shrink-0 rounded-xl bg-brand-blue/10 py-1.5 text-center text-sm font-bold text-brand-blue tabular-nums">
                       {time}
@@ -327,7 +328,7 @@ export default function DashboardPage() {
           {data.topServices.length === 0 ? (
             <p className="py-8 text-center text-sm text-brand-gray">Sin datos aun</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {data.topServices.map((svc, i) => (
                 <div key={svc.name}>
                   <div className="mb-1.5 flex items-center justify-between gap-3">

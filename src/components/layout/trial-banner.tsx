@@ -1,11 +1,25 @@
 "use client";
 
 import { useTenant } from "@/lib/tenant-context";
+import { useIsNativeApp } from "@/lib/native-app";
 
 export function TrialBanner() {
   const { tenant, daysLeft, isTrialExpired } = useTenant();
+  const inApp = useIsNativeApp();
 
   if (!tenant) return null;
+
+  // Dentro de la app (App Store / Google Play) no se muestran cobros ni botones de pago: eso se gestiona en la web.
+  if (inApp) {
+    if (tenant.status === "suspended") {
+      return (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2.5 text-center">
+          <span className="text-sm text-red-700 font-medium">⛔ Esta cuenta está suspendida. Avisa al administrador de tu negocio.</span>
+        </div>
+      );
+    }
+    return null;
+  }
 
   if (tenant.status === "past_due") {
     return (

@@ -151,7 +151,7 @@ export default function RecepcionPage() {
   const completed = appointments.filter((a: any) => a.status === "completed");
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 bg-gray-50 min-h-screen">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 bg-gray-50 min-h-screen">
       {/* Header with Clock */}
       <div className="flex justify-between items-center">
         <div>

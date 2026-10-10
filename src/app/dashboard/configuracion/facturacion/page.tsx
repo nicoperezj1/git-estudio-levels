@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/toast";
+import { useIsNativeApp } from "@/lib/native-app";
+import { useTenant } from "@/lib/tenant-context";
+import { Monitor } from "lucide-react";
 
 interface Plan {
   plan: string;
@@ -26,7 +29,7 @@ function fmt(n: number) {
   return "$" + Math.round(n || 0).toLocaleString("es-CL");
 }
 
-export default function FacturacionPage() {
+function FacturacionContent() {
   const { showToast } = useToast();
   const [tenant, setTenant] = useState<{ plan: string; max_professionals: number; status: string } | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -172,7 +175,7 @@ export default function FacturacionPage() {
   const hasActiveSubscription = (!!subscription?.mp_preapproval_id || isAnnualOneTime) && !isCancelled;
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-6">
+    <div className="p-3 md:p-6 max-w-2xl space-y-3 md:space-y-6">
       <div>
         <h1 className="text-xl font-bold text-brand-dark">Plan y facturación</h1>
         <p className="text-sm text-brand-gray mt-1">Administra tu suscripción a re-booking.</p>
@@ -355,4 +358,72 @@ export default function FacturacionPage() {
       )}
     </div>
   );
+}
+
+// Dentro de la app movil solo se muestra el plan y su vencimiento (reglas de Apple y Google):
+// sin precios, sin botones de pago y sin enlaces. La gestion se hace desde un computador.
+function InAppPlanInfo() {
+  const { tenant } = useTenant();
+  const [planName, setPlanName] = useState<string | null>(null);
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    // Solo el administrador puede pedir el resumen; si no, se usa lo que ya sabe el negocio.
+    fetch("/api/billing/summary")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.subscription) {
+          setPeriodEnd(data.subscription.current_period_end || null);
+          const p = (data.plans || []).find((x: any) => x.plan === data.subscription.plan);
+          setPlanName(p?.name || data.subscription.plan || null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const onTrial = tenant?.status === "trial";
+  const endDate = onTrial ? tenant?.trial_ends_at : periodEnd || tenant?.trial_ends_at;
+  const dateLabel = endDate ? new Date(endDate).toLocaleDateString("es-CL", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const plan = planName || (tenant?.plan ? tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1) : null);
+  const suspended = tenant?.status === "suspended";
+
+  return (
+    <div className="flex items-center justify-center px-6 py-16">
+      <div className="w-full max-w-sm space-y-4 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue">
+          <Monitor className="h-7 w-7" strokeWidth={1.75} />
+        </div>
+        <h1 className="text-lg font-bold text-brand-dark">Plan y facturación</h1>
+
+        {!loaded && !tenant ? (
+          <p className="text-sm text-brand-gray">Cargando...</p>
+        ) : (
+          <div className="space-y-1.5 rounded-xl bg-brand-light p-4">
+            {plan && <p className="text-sm font-semibold text-brand-dark">{onTrial ? "Período de prueba" : `Plan ${plan}`}</p>}
+            {suspended ? (
+              <p className="text-sm font-medium text-red-600">Cuenta suspendida</p>
+            ) : dateLabel ? (
+              <p className="text-sm text-brand-gray">
+                {onTrial ? "La prueba vence el" : "Vence el"} <strong className="text-brand-dark">{dateLabel}</strong>
+              </p>
+            ) : (
+              <p className="text-sm text-brand-gray">Sin fecha de vencimiento registrada.</p>
+            )}
+          </div>
+        )}
+
+        <p className="text-xs text-brand-gray">
+          Para cambiar de plan o ver la facturación, ingresa a re-booking desde un computador.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function FacturacionPage() {
+  const inApp = useIsNativeApp();
+  if (inApp) return <InAppPlanInfo />;
+  return <FacturacionContent />;
 }

@@ -79,7 +79,7 @@ export default function WaitlistPage() {
   const others = entries.filter((e) => e.status !== "waiting");
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Lista de Espera</h1>
         <p className="text-gray-500 text-sm">Clientes esperando hora. Notificalos cuando se libere un slot.</p>

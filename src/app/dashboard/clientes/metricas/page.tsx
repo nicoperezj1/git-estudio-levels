@@ -85,7 +85,7 @@ export default function ClientesMetricasPage() {
   const activeList = activeSource ? data.clientsBySource[activeSource] || [] : [];
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
       <div>
         <div className="flex items-center gap-3">
           <button

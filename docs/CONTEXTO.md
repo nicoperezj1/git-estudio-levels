@@ -80,12 +80,7 @@
 - Base de pruebas: Supabase `rebooking-pruebas` (ref `ucwrdmwtlesayjxmlbve`). El `.env.local` de Nico ya apunta ahí. **Nunca** producción.
 - Script `scripts/seed-pruebas.mjs` (no va en los zips a Pablo): se niega a correr si la URL no es la de pruebas. `--dry` simula; `--crear-negocio` crea el negocio si el admin no tiene. Re-ejecutable.
 - Negocio de pruebas "Estudio Levels (pruebas)", id `0235d97a-6658-4a1c-be69-8c1341ac50ce`, plan **Pro**, 8 profesionales. Si la pantalla muestra "límite de profesionales (3)" o candados PRO, correr en el SQL Editor **de pruebas**: `update tenants set plan='pro', max_professionals=8 where id='0235d97a-6658-4a1c-be69-8c1341ac50ce';`
-- Usuarios de prueba (clave de todos: `Prueba2026!`; el admin conserva su clave de siempre):
-  - Admin `nicoperezj1@gmail.com` PIN 3333
-  - Recepción David Muñoz `nicoperezj1+recepcion@gmail.com` PIN 1234
-  - Arriendo $16.000/día, Matías Soto `nicoperezj1+arriendo@gmail.com` PIN 1111
-  - Comisión 48%, Camila Rojas `nicoperezj1+comision48@gmail.com` PIN 2222
-  - Comisión 40%: Diego Fuentes `nicoperezj1+diego@gmail.com` PIN 4444; Valentina Paredes `nicoperezj1+valentina@gmail.com` PIN 5555
+- Usuarios de prueba: los crea `scripts/seed-pruebas.mjs` (admin, recepción, arriendo y comisión). Correos y PINs en el gestor de claves de Nico, no en el repo.
   - 20 clientes `clienteNN@prueba.test` con orígenes variados y 20 citas (pasadas, hoy y próximas).
 - Cómo trabaja Nico en su Mac (carpeta `~/barberia`): el servidor corre en **una ventana de Terminal** (`npm run dev`); los demás comandos van en **otra ventana/pestaña** (`Cmd+T`), nunca en la del servidor. Para traer lo nuevo: `git fetch https://github.com/nicoperezj1/git-estudio-levels claude/hopeful-mayer-jtqlh4` y `git checkout -B claude/hopeful-mayer-jtqlh4 FETCH_HEAD`. Si sale "Cannot find the middleware module": detener el servidor, `rm -rf .next`, volver a `npm run dev`. Pegar comandos largos a veces mete caracteres raros (`[200~`): escribirlos a mano o pegar de a una línea.
 - El hook del repo pide hacer `git push` a la rama de trabajo al terminar; se hace (solo a `claude/hopeful-mayer-jtqlh4`).

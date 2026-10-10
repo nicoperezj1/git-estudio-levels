@@ -40,10 +40,10 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-brand-dark md:text-3xl">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-brand-gray">{subtitle}</p>}
+        <h1 className="text-xl font-bold tracking-tight text-brand-dark md:text-3xl">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-xs text-brand-gray md:text-sm">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -86,18 +86,19 @@ export function StatCard({
   if (hero) {
     return (
       <div
-        className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-blue to-emerald-500 p-5 text-white shadow-lg shadow-brand-blue/25 ${className}`}
+        className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-blue to-emerald-500 p-4 text-white md:p-5 shadow-lg shadow-brand-blue/25 ${className}`}
       >
         <span className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
         <span className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
         <div className="relative flex items-start justify-between">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/80">{label}</p>
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/25">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/25 md:h-9 md:w-9">
             <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
           </div>
         </div>
-        <p className="relative mt-3 text-3xl font-black leading-none tracking-tight tabular-nums md:text-4xl">{value}</p>
-        <div className="relative mt-3 flex flex-wrap items-center gap-2">
+        <div className="relative mt-2 flex items-end justify-between gap-2 md:mt-3 md:block">
+        <p className="text-2xl font-black leading-none tracking-tight tabular-nums md:text-4xl">{value}</p>
+        <div className="flex flex-wrap items-center gap-2 md:mt-3">
           {delta && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">
               {delta.value >= 0 ? "▲" : "▼"} {Math.abs(delta.value)}%
@@ -106,24 +107,27 @@ export function StatCard({
           )}
           {hint && <span className="text-[11px] text-white/70">{hint}</span>}
         </div>
+        </div>
       </div>
     );
   }
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:shadow-lg hover:shadow-black/5 ${className}`}
+      className={`group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 transition-all duration-300 hover:-translate-y-0.5 md:p-5 hover:border-brand-blue/30 hover:shadow-lg hover:shadow-black/5 ${className}`}
     >
       <span className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-brand-blue/10 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
       <div className="relative flex items-start justify-between gap-2">
         <p className="text-xs font-semibold text-brand-gray">{label}</p>
-        <IconTile Icon={Icon} tone={tone} size={34} />
+        <IconTile Icon={Icon} tone={tone} size={30} />
       </div>
-      <p className="relative mt-2 text-2xl font-extrabold leading-none tracking-tight text-brand-dark tabular-nums md:text-[28px]">
-        {value}
-      </p>
-      <div className="relative mt-2.5 flex flex-wrap items-center gap-2">
-        {delta && <Delta {...delta} />}
-        {hint && <span className="text-[11px] text-brand-gray">{hint}</span>}
+      <div className="relative mt-1.5 flex items-end justify-between gap-1.5 md:mt-2 md:block">
+        <p className="text-xl font-extrabold leading-none tracking-tight text-brand-dark tabular-nums md:text-[28px]">
+          {value}
+        </p>
+        <div className="flex flex-wrap items-center gap-2 md:mt-2.5">
+          {delta && <Delta {...delta} />}
+          {hint && <span className="text-[11px] text-brand-gray">{hint}</span>}
+        </div>
       </div>
     </div>
   );
@@ -147,7 +151,7 @@ export function Panel({
   return (
     <div className={`rounded-2xl border border-gray-100 bg-white ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-4">
+        <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-3 md:px-5 md:pb-3 md:pt-4">
           <div>
             {title && (
               <div className="flex items-center gap-2.5">
@@ -160,7 +164,7 @@ export function Panel({
           {action}
         </div>
       )}
-      <div className={flush ? "" : "px-5 pb-5"}>{children}</div>
+      <div className={flush ? "" : "px-4 pb-4 md:px-5 md:pb-5"}>{children}</div>
     </div>
   );
 }

@@ -71,7 +71,7 @@ export default function VacacionesPage() {
   const past = vacations.filter((v) => v.end_date < today);
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto animate-fade-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-4 max-w-3xl mx-auto animate-fade-in">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Vacaciones</h1>
         <p className="text-sm text-brand-gray">Esos días el profesional no aparece en la reserva online y su agenda queda bloqueada.</p>

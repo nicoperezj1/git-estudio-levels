@@ -1,3 +1,4 @@
+import { AppFlag } from "@/components/app-flag";
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
@@ -36,7 +37,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={jakarta.className}>{children}</body>
+      <body className={jakarta.className}>
+        <AppFlag />
+        {children}
+      </body>
     </html>
   );
 }

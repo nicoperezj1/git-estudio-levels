@@ -311,7 +311,7 @@ export default function FinanzasPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8 animate-fade-in">
+    <div className="mx-auto max-w-7xl space-y-3 md:space-y-6 p-3 md:p-8 animate-fade-in">
       <PageHeader
         title="Ingresos y egresos"
         subtitle="Todos los movimientos del negocio, en el periodo que elijas."

@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
     .select("*, opened_by_profile:profiles!cash_register_opened_by_fkey(name), closed_by_profile:profiles!cash_register_closed_by_fkey(name)")
     .eq("date", date);
   if (tenantId && tenantId !== "ALL") registerQuery = registerQuery.eq("tenant_id", tenantId);
-  const { data: register } = await registerQuery.maybeSingle();
 
   // Get today's cash transactions. Bounds computed against Chile's real midnight (not a
   // naive date-string range, which Postgres would read in its own session timezone).
@@ -45,17 +44,23 @@ export async function GET(req: NextRequest) {
   };
   // Con quien emitio cada movimiento y desde donde (created_by / origin: migraciones 090 y 097). Si alguna aun no esta
   // aplicada, se pide sin esos datos para que la caja nunca quede en blanco.
-  let { data: transactionsRaw, error: txErr } = await runTx(", created_by, origin");
+  // Todo lo que no depende de las ventas se pide a la vez (antes eran 7 consultas seguidas).
+  const specific = !!tenantId && tenantId !== "ALL";
+  const [registerRes, firstTx, wd, cashCap, adj] = await Promise.all([
+    registerQuery.maybeSingle(),
+    runTx(", created_by, origin"),
+    specific ? getWithdrawals(supabase, tenantId as string, date) : Promise.resolve({ total: 0, rows: [] as any[] }),
+    specific ? getCashCap(supabase, tenantId as string) : Promise.resolve(null),
+    specific ? getAdjustments(supabase, tenantId as string, date) : Promise.resolve({ total: 0, rows: [] as any[] }),
+  ]);
+  const register = registerRes.data;
+  let { data: transactionsRaw, error: txErr } = firstTx;
   if (txErr) ({ data: transactionsRaw, error: txErr } = await runTx(", created_by"));
   if (txErr) ({ data: transactionsRaw } = await runTx(""));
 
   // Nombres de quienes emitieron (created_by no tiene llave hacia profiles: se buscan aparte).
   const issuerIds = Array.from(new Set((transactionsRaw || []).map((t: any) => t.created_by).filter(Boolean)));
   const issuerNames = new Map<string, string>();
-  if (issuerIds.length > 0) {
-    const { data: issuers } = await supabase.from("profiles").select("id, name").in("id", issuerIds);
-    for (const i of (issuers || []) as any[]) issuerNames.set(i.id, i.name);
-  }
 
   // Bug (reportado por Nico, 26-sep): un cobro dividido (ej. debito + efectivo) guarda
   // payment_method = "mixed" en transactions (ver /api/pos/checkout), y el detalle real
@@ -67,15 +72,15 @@ export async function GET(req: NextRequest) {
     .filter((t: any) => t.payment_method === "mixed")
     .map((t: any) => t.id);
   const mixedCashById = new Map<string, number>();
-  if (mixedIds.length > 0) {
-    const { data: splitRows } = await supabase
-      .from("transaction_payments")
-      .select("transaction_id, payment_method, amount")
-      .in("transaction_id", mixedIds)
-      .eq("payment_method", "cash");
-    for (const row of splitRows || []) {
-      mixedCashById.set(row.transaction_id, (mixedCashById.get(row.transaction_id) || 0) + Number(row.amount));
-    }
+  const [issuersRes, splitRes] = await Promise.all([
+    issuerIds.length > 0 ? supabase.from("profiles").select("id, name").in("id", issuerIds) : Promise.resolve({ data: [] as any[] }),
+    mixedIds.length > 0
+      ? supabase.from("transaction_payments").select("transaction_id, payment_method, amount").in("transaction_id", mixedIds).eq("payment_method", "cash")
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+  for (const i of (issuersRes.data || []) as any[]) issuerNames.set(i.id, i.name);
+  for (const row of (splitRes.data || []) as any[]) {
+    mixedCashById.set(row.transaction_id, (mixedCashById.get(row.transaction_id) || 0) + Number(row.amount));
   }
   const cashAmountOf = (t: any) => (t.payment_method === "mixed" ? (mixedCashById.get(t.id) || 0) : Number(t.total));
 
@@ -133,13 +138,6 @@ export async function GET(req: NextRequest) {
 
   const openingAmount = register ? Number(register.opening_amount) : 0;
   // Retiros a la caja fuerte (reduccion de efectivo): salen de la caja, asi que se restan.
-  const specific = !!tenantId && tenantId !== "ALL";
-  // Ajustes de caja: lo que el administrador declaro como efectivo real al revisar un reporte (puede sumar o restar).
-  const [wd, cashCap, adj] = await Promise.all([
-    specific ? getWithdrawals(supabase, tenantId as string, date) : Promise.resolve({ total: 0, rows: [] as any[] }),
-    specific ? getCashCap(supabase, tenantId as string) : Promise.resolve(null),
-    specific ? getAdjustments(supabase, tenantId as string, date) : Promise.resolve({ total: 0, rows: [] as any[] }),
-  ]);
   const expectedCash = openingAmount + cashIncome - cashExpense - wd.total + adj.total;
 
   return NextResponse.json({

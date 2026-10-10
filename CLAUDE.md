@@ -32,7 +32,7 @@ Claude Code lee este archivo solo al abrir la carpeta. Detalle largo en `docs/CO
 
 ## 4. Entorno de pruebas
 - Supabase de pruebas `rebooking-pruebas` (ref `ucwrdmwtlesayjxmlbve`); el `.env.local` de Nico ya apunta ahí. Negocio "Estudio Levels (pruebas)" id `0235d97a-6658-4a1c-be69-8c1341ac50ce` (plan Pro, 8 profesionales), slug de reserva `levels-pruebas-0xrf` → `localhost:3000/booking?tenant=levels-pruebas-0xrf`.
-- Usuarios de prueba (clave `Prueba2026!`; el admin conserva la suya): admin `nicoperezj1@gmail.com` PIN 3333; recepción David `nicoperezj1+recepcion@gmail.com` PIN 1234; arriendo Matías PIN 1111; comisión 48% Camila PIN 2222; comisión 40% Diego PIN 4444 y Valentina PIN 5555.
+- Usuarios de prueba: ver el gestor de claves de Nico (no se guardan contraseñas ni PINs en el repo).
 - Servidor local: en **una** ventana de Terminal `npm run dev`; otros comandos en otra pestaña. Si falla ("Cannot find the middleware module", pantalla rara, puerto 3000/3001 ocupado): detener, `rm -rf .next`, `npm run dev`.
 - En la Mac (no web) Claude puede correr la app y los scripts directamente; aun así, nada de `next build` sin avisar.
 
