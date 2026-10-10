@@ -1,5 +1,6 @@
 "use client";
 
+import { peakOverlap } from "@/lib/capacity";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
@@ -444,6 +445,44 @@ export default function CalendarioPage() {
     return out;
   };
 
+  // Espacios (cupos) de un profesional en un tramo: cuantos estan ocupados por citas o bloqueos parciales y cuantos quedan libres.
+  const toMinStr = (t: string) => { const m = t?.match(/(\d{2}):(\d{2})/); return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0; };
+  const spacesAt = (barberId: string, day: string, startT: string, endT: string) => {
+    const s0 = toMinStr(startT), e0 = toMinStr(endT);
+    const occ = appointments
+      .filter((a: any) => a.barber_id === barberId && (a.date || date) === day && !["cancelled", "no_show"].includes(a.status))
+      .map((a: any) => ({ name: a.client?.name || "Cliente", start: toMinStr(a.start_time), end: toMinStr(a.end_time) }))
+      .filter((x) => x.end > s0 && x.start < e0);
+    const held: { start: number; end: number }[] = occ.map((x) => ({ start: x.start, end: x.end }));
+    let blockedSpots = 0;
+    for (const b of rangeBlocks) {
+      if (b.barber_id !== barberId || b.date !== day || b.all_day || !b.start_time || !b.end_time || !(Number(b.spots) > 0)) continue;
+      const bs = toMinStr(b.start_time), be = toMinStr(b.end_time);
+      if (be > s0 && bs < e0) { for (let i = 0; i < Number(b.spots); i++) held.push({ start: bs, end: be }); blockedSpots = Math.max(blockedSpots, Number(b.spots)); }
+    }
+    const taken = Math.min(slotCap, peakOverlap(held, s0, e0));
+    return { names: occ.map((x) => x.name), taken, free: Math.max(0, slotCap - taken), blockedSpots };
+  };
+  // Recuadros punteados "Espacio libre" al lado de una cita cuando todavia cabe otro cliente (se ven, y se toca para agendar).
+  const freeLaneHints = (list: any[], lanes: Record<string, { lane: number; cols: number }> | null, blockList: any[], wrap: boolean) => {
+    if (!lanes) return [] as Array<{ key: string; top: number; height: number; leftPct: number; widthPct: number }>;
+    const out = new Map<string, { key: string; top: number; height: number; leftPct: number; widthPct: number }>();
+    for (const a of list) {
+      if (["cancelled", "no_show"].includes(a.status)) continue;
+      const l = lanes[a.id];
+      if (!l || l.cols < 2) continue;
+      const as = toMinStr(a.start_time), ae = toMinStr(a.end_time);
+      if (blockList.some((b) => b.all_day || (Number(b.spots) > 0 && toMinStr(b.end_time) > as && toMinStr(b.start_time) < ae))) continue;
+      const used = new Set(list.filter((o) => lanes[o.id] && toMinStr(o.end_time) > as && toMinStr(o.start_time) < ae).map((o) => wrap ? lanes[o.id].lane % l.cols : lanes[o.id].lane));
+      for (let lane = 0; lane < l.cols; lane++) {
+        if (used.has(lane)) continue;
+        const key = `${lane}-${as}-${ae}`;
+        out.set(key, { key, top: ((as - START_HOUR * 60) / 60) * HOUR_HEIGHT, height: Math.max(((ae - as) / 60) * HOUR_HEIGHT, 24), leftPct: (100 / l.cols) * lane, widthPct: 100 / l.cols });
+      }
+    }
+    return Array.from(out.values());
+  };
+
   // Cuando hay un profesional elegido (vista 1/3/7 dias), se pide el rango completo de
   // dias de una sola vez en vez de un fetch por dia -- ver dateFrom/dateTo en
   // /api/appointments. Sin profesional elegido, se comporta exactamente igual que antes
@@ -811,7 +850,7 @@ export default function CalendarioPage() {
           startTime: popupData.startTime,
           endTime: popupData.endTime,
           reason: eventName || "Bloqueo",
-          ...(slotCap > 1 && blockSpots > 0 && blockSpots < slotCap ? { spots: blockSpots } : {}),
+          ...(slotCap > 1 && blockSpots > 0 && blockSpots < slotCap ? { spots: Math.max(1, Math.min(blockSpots, spacesAt(popupData.barberId, day, popupData.startTime, popupData.endTime).free)) } : {}),
         }),
       });
       if (blockRes.ok) {
@@ -1426,6 +1465,12 @@ export default function CalendarioPage() {
                           </div>
                         );
                       })}
+                      {freeLaneHints(dayAppts, dayLanes, dayBlocks, true).map((h) => (
+                        <div key={h.key} className="pointer-events-none absolute z-[1] rounded-lg border border-dashed border-gray-400/50 px-1.5 py-1 text-[9px] font-medium text-gray-400"
+                          style={{ top: h.top, height: h.height, left: `calc(${h.leftPct}% + 2px)`, width: `calc(${h.widthPct}% - 4px)` }}>
+                          Espacio libre
+                        </div>
+                      ))}
                       {dayAppts.map((appt: any) => {
                         const sm = appt.start_time?.match(/(\d{2}):(\d{2})/);
                         const em = appt.end_time?.match(/(\d{2}):(\d{2})/);
@@ -1671,6 +1716,13 @@ export default function CalendarioPage() {
                       </div>
                     )}
 
+                    {/* Espacios libres al lado de una cita (cupos por bloque) */}
+                    {freeLaneHints(barberAppts, lanes, blocks.filter((bl) => bl.barber_id === barber.id), false).map((h) => (
+                      <div key={h.key} className="pointer-events-none absolute z-[1] rounded-lg border border-dashed border-gray-400/50 px-1.5 py-1 text-[9px] font-medium text-gray-400"
+                        style={{ top: h.top, height: h.height, left: `calc(${h.leftPct}% + 2px)`, width: `calc(${h.widthPct}% - 4px)` }}>
+                        Espacio libre · toca para agendar
+                      </div>
+                    ))}
                     {/* Appointment blocks */}
                     {barberAppts.map((appt: any) => {
                       const sm = appt.start_time?.match(/(\d{2}):(\d{2})/);
@@ -1940,6 +1992,31 @@ export default function CalendarioPage() {
                 </select>
               </div>
 
+              {slotCap > 1 && (() => {
+                const sp = spacesAt(popupData.barberId, popupDay || date, popupData.startTime, popupData.endTime);
+                const chips: { label: string; free: boolean }[] = [];
+                for (let i = 0; i < slotCap; i++) {
+                  if (i < sp.names.length) chips.push({ label: sp.names[i], free: false });
+                  else if (i < sp.taken) chips.push({ label: "Bloqueado", free: false });
+                  else chips.push({ label: "Libre", free: true });
+                }
+                return (
+                  <div className="rounded-xl bg-gray-50 p-2.5">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Espacios a esa hora</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {chips.map((c, i) => (
+                        <span key={i} className={`rounded-lg px-2 py-1 text-xs font-medium ${c.free ? "border border-dashed border-emerald-400 bg-emerald-50 text-emerald-700" : "bg-gray-200 text-gray-700"}`}>
+                          {String.fromCharCode(65 + i)} · {c.label}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-gray-500">
+                      {sp.free > 0 ? "Cada espacio libre se puede agendar aquí o lo reserva un cliente por el link. Bloquéalo en la pestaña Bloquear si no quieres que se use." : "No quedan espacios libres a esa hora."}
+                    </p>
+                  </div>
+                );
+              })()}
+
               {popupTab === "service" ? (
                 <>
                   {/* Service selector */}
@@ -2013,13 +2090,18 @@ export default function CalendarioPage() {
                   {slotCap > 1 && (
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-1">Cupos que bloquea</label>
-                      <select value={blockSpots} onChange={(e) => setBlockSpots(Number(e.target.value))}
-                        className="w-full border rounded-xl px-3 py-2.5 text-sm">
-                        <option value={0}>Todo el horario (nadie puede reservar)</option>
-                        {Array.from({ length: slotCap - 1 }, (_, i) => i + 1).map((n) => (
-                          <option key={n} value={n}>{n} cupo{n > 1 ? "s" : ""} (quedan {slotCap - n} para reservar)</option>
-                        ))}
-                      </select>
+                      {(() => {
+                        const free = spacesAt(popupData.barberId, popupDay || date, popupData.startTime, popupData.endTime).free;
+                        return (
+                          <select value={Math.min(blockSpots, free)} onChange={(e) => setBlockSpots(Number(e.target.value))}
+                            className="w-full border rounded-xl px-3 py-2.5 text-sm">
+                            <option value={0}>Todo el horario (nadie puede reservar)</option>
+                            {Array.from({ length: free }, (_, i) => i + 1).filter((n) => n < slotCap).map((n) => (
+                              <option key={n} value={n}>{n} espacio{n > 1 ? "s" : ""} libre{n > 1 ? "s" : ""} ({free - n === 0 ? "ya no queda ninguno para reservar" : `quedan ${free - n} para reservar`})</option>
+                            ))}
+                          </select>
+                        );
+                      })()}
                     </div>
                   )}
                 </>
