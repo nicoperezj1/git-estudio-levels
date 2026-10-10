@@ -17,6 +17,7 @@ function pick(t: any) {
     google_rating: t.google_rating ?? null,
     google_reviews_count: t.google_reviews_count ?? null,
     booking_view_mode: t.booking_view_mode ?? "professional",
+    booking_show_profile_direct: !!t.booking_show_profile_direct,
   };
 }
 
@@ -68,12 +69,14 @@ export async function POST(req: NextRequest) {
     update.booking_view_mode = body.booking_view_mode;
   }
 
+  if (body.booking_show_profile_direct !== undefined) update.booking_show_profile_direct = !!body.booking_show_profile_direct;
+
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nada que guardar" }, { status: 400 });
 
   const { error } = await supabase.from("tenants").update(update).eq("id", tenantId);
   if (error) {
     const missing = /column .* does not exist|schema cache/i.test(error.message);
-    return NextResponse.json({ error: missing ? "Falta aplicar la migración 082 en la base de datos." : error.message }, { status: 500 });
+    return NextResponse.json({ error: missing ? `Falta aplicar la migración ${"booking_show_profile_direct" in update ? "103" : "082"} en la base de datos.` : error.message }, { status: 500 });
   }
   return NextResponse.json({ success: true });
 }

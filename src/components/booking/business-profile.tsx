@@ -17,6 +17,7 @@ export interface BusinessInfo {
   google_reviews_count?: number | null;
   booking_window_days?: number | null;
   booking_view_mode?: "time" | "professional" | "both";
+  booking_show_profile_direct?: boolean;
   hours?: BusinessHour[];
 }
 
@@ -58,12 +59,12 @@ export default function BusinessProfile({ info }: { info: BusinessInfo }) {
       )}
 
       <div className="flex items-start gap-4">
-        <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm sm:h-24 sm:w-24">
+        <div className={`flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm sm:h-24 sm:w-24 ${info.banner_url ? "relative z-10 -mt-12 ml-2 ring-4 ring-brand-light" : ""}`}>
           {info.logo_url ? <img src={info.logo_url} alt={info.name} className="max-h-full max-w-full object-contain" /> : (
             <span className="text-xl font-bold text-brand-blue">{info.name.slice(0, 2).toUpperCase()}</span>
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 ${info.banner_url ? "pt-1" : ""}`}>
           <h1 className="text-xl font-bold leading-tight sm:text-2xl">{info.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {open !== null && (

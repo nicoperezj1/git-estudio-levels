@@ -29,6 +29,7 @@ export default function PreferenciasReservasPage() {
   const [rating, setRating] = useState("");
   const [reviews, setReviews] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("professional");
+  const [showProfileDirect, setShowProfileDirect] = useState(false);
   const logoInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
 
@@ -47,6 +48,7 @@ export default function PreferenciasReservasPage() {
         setRating(d.google_rating != null ? String(d.google_rating) : "");
         setReviews(d.google_reviews_count != null ? String(d.google_reviews_count) : "");
         setViewMode((d.booking_view_mode as ViewMode) || "professional");
+        setShowProfileDirect(!!d.booking_show_profile_direct);
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoading(false));
@@ -100,6 +102,7 @@ export default function PreferenciasReservasPage() {
           google_rating: rating,
           google_reviews_count: reviews,
           booking_view_mode: viewMode,
+          booking_show_profile_direct: showProfileDirect,
         }),
       });
       const result = await res.json();
@@ -191,6 +194,16 @@ export default function PreferenciasReservasPage() {
             </button>
           ))}
         </div>
+      </Panel>
+
+      <Panel title="Presentación en links directos" subtitle="Para quien entra por el link de un profesional, o si tu negocio tiene un solo profesional">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input type="checkbox" checked={showProfileDirect} onChange={(e) => setShowProfileDirect(e.target.checked)} className="mt-1 h-4 w-4" />
+          <span>
+            <span className="block text-sm font-bold text-brand-dark">Mostrar la presentación de mi negocio antes de los servicios</span>
+            <span className="mt-1 block text-xs text-brand-gray">Aparece el banner, la descripción, cómo llegar y el horario arriba de la lista de servicios. Apagado, el cliente va directo a los servicios.</span>
+          </span>
+        </label>
       </Panel>
 
       <div className="flex flex-wrap justify-end gap-2">

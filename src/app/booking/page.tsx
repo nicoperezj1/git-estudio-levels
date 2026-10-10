@@ -63,6 +63,15 @@ export default function BookingPage() {
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
   // Vista de reserva: "time" (día y hora primero) o "professional" (profesional primero).
   const [viewMode, setViewMode] = useState<"time" | "professional">("professional");
+  // true = el cliente llego directo a un profesional (link personal o negocio con uno solo).
+  const [directEntry, setDirectEntry] = useState(false);
+  const [expandedService, setExpandedService] = useState<string | null>(null);
+  // "Salir" solo se muestra si hay una sesion abierta (el personal del negocio); un cliente no lo necesita.
+  const [hasSession, setHasSession] = useState(false);
+  useEffect(() => {
+    import("@/lib/supabase/client").then(({ createClient }) => createClient().auth.getUser())
+      .then(({ data }) => setHasSession(!!data?.user)).catch(() => {});
+  }, []);
   const preselectSlot = useRef<string>(""); // hora elegida en la vista por horario
   const [depositRequired, setDepositRequired] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(30);
@@ -127,6 +136,7 @@ export default function BookingPage() {
       fetch(`/api/public/barber?id=${barberIdParam}`).then((r) => r.json()).then((res) => {
         if (res?.barber) {
           setSelectedBarber(res.barber);
+          setDirectEntry(true);
           setStep("service");
           if (res.tenant?.logo_url) setBusinessLogoUrl(res.tenant.logo_url);
           if (res.tenant?.name) setBusinessName(res.tenant.name);
@@ -152,6 +162,7 @@ export default function BookingPage() {
         if (!match && !profSlugParam && !barberSlug && data.length === 1) match = data[0];
         if (match) {
           setSelectedBarber(match);
+          setDirectEntry(true);
           setStep("service");
         }
       }
@@ -339,7 +350,9 @@ export default function BookingPage() {
   };
 
   // El perfil completo del negocio se muestra en el primer paso.
-  const showProfile = step === "barber" && !!businessInfo?.name;
+  // Con el link directo a un profesional el cliente salta a los servicios; si el negocio lo activo
+  // (Preferencias de reservas), la presentacion se muestra igual arriba de los servicios.
+  const showProfile = !!businessInfo?.name && (step === "barber" || (step === "service" && directEntry && !!businessInfo.booking_show_profile_direct));
 
   if (businessSuspended) {
     return (
@@ -354,34 +367,34 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-screen bg-brand-light text-brand-dark">
-      {/* Header */}
-      <div className="border-b border-gray-100 py-4 px-6 flex items-center justify-between bg-white">
-        <div className="flex-1" />
-        <div className="text-center">
+      {/* Header: logo y nombre del negocio integrados (con la presentacion visible solo dice "Agendar hora") */}
+      <div className="sticky top-0 z-30 border-b border-gray-100 bg-white/90 px-4 py-2.5 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center gap-3">
           {showProfile ? (
-            <p className="text-xs text-brand-blue uppercase tracking-widest font-medium">Agendar hora</p>
+            <p className="flex-1 text-xs font-medium uppercase tracking-widest text-brand-blue">Agendar hora</p>
           ) : (
-            <>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               {businessLogoUrl ? (
-                <img src={businessLogoUrl} alt={businessName || "Logo"} className="h-12 mx-auto object-contain" />
+                <img src={businessLogoUrl} alt={businessName || "Logo"} className="h-10 w-10 flex-shrink-0 rounded-xl border border-gray-100 object-cover shadow-sm" />
               ) : (
-                <img src="/logo-horizontal.png" alt="re-booking" className="h-10 mx-auto" />
+                <img src="/logo-horizontal.png" alt="re-booking" className="h-8 flex-shrink-0" />
               )}
-              <p className="text-xs text-brand-blue uppercase tracking-widest mt-2 font-medium">
-                {businessName || "Agendar Hora"}
-              </p>
-            </>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-bold text-brand-dark">{businessName || "Agendar hora"}</p>
+                {businessName && <p className="text-[11px] text-brand-gray">Agenda tu hora online</p>}
+              </div>
+            </div>
           )}
-        </div>
-        <div className="flex-1 flex justify-end">
-          <button onClick={async () => {
-            const { createClient } = await import("@/lib/supabase/client");
-            const supabase = createClient();
-            await supabase.auth.signOut();
-            window.location.href = "/login";
-          }} className="text-xs text-brand-gray hover:text-brand-dark transition-colors px-2 py-1 rounded">
-            Salir
-          </button>
+          {hasSession && (
+            <button onClick={async () => {
+              const { createClient } = await import("@/lib/supabase/client");
+              const supabase = createClient();
+              await supabase.auth.signOut();
+              window.location.href = "/login";
+            }} className="rounded px-2 py-1 text-xs text-brand-gray transition-colors hover:text-brand-dark">
+              Salir
+            </button>
+          )}
         </div>
       </div>
 
@@ -430,42 +443,56 @@ export default function BookingPage() {
             )}
             <h2 className="text-2xl font-bold mb-2">Servicios de {selectedBarber?.name}</h2>
             <p className="text-brand-gray mb-6">Selecciona uno o mas servicios</p>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {services.map((s) => {
                 const isSelected = selectedServices.some((ss) => ss.id === s.id);
+                const longDesc = (s.description || "").length > 90;
+                const expanded = expandedService === s.id;
+                const toggle = () => setSelectedServices(isSelected ? selectedServices.filter((ss) => ss.id !== s.id) : [...selectedServices, s]);
                 return (
-                  <button
+                  <div
                     key={s.id}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedServices(selectedServices.filter((ss) => ss.id !== s.id));
-                      } else {
-                        setSelectedServices([...selectedServices, s]);
-                      }
-                    }}
-                    className={`w-full flex items-center justify-between p-4 rounded-lg border transition-colors text-left ${
+                    role="button"
+                    tabIndex={0}
+                    onClick={toggle}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
+                    className={`flex w-full cursor-pointer items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
                       isSelected
                         ? "border-brand-blue bg-brand-blue/10"
-                        : "border-gray-200 hover:border-brand-blue hover:bg-blue-50/50"
+                        : "border-gray-200 bg-white hover:border-brand-blue hover:bg-blue-50/50"
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? "border-brand-blue bg-brand-blue" : "border-gray-300"
-                      }`}>
-                        {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </div>
-                      {/* Visual reference photo (e.g. an example of "perfilado de barba") */}
-                      {s.imageUrl && (
-                        <img src={s.imageUrl} alt={s.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-medium text-brand-dark">{s.name}</p>
-                        <p className="text-sm text-brand-gray">{s.duration} min{s.description ? ` · ${s.description}` : ""}</p>
-                      </div>
+                    <div className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 ${
+                      isSelected ? "border-brand-blue bg-brand-blue" : "border-gray-300"
+                    }`}>
+                      {isSelected && <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </div>
-                    <p className="text-brand-blue font-bold text-lg flex-shrink-0 ml-2">{formatCurrency(Number(s.price))}</p>
-                  </button>
+                    {/* Foto de referencia del servicio */}
+                    {s.imageUrl && (
+                      <img src={s.imageUrl} alt={s.name} className="h-14 w-14 flex-shrink-0 rounded-lg object-cover" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold leading-snug text-brand-dark">{s.name}</p>
+                        <p className="flex-shrink-0 text-sm font-bold text-brand-blue">{formatCurrency(Number(s.price))}</p>
+                      </div>
+                      <p className="mt-0.5 text-xs text-brand-gray">{s.duration} min</p>
+                      {s.description && (
+                        <p className={`mt-1 whitespace-pre-line text-xs leading-relaxed text-brand-gray ${expanded ? "" : "line-clamp-2"}`}>{s.description}</p>
+                      )}
+                      {longDesc && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); setExpandedService(expanded ? null : s.id); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setExpandedService(expanded ? null : s.id); } }}
+                          className="mt-1 inline-block text-xs font-semibold text-brand-blue underline"
+                        >
+                          {expanded ? "Ver menos" : "Ver más"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
