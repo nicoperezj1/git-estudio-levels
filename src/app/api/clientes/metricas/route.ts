@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, isManagerLevel, resolveTenantForRequest } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/utils";
+import { loadCustomSources } from "@/lib/client-sources";
 
 // Punto 10 (Pablo): "Metricas" en Clientes — diferenciar el origen de cada CLIENTE
 // (reserva por link / agendado manualmente / desde promociones / sin registrar) para
@@ -31,12 +32,14 @@ const SOURCE_LABELS: Record<string, string> = {
   unknown: "Sin registrar",
 };
 
-const EMPTY_SOURCE_BUCKETS = () => ({
+// Casillas por origen: las de siempre + los origenes propios del negocio.
+const EMPTY_SOURCE_BUCKETS = (extra: string[] = []) => ({
   link: [] as any[], walk_in: [] as any[], instagram: [] as any[], tiktok: [] as any[],
   facebook: [] as any[], referral: [] as any[],
   google_maps: [] as any[], promotion: [] as any[], influencer: [] as any[],
+  ...Object.fromEntries(extra.map((k) => [k, [] as any[]])),
   manual: [] as any[], unknown: [] as any[],
-});
+}) as Record<string, any[]>;
 
 export async function GET(req: NextRequest) {
   const { ok } = await isManagerLevel();
@@ -58,6 +61,10 @@ export async function GET(req: NextRequest) {
   if (!tenantId) {
     return NextResponse.json({ summary: [], monthly: [], clientsBySource: EMPTY_SOURCE_BUCKETS() });
   }
+
+  // Origenes propios del negocio ("+ Crear otra opcion"): se suman a las casillas y a las etiquetas.
+  const custom = await loadCustomSources(supabase, tenantId);
+  const labels: Record<string, string> = { ...SOURCE_LABELS, ...Object.fromEntries(custom.map((c) => [c.code, c.label])) };
 
   // Supabase devuelve como maximo 1.000 filas por consulta; sin paginar, solo se leian
   // los primeros 1.000 clientes (los mas antiguos/importados) y los nuevos nunca se
@@ -82,7 +89,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Agrupa clientes por origen.
-  const bySource: Record<string, Array<{ id: string; name: string; email: string | null; phone: string | null; firstVisit: string; detail: string | null }>> = EMPTY_SOURCE_BUCKETS();
+  const bySource: Record<string, Array<{ id: string; name: string; email: string | null; phone: string | null; firstVisit: string; detail: string | null }>> = EMPTY_SOURCE_BUCKETS(custom.map((c) => c.code));
   for (const c of clients || []) {
     const key = c.acquisition_source && bySource[c.acquisition_source] ? c.acquisition_source : "unknown";
     bySource[key].push({
@@ -98,7 +105,7 @@ export async function GET(req: NextRequest) {
   const total = clients?.length || 0;
   const summary = Object.entries(bySource).map(([source, list]) => ({
     source,
-    label: SOURCE_LABELS[source],
+    label: labels[source] || source,
     count: list.length,
     percent: total > 0 ? Math.round((list.length / total) * 1000) / 10 : 0,
   }));
@@ -117,7 +124,7 @@ export async function GET(req: NextRequest) {
     let y = chileYear;
     while (m < 0) { m += 12; y--; }
     const label = `${monthNamesShort[m]} ${String(y).slice(2)}`;
-    const bucket = { label, ...Object.fromEntries(Object.keys(EMPTY_SOURCE_BUCKETS()).map((k) => [k, 0])) };
+    const bucket = { label, ...Object.fromEntries(Object.keys(bySource).map((k) => [k, 0])) };
     for (const c of clients || []) {
       if (!c.created_at) continue;
       const cd = new Date(c.created_at);

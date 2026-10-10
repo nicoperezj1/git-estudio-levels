@@ -1,3 +1,4 @@
+import { loadCustomSources } from "@/lib/client-sources";
 import { accountingColumnsAvailable, fetchMonthTx } from "@/lib/accounting";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
@@ -152,11 +153,13 @@ export async function GET(req: NextRequest) {
   const attendedNew = attendedRows.filter((c) => new Date(c.created_at).getTime() >= startMs).length;
   const attendedReturning = attendedRows.length - attendedNew;
 
-  // Origen de los clientes nuevos.
+  // Origen de los clientes nuevos (incluye los origenes que el negocio creo).
+  const customSources = await loadCustomSources(supabase, tenantId);
+  const sourceLabels: Record<string, string> = { ...SOURCE_LABELS, ...Object.fromEntries(customSources.map((c) => [c.code, c.label])) };
   const sourceMap: Record<string, number> = {};
   const promoDetail: Record<string, number> = {};
   for (const c of newClientsList) {
-    const key = c.acquisition_source && SOURCE_LABELS[c.acquisition_source] ? c.acquisition_source : "unknown";
+    const key = c.acquisition_source && sourceLabels[c.acquisition_source] ? c.acquisition_source : "unknown";
     sourceMap[key] = (sourceMap[key] || 0) + 1;
     if (c.acquisition_source === "promotion" && c.acquisition_detail) {
       const d = String(c.acquisition_detail).trim();
@@ -413,7 +416,7 @@ export async function GET(req: NextRequest) {
   <div class="grid g2" style="margin-top:12px;">
     <div class="card">
       <div class="k-label" style="margin-bottom:8px;">¿Cómo llegaron los clientes nuevos?</div>
-      ${sourceRows.length ? sourceRows.map(([k, n]) => `<div class="row"><span class="lbl" style="text-transform:none;">${SOURCE_LABELS[k]}</span>${bar(n, sourceRows[0][1])}<span class="val" style="width:70px;">${n} · ${pct(n, newClients)}%</span></div>`).join("") : `<div class="empty">Sin clientes nuevos en el mes</div>`}
+      ${sourceRows.length ? sourceRows.map(([k, n]) => `<div class="row"><span class="lbl" style="text-transform:none;">${esc(sourceLabels[k])}</span>${bar(n, sourceRows[0][1])}<span class="val" style="width:70px;">${n} · ${pct(n, newClients)}%</span></div>`).join("") : `<div class="empty">Sin clientes nuevos en el mes</div>`}
       ${Object.keys(promoDetail).length ? `<p class="note">Promociones indicadas: ${Object.entries(promoDetail).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([d, n]) => `${esc(d)} (${n})`).join(", ")}</p>` : ""}
     </div>
     <div class="card">

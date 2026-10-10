@@ -14,6 +14,7 @@ import { StandbyHeader } from "@/components/standby/standby-header";
 import { CajaLockGate } from "@/components/caja/caja-lock";
 import { ReceptionistGreeting } from "@/components/ui/receptionist-greeting";
 import { useLedgerEnabled } from "@/components/finance/professional-ledger-view";
+import SourceSelect from "@/components/clients/source-select";
 
 interface Service {
   id: string;
@@ -956,21 +957,14 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
                             placeholder="Correo *"
                             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
                           />
-                          <select
+                          <SourceSelect
                             value={newClientSource}
-                            onChange={(e) => setNewClientSource(e.target.value)}
-                            aria-label="¿Cómo nos conoció?"
+                            onChange={setNewClientSource}
+                            tenantId={getActiveTenantId()}
+                            ariaLabel="¿Cómo nos conoció?"
+                            walkInLabel="¿Cómo nos conoció? · Pasó por fuera"
                             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs outline-none transition focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10"
-                          >
-                            <option value="walk_in">¿Cómo nos conoció? · Pasó por fuera</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="tiktok">TikTok</option>
-                            <option value="facebook">Facebook</option>
-                            <option value="referral">Referido de un amigo/conocido</option>
-                            <option value="google_maps">Google Maps</option>
-                            <option value="promotion">Promoción</option>
-                            <option value="influencer">Influencer</option>
-                          </select>
+                          />
                           <div className="flex gap-2">
                             <button onClick={addClient} disabled={savingClient || !formOk}
                               className="flex-1 px-3 py-1.5 bg-brand-blue text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">

@@ -42,7 +42,21 @@ const SOURCE_COLORS: Record<string, { bg: string; text: string; bar: string; dot
   manual: { bg: "bg-purple-50", text: "text-purple-700", bar: "bg-purple-400", dot: "bg-purple-400" },
   unknown: { bg: "bg-gray-50", text: "text-gray-600", bar: "bg-gray-300", dot: "bg-gray-300" },
 };
-const SOURCE_KEYS = Object.keys(SOURCE_COLORS);
+// Origenes creados por el negocio: sin color fijo, se reparte uno de esta paleta segun su nombre.
+const CUSTOM_PALETTE = [
+  { bg: "bg-cyan-50", text: "text-cyan-700", bar: "bg-cyan-400", dot: "bg-cyan-400" },
+  { bg: "bg-lime-50", text: "text-lime-700", bar: "bg-lime-500", dot: "bg-lime-500" },
+  { bg: "bg-rose-50", text: "text-rose-700", bar: "bg-rose-400", dot: "bg-rose-400" },
+  { bg: "bg-violet-50", text: "text-violet-700", bar: "bg-violet-400", dot: "bg-violet-400" },
+  { bg: "bg-yellow-50", text: "text-yellow-700", bar: "bg-yellow-400", dot: "bg-yellow-400" },
+  { bg: "bg-emerald-50", text: "text-emerald-700", bar: "bg-emerald-400", dot: "bg-emerald-400" },
+];
+const colorFor = (source: string) => {
+  if (SOURCE_COLORS[source]) return SOURCE_COLORS[source];
+  let h = 0;
+  for (const ch of source) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return CUSTOM_PALETTE[h % CUSTOM_PALETTE.length];
+};
 
 export default function ClientesMetricasPage() {
   const router = useRouter();
@@ -78,9 +92,10 @@ export default function ClientesMetricasPage() {
     );
   }
 
+  const sourceKeys = data.summary.map((r) => r.source);
   const total = data.summary.reduce((s, r) => s + r.count, 0);
   const monthlyTotal = (m: MetricsData["monthly"][number]) =>
-    SOURCE_KEYS.reduce((s, k) => s + (m[k] || 0), 0);
+    sourceKeys.reduce((s, k) => s + (m[k] || 0), 0);
   const maxMonthly = Math.max(...data.monthly.map(monthlyTotal), 1);
   const activeList = activeSource ? data.clientsBySource[activeSource] || [] : [];
 
@@ -102,7 +117,7 @@ export default function ClientesMetricasPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {data.summary.map((row) => {
-          const colors = SOURCE_COLORS[row.source] || SOURCE_COLORS.unknown;
+          const colors = colorFor(row.source);
           return (
             <button
               key={row.source}
@@ -128,11 +143,11 @@ export default function ClientesMetricasPage() {
             return (
               <div key={m.label} className="flex-1 flex flex-col items-center gap-1">
                 <div className="flex flex-col-reverse w-full max-w-[36px] h-36 rounded-t overflow-hidden">
-                  {SOURCE_KEYS.map((key) =>
+                  {sourceKeys.map((key) =>
                     m[key] > 0 ? (
                       <div
                         key={key}
-                        className={SOURCE_COLORS[key].bar}
+                        className={colorFor(key).bar}
                         style={{ height: `${(m[key] / maxMonthly) * 100}%` }}
                         title={`${data.summary.find((s) => s.source === key)?.label || key}: ${m[key]}`}
                       />
@@ -148,7 +163,7 @@ export default function ClientesMetricasPage() {
         <div className="flex flex-wrap gap-4 justify-center mt-4 text-xs text-gray-500">
           {data.summary.map((row) => (
             <span key={row.source} className="flex items-center gap-1">
-              <span className={`w-3 h-3 rounded ${(SOURCE_COLORS[row.source] || SOURCE_COLORS.unknown).dot}`} />
+              <span className={`w-3 h-3 rounded ${(colorFor(row.source)).dot}`} />
               {row.label}
             </span>
           ))}

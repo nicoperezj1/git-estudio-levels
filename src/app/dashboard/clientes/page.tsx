@@ -9,6 +9,7 @@ import { useTenant } from "@/lib/tenant-context";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyIcons } from "@/components/ui/empty-state";
 import { parseCsvText, rowsToClients } from "@/lib/client-import";
+import SourceSelect from "@/components/clients/source-select";
 
 interface Client {
   id: string;
@@ -413,18 +414,12 @@ export default function ClientesPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">¿Cómo nos visitó?</label>
-                <select value={formData.source}
-                  onChange={(e) => setFormData({ ...formData, source: e.target.value, sourceDetail: (e.target.value === "promotion" || e.target.value === "influencer") ? formData.sourceDetail : "" })}
-                  className="w-full border rounded-lg px-3 py-2">
-                  <option value="walk_in">Pasó por fuera</option>
-                  <option value="instagram">Instagram</option>
-                  <option value="tiktok">TikTok</option>
-                  <option value="facebook">Facebook</option>
-                  <option value="referral">Referido de un amigo/conocido</option>
-                  <option value="google_maps">Google Maps</option>
-                  <option value="promotion">Promoción</option>
-                  <option value="influencer">Influencer</option>
-                </select>
+                <SourceSelect
+                  value={formData.source}
+                  tenantId={tenant?.id}
+                  onChange={(code) => setFormData({ ...formData, source: code, sourceDetail: (code === "promotion" || code === "influencer") ? formData.sourceDetail : "" })}
+                  className="w-full border rounded-lg px-3 py-2"
+                />
               </div>
               {formData.source === "promotion" && (
                 <div>

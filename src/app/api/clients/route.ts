@@ -1,3 +1,4 @@
+import { BUILTIN_SOURCES, loadCustomSources } from "@/lib/client-sources";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentTenantId, getCurrentUserRoleAndTenant, resolveTenantForRequest } from "@/lib/supabase/server";
 
@@ -85,7 +86,8 @@ export async function POST(req: NextRequest) {
   // "Normal"/"Promocion" — la recepcion siempre pregunta de donde viene el cliente.
   // "walk_in" (Paso por fuera) es el default cuando no se elige nada. "promotion" e
   // "influencer" aceptan un detalle opcional (codigo de descuento / @handle).
-  const VALID_SOURCES = ["instagram", "tiktok", "facebook", "google_maps", "promotion", "walk_in", "influencer", "referral"];
+  // Ademas de los de siempre vale cualquier origen que el negocio haya creado ("+ Crear otra opcion").
+  const VALID_SOURCES = [...BUILTIN_SOURCES.map((x) => x.code), ...(await loadCustomSources(supabase, resolvedTenantId)).map((x) => x.code)];
   const acquisitionSource = VALID_SOURCES.includes(source) ? source : "walk_in";
   const acquisitionDetail = (source === "promotion" || source === "influencer") ? (sourceDetail || null) : null;
 
