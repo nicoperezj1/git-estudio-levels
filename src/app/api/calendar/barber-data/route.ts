@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     wantBlocks
       ? supabase
           .from("barber_blocks")
-          .select("id, barber_id, date, all_day, start_time, end_time, reason")
+          .select("id, barber_id, date, all_day, start_time, end_time, reason, spots")
           .in("barber_id", ids)
           .gte("date", from)
           .lte("date", to)
@@ -79,9 +79,19 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] as any[], error: null }),
   ]);
 
-  if (blocksRes.error) console.error("[calendar/barber-data] blocks failed:", blocksRes.error.message);
+  // Sin la migracion 102 (columna spots) se repite la consulta sin ella.
+  let blocksData: any[] = (blocksRes.data || []) as any[];
+  let blocksError = blocksRes.error;
+  if (blocksError && wantBlocks && /spots/.test(blocksError.message)) {
+    const retry = await supabase
+      .from("barber_blocks")
+      .select("id, barber_id, date, all_day, start_time, end_time, reason")
+      .in("barber_id", ids).gte("date", from).lte("date", to).order("date", { ascending: true });
+    blocksData = (retry.data || []) as any[]; blocksError = retry.error;
+  }
+  if (blocksError) console.error("[calendar/barber-data] blocks failed:", blocksError.message);
 
-  const blocks: any[] = blocksRes.error ? [] : [...(blocksRes.data || [])];
+  const blocks: any[] = blocksError ? [] : [...blocksData];
 
   // Las vacaciones se muestran como bloqueos de todo el dia, solo de lectura
   // (igual que en /api/barber/blocks).

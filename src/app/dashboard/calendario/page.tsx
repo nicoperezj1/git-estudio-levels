@@ -107,7 +107,7 @@ export default function CalendarioPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [blocks, setBlocks] = useState<Array<{ id: string; barber_id: string; date: string; all_day: boolean; start_time: string | null; end_time: string | null; reason: string | null }>>([]);
+  const [blocks, setBlocks] = useState<Array<{ id: string; barber_id: string; date: string; all_day: boolean; start_time: string | null; end_time: string | null; reason: string | null; spots?: number | null }>>([]);
   // Each barber's working hours for the currently viewed weekday, keyed by barber id.
   // Used to dim (grey out) the slots OUTSIDE their shift on the grid, so out-of-hours
   // time reads as unavailable at a glance (David's feedback), without needing a manual
@@ -146,7 +146,7 @@ export default function CalendarioPage() {
   // el selector 1/3/7 dias tambien aplica a TODOS los profesionales a la vez.
   // Se activa en Configuracion > Calendario (admin). Ver /api/settings/calendar-view.
   const [groupWeekActive, setGroupWeekActive] = useState(false);
-  const [rangeBlocks, setRangeBlocks] = useState<Array<{ id: string; barber_id: string; date: string; all_day: boolean; start_time: string | null; end_time: string | null; reason: string | null }>>([]);
+  const [rangeBlocks, setRangeBlocks] = useState<Array<{ id: string; barber_id: string; date: string; all_day: boolean; start_time: string | null; end_time: string | null; reason: string | null; spots?: number | null }>>([]);
   const START_HOUR = fullDay ? FULL_DAY_START_HOUR : DEFAULT_START_HOUR;
   const END_HOUR = fullDay ? FULL_DAY_END_HOUR : DEFAULT_END_HOUR;
   // Punto (Nico, 25-sep): tooltip que sigue el cursor mostrando hora (redondeada a 15
@@ -157,7 +157,7 @@ export default function CalendarioPage() {
   // roja). Al hacer click en un bloqueo se abre este panel con nombre + duracion +
   // eliminar, en vez del toast de solo lectura que habia antes.
   const [editingBlock, setEditingBlock] = useState<{
-    id: string; barberId: string; reason: string; allDay: boolean; startTime: string; endTime: string;
+    id: string; barberId: string; reason: string; allDay: boolean; startTime: string; endTime: string; spots?: number;
   } | null>(null);
   const [savingBlock, setSavingBlock] = useState(false);
   const { showToast } = useToast();
@@ -166,6 +166,15 @@ export default function CalendarioPage() {
   const openBlockEditor = (b: any) => {
     if (String(b?.id || "").startsWith("vac-")) { showToast("Son vacaciones del profesional: se cambian en Mi negocio > Vacaciones", "success"); return; }
     setEditingBlock(b);
+  };
+  // Bloqueo de solo algunos cupos: se dibuja en la parte derecha de la columna, donde queda el cupo libre.
+  const partialBlockStyle = (block: any, base: any) => {
+    const sp = Number(block?.spots);
+    if (slotCap > 1 && !block?.all_day && sp >= 1 && sp < slotCap) {
+      const w = (100 / slotCap) * sp;
+      return { ...base, left: `calc(${100 - w}% + 2px)`, width: `calc(${w}% - 4px)`, right: "auto" };
+    }
+    return base;
   };
   const { tenant, loading: tenantLoading } = useTenant();
   const { user, effectiveRole } = useAuth();
@@ -232,6 +241,11 @@ export default function CalendarioPage() {
   const groupedAllowed = !isBarber && groupWeekActive && groupPros.length >= 2 && groupPros.length <= 4;
   // Varios dias a la vez: un profesional puntual (como antes) o, si el negocio lo activo,
   // todos sus profesionales agrupados. Con "1 dia" y sin profesional sigue la grilla normal.
+  // Un solo profesional en el negocio: no hay a quien elegir, queda fijo y salen 1/3/7 dias de inmediato.
+  const soloPro = !isBarber && groupPros.length === 1 ? groupPros[0] : null;
+  useEffect(() => {
+    if (soloPro && professionalFilter !== soloPro.id) setProfessionalFilter(soloPro.id);
+  }, [soloPro?.id, professionalFilter]);
   const multiDay = !!professionalFilter || (groupedAllowed && rangeDays > 1);
   const multiPros: Barber[] = professionalFilter
     ? (displayBarbers.filter((b) => b.id === professionalFilter).length > 0
@@ -335,6 +349,8 @@ export default function CalendarioPage() {
   const [selectedService, setSelectedService] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
   const [eventName, setEventName] = useState("");
+  // Cupos que ocupa el bloqueo nuevo (0 = todo el horario). Solo con cupos por bloque.
+  const [blockSpots, setBlockSpots] = useState(0);
   const [eventNotes, setEventNotes] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -795,10 +811,12 @@ export default function CalendarioPage() {
           startTime: popupData.startTime,
           endTime: popupData.endTime,
           reason: eventName || "Bloqueo",
+          ...(slotCap > 1 && blockSpots > 0 && blockSpots < slotCap ? { spots: blockSpots } : {}),
         }),
       });
       if (blockRes.ok) {
         showToast("Bloqueo creado", "success");
+        setBlockSpots(0);
       } else {
         const err = await blockRes.json().catch(() => ({}));
         showToast(err.error || "No se pudo crear el bloqueo", "error");
@@ -1055,7 +1073,7 @@ export default function CalendarioPage() {
           </div>
         )}
 
-        {view === "calendario" && (
+        {view === "calendario" && !soloPro && (
           <select
             value={professionalFilter}
             onChange={(e) => { setProfessionalFilter(e.target.value); setRangeDays(1); }}
@@ -1148,7 +1166,7 @@ export default function CalendarioPage() {
             })}
           </div>
 
-          <div data-noswipe className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div data-noswipe className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${soloPro ? "hidden" : ""}`}>
             {[{ id: "", name: "Todos" }, ...displayBarbers].map((b) => {
               const active = professionalFilter === b.id;
               return (
@@ -1388,7 +1406,7 @@ export default function CalendarioPage() {
                           <div
                             key={block.id}
                             className="absolute left-1 right-1 rounded-md bg-gray-100 border border-gray-200 px-1.5 py-1 overflow-hidden z-[5] cursor-pointer hover:bg-gray-200/70"
-                            style={{ top: `${top}px`, height: `${Math.max(height, 24)}px` }}
+                            style={partialBlockStyle(block, { top: `${top}px`, height: `${Math.max(height, 24)}px` })}
                             onClick={() => openBlockEditor({
                               id: block.id,
                               barberId: block.barber_id,
@@ -1396,6 +1414,7 @@ export default function CalendarioPage() {
                               allDay: block.all_day,
                               startTime: block.start_time?.slice(0, 5) || "09:00",
                               endTime: block.end_time?.slice(0, 5) || "18:00",
+                              spots: Number(block.spots) || 0,
                             })}
                           >
                             <p className="text-[10px] font-medium text-gray-500 truncate">{block.reason || "Bloqueado"}</p>
@@ -1403,6 +1422,7 @@ export default function CalendarioPage() {
                               <p className="text-[9px] text-gray-400">{block.start_time.slice(0, 5)} – {block.end_time.slice(0, 5)}</p>
                             )}
                             {block.all_day && <p className="text-[9px] text-gray-400">Todo el dia</p>}
+                          {Number(block.spots) > 0 && Number(block.spots) < slotCap && <p className="text-[9px] text-gray-400">{block.spots} cupo{Number(block.spots) > 1 ? "s" : ""}</p>}
                           </div>
                         );
                       })}
@@ -1763,7 +1783,7 @@ export default function CalendarioPage() {
                         <div
                           key={block.id}
                           className="absolute left-1 right-1 rounded-md bg-gray-100 border border-gray-200 px-1.5 py-1 overflow-hidden z-[5] cursor-pointer hover:bg-gray-200/70"
-                          style={{ top: `${top}px`, height: `${Math.max(height, 24)}px` }}
+                          style={partialBlockStyle(block, { top: `${top}px`, height: `${Math.max(height, 24)}px` })}
                           onClick={(e) => {
                             e.stopPropagation();
                             // Punto (Nico, 25-sep): antes esto mostraba un toast de solo
@@ -1777,6 +1797,7 @@ export default function CalendarioPage() {
                               allDay: block.all_day,
                               startTime: block.start_time?.slice(0, 5) || "09:00",
                               endTime: block.end_time?.slice(0, 5) || "18:00",
+                              spots: Number(block.spots) || 0,
                             });
                           }}
                         >
@@ -1785,6 +1806,7 @@ export default function CalendarioPage() {
                             <p className="text-[9px] text-gray-400">{block.start_time?.slice(0,5)} – {block.end_time?.slice(0,5)}</p>
                           )}
                           {block.all_day && <p className="text-[9px] text-gray-400">Todo el dia</p>}
+                          {Number(block.spots) > 0 && Number(block.spots) < slotCap && <p className="text-[9px] text-gray-400">{block.spots} cupo{Number(block.spots) > 1 ? "s" : ""}</p>}
                         </div>
                       );
                     })}
@@ -1988,6 +2010,18 @@ export default function CalendarioPage() {
                   <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
                     placeholder="Nombre del evento o bloqueo"
                     className="w-full border rounded-xl px-3 py-2.5 text-sm" />
+                  {slotCap > 1 && (
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-1">Cupos que bloquea</label>
+                      <select value={blockSpots} onChange={(e) => setBlockSpots(Number(e.target.value))}
+                        className="w-full border rounded-xl px-3 py-2.5 text-sm">
+                        <option value={0}>Todo el horario (nadie puede reservar)</option>
+                        {Array.from({ length: slotCap - 1 }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>{n} cupo{n > 1 ? "s" : ""} (quedan {slotCap - n} para reservar)</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -2368,6 +2402,19 @@ export default function CalendarioPage() {
                 Todo el dia
               </label>
 
+              {!editingBlock.allDay && slotCap > 1 && (
+                <div>
+                  <label className="text-[10px] text-brand-gray block mb-1">Cupos que bloquea</label>
+                  <select value={editingBlock.spots || 0} onChange={(e) => setEditingBlock({ ...editingBlock, spots: Number(e.target.value) })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <option value={0}>Todo el horario</option>
+                    {Array.from({ length: slotCap - 1 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>{n} cupo{n > 1 ? "s" : ""}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {!editingBlock.allDay && (
                 <div>
                   <label className="text-[10px] text-brand-gray block mb-1">Duracion</label>
@@ -2424,6 +2471,7 @@ export default function CalendarioPage() {
                           allDay: editingBlock.allDay,
                           startTime: editingBlock.allDay ? null : editingBlock.startTime,
                           endTime: editingBlock.allDay ? null : editingBlock.endTime,
+                          ...(slotCap > 1 ? { spots: editingBlock.allDay || !editingBlock.spots ? null : editingBlock.spots } : {}),
                         }),
                       });
                       if (!res.ok) {

@@ -110,11 +110,19 @@ export async function GET(req: NextRequest) {
     .in("status", ["scheduled", "confirmed", "in_progress"]);
 
   // Check if barber has blocked this day
-  const { data: blocks } = await supabase
+  let { data: blocks, error: blocksErr } = (await supabase
     .from("barber_blocks")
-    .select("all_day, start_time, end_time")
+    .select("all_day, start_time, end_time, spots")
     .eq("barber_id", barberId)
-    .eq("date", date);
+    .eq("date", date)) as { data: any[] | null; error: any };
+  // Sin la migracion 102 (columna spots) se consulta como antes: todos los bloqueos ocupan todo el horario.
+  if (blocksErr) {
+    ({ data: blocks } = await supabase
+      .from("barber_blocks")
+      .select("all_day, start_time, end_time")
+      .eq("barber_id", barberId)
+      .eq("date", date));
+  }
 
   // If any block is all_day, no slots available
   if (blocks?.some((b) => b.all_day)) {
@@ -143,14 +151,20 @@ export async function GET(req: NextRequest) {
   }
   // Con cupo 1 cada cita bloquea su horario (igual que siempre). Con cupo > 1 solo se bloquean
   // los tramos donde ya hay tantas citas a la vez como cupos.
-  if (capacity > 1) busyIntervals.push(...fullSegments(apptIntervals, capacity));
-  else busyIntervals.push(...apptIntervals);
+  // Un bloqueo con `spots` (migracion 102) ocupa solo esa cantidad de cupos, como si fueran citas.
+  const capIntervals = [...apptIntervals];
   for (const block of blocks || []) {
     if (block.all_day || !block.start_time || !block.end_time) continue;
     const s = block.start_time.match(/(\d{2}):(\d{2})/);
     const e = block.end_time.match(/(\d{2}):(\d{2})/);
-    if (s && e) busyIntervals.push({ start: parseInt(s[1]) * 60 + parseInt(s[2]), end: parseInt(e[1]) * 60 + parseInt(e[2]) });
+    if (!(s && e)) continue;
+    const iv = { start: parseInt(s[1]) * 60 + parseInt(s[2]), end: parseInt(e[1]) * 60 + parseInt(e[2]) };
+    const bs = Number((block as any).spots);
+    if (capacity > 1 && bs >= 1 && bs < capacity) { for (let i = 0; i < bs; i++) capIntervals.push(iv); }
+    else busyIntervals.push(iv);
   }
+  if (capacity > 1) busyIntervals.push(...fullSegments(capIntervals, capacity));
+  else busyIntervals.push(...apptIntervals);
   if (breakStartMin !== null && breakEndMin !== null) {
     busyIntervals.push({ start: breakStartMin, end: breakEndMin });
   }
@@ -218,7 +232,7 @@ export async function GET(req: NextRequest) {
     const spots: Record<string, number> = {};
     for (const slot of slots) {
       const m = parseInt(slot.slice(11, 13)) * 60 + parseInt(slot.slice(14, 16));
-      spots[slot] = Math.max(0, capacity - peakOverlap(apptIntervals, m, m + duration));
+      spots[slot] = Math.max(0, capacity - peakOverlap(capIntervals, m, m + duration));
     }
     return NextResponse.json({ slots, date, barberId, capacity, spots });
   }

@@ -52,19 +52,21 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { barberId, date, allDay, startTime, endTime, reason } = body;
+  const spots = Number.isInteger(body.spots) && body.spots >= 1 && body.spots <= 6 && allDay === false ? body.spots : null;
 
-  const { data, error } = await supabase
-    .from("barber_blocks")
-    .insert({
-      barber_id: barberId,
-      date,
-      all_day: allDay !== false,
-      start_time: allDay ? null : startTime,
-      end_time: allDay ? null : endTime,
-      reason: reason || null,
-    })
-    .select()
-    .single();
+  const row: Record<string, any> = {
+    barber_id: barberId,
+    date,
+    all_day: allDay !== false,
+    start_time: allDay ? null : startTime,
+    end_time: allDay ? null : endTime,
+    reason: reason || null,
+  };
+  let { data, error } = await supabase.from("barber_blocks").insert(spots ? { ...row, spots } : row).select().single();
+  // Falta la migracion 102: no se puede guardar un bloqueo parcial; se avisa en vez de bloquear todo.
+  if (error && spots && /spots/.test(error.message)) {
+    return NextResponse.json({ error: "Falta aplicar la migración 102 para bloquear solo algunos cupos" }, { status: 500 });
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
@@ -83,6 +85,7 @@ export async function PATCH(req: NextRequest) {
   const { reason, allDay, startTime, endTime } = body;
 
   const updates: Record<string, any> = {};
+  if (body.spots !== undefined) updates.spots = Number.isInteger(body.spots) && body.spots >= 1 && body.spots <= 6 ? body.spots : null;
   if (reason !== undefined) updates.reason = reason || null;
   if (allDay !== undefined) {
     updates.all_day = !!allDay;
@@ -94,6 +97,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Nada para actualizar" }, { status: 400 });
   }
 
+  if (updates.all_day === true) updates.spots = null;
   const { data, error } = await supabase
     .from("barber_blocks")
     .update(updates)
@@ -101,6 +105,9 @@ export async function PATCH(req: NextRequest) {
     .select()
     .single();
 
+  if (error && /spots/.test(error.message)) {
+    return NextResponse.json({ error: "Falta aplicar la migración 102 para bloquear solo algunos cupos" }, { status: 500 });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }

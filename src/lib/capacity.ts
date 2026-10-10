@@ -64,10 +64,32 @@ async function overlapping(supabase: Admin, barberId: string, date: string, star
   return (data || []).map((a: any) => ({ id: a.id, iv: { start: Date.parse(a.start_time), end: Date.parse(a.end_time) } }));
 }
 
+// Bloqueos parciales (migracion 102): ocupan `spots` cupos, como si fueran citas. Solo importa con cupo > 1;
+// si la columna no existe devuelve vacio y todo funciona como antes.
+async function partialBlocks(supabase: Admin, barberId: string, date: string, startMs: number, endMs: number): Promise<{ id: string; iv: Interval }[]> {
+  const { data, error } = await supabase
+    .from("barber_blocks")
+    .select("id, start_time, end_time, spots")
+    .eq("barber_id", barberId)
+    .eq("date", date)
+    .eq("all_day", false)
+    .not("spots", "is", null);
+  if (error) return [];
+  const out: { id: string; iv: Interval }[] = [];
+  for (const b of data || []) {
+    if (!b.start_time || !b.end_time) continue;
+    const iv = { start: Date.parse(`${date}T${String(b.start_time).slice(0, 5)}:00`), end: Date.parse(`${date}T${String(b.end_time).slice(0, 5)}:00`) };
+    if (!(iv.end > startMs && iv.start < endMs)) continue;
+    for (let i = 0; i < Number(b.spots); i++) out.push({ id: `block-${b.id}-${i}`, iv });
+  }
+  return out;
+}
+
 // true = NO se puede agendar (horario lleno para ese profesional).
 export async function isSlotFull(supabase: Admin, barberId: string, tenantId: string | null | undefined, date: string, start: Date, end: Date, excludeId?: string): Promise<boolean> {
   const cap = await getSlotCapacity(supabase, tenantId);
   const rows = (await overlapping(supabase, barberId, date, start.toISOString(), end.toISOString())).filter((r) => r.id !== excludeId);
+  if (cap > 1) rows.push(...(await partialBlocks(supabase, barberId, date, start.getTime(), end.getTime())));
   return rows.length > 0 && (cap === 1 ? true : peakOverlap(rows.map((r) => r.iv), start.getTime(), end.getTime()) >= cap);
 }
 
@@ -77,5 +99,6 @@ export async function exceededAfterInsert(supabase: Admin, barberId: string, ten
   const cap = await getSlotCapacity(supabase, tenantId);
   if (cap <= 1) return false;
   const rows = await overlapping(supabase, barberId, date, start.toISOString(), end.toISOString());
+  rows.push(...(await partialBlocks(supabase, barberId, date, start.getTime(), end.getTime())));
   return peakOverlap(rows.map((r) => r.iv), start.getTime(), end.getTime()) > cap;
 }
