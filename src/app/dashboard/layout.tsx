@@ -27,9 +27,23 @@ export default async function DashboardLayout({
   // Single query: profile + tenant name via join (was two sequential round-trips).
   const { data: profile } = await createAdminSupabase()
     .from("profiles")
-    .select("name, role, tenant_id, tenant:tenants(name, status)")
+    .select("name, role, tenant_id, tenant:tenants(name, status, admin_email, must_change_password, temp_password, created_at)")
     .eq("id", user.id)
     .single();
+
+  // Primer ingreso de un negocio nuevo: obliga a crear una clave propia (dos veces) antes de
+  // entrar. Solo aplica al administrador del negocio, mientras la clave temporal siga vigente,
+  // y a negocios creados desde el 10-oct-2026 para no pedirsela de golpe a los que ya operan.
+  const t = profile?.tenant as any;
+  if (
+    profile?.role === "admin" &&
+    t?.must_change_password === true &&
+    t?.temp_password &&
+    t?.admin_email?.toLowerCase() === user.email?.toLowerCase() &&
+    new Date(t.created_at) >= new Date("2026-10-10T00:00:00-03:00")
+  ) {
+    redirect("/cambiar-clave");
+  }
 
   const tenantName = (profile?.tenant as any)?.name || "";
   // Negocio suspendido por falta de pago: se bloquea el panel (salvo Plan y facturacion).
