@@ -77,6 +77,14 @@ export async function PATCH(
     }
   }
 
+  // Nota corta del equipo para ESTA cita (columna aparte: "notes" guarda lo que escribe el cliente al reservar, p. ej. su direccion).
+  if (body.staff_note !== undefined) {
+    const { error: snErr } = await supabase.from("appointments").update({ staff_note: body.staff_note || null }).eq("id", params.id);
+    if (snErr) {
+      return NextResponse.json({ error: /staff_note/.test(snErr.message) ? "Falta aplicar la migración 105 (notas de la cita)." : snErr.message }, { status: 500 });
+    }
+  }
+
   if (Object.keys(update).length === 0) {
     const { data: same, error: sameErr } = await supabase.from("appointments").select().eq("id", params.id).single();
     if (sameErr) return NextResponse.json({ error: sameErr.message }, { status: 500 });
