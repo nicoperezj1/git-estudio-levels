@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   if (!appointments) return NextResponse.json([]);
 
-  const bookingUrl = process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+  const bookingUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
 
   // Punto 4 (Nico): el mensaje decia "manana" fijo, pero ahora la fecha puede ser
   // cualquier dia elegido en el selector, asi que el texto debe reflejar el dia real.

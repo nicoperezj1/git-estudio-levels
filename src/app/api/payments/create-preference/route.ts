@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "MercadoPago no configurado" }, { status: 500 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
 
   const items = services.map((s: { name: string; price: number }) => ({
     title: s.name,

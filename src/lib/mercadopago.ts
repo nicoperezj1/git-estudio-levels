@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server";
 export const MP_API = "https://api.mercadopago.com";
 
 export function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+  return process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
 }
 
 // Mercado Pago exige URLs https para back_url y notification_url. En desarrollo local

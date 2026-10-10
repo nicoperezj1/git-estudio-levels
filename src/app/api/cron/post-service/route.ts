@@ -30,7 +30,7 @@ export async function GET() {
   }
 
   let sent = 0;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
 
   for (const appt of appointments) {
     const client = appt.client as any;

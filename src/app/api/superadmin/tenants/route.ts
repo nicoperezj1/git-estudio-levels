@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
   try {
     const { getResendClient } = await import("@/lib/resend-client");
     const resend = getResendClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
 
     await resend.emails.send({
       from: process.env.EMAIL_FROM || "re-booking <no-reply@rebooking.cl>",
@@ -224,6 +224,6 @@ export async function POST(req: NextRequest) {
     tenant,
     temp_password: tempPassword,
     message: `Empresa creada. Trial de ${trialDays} dias activo.`,
-    login_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app"}/login`,
+    login_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl"}/login`,
   }, { status: 201 });
 }

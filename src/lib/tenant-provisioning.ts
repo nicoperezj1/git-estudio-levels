@@ -119,7 +119,7 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
   try {
     const { getResendClient } = await import("@/lib/resend-client");
     const resend = getResendClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
     const planLabel = input.plan.charAt(0).toUpperCase() + input.plan.slice(1);
     const trialLine = input.status === "trial"
       ? `${planLabel} (${input.trialDays || 15} días gratis)`

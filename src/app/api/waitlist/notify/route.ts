@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   if (!entry) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
-  const bookingUrl = process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app";
+  const bookingUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
 
   if (type === "whatsapp" && entry.client_phone) {
     const phone = entry.client_phone.replace(/\D/g, "").replace(/^0/, "56");

@@ -303,7 +303,7 @@ export async function sendRetentionEmail(params: SendRetentionEmailParams) {
     ? params.bookingUrl
     : process.env.NEXT_PUBLIC_APP_URL
     ? `${process.env.NEXT_PUBLIC_APP_URL}/booking`
-    : "https://barberia-kappa-weld.vercel.app/booking";
+    : "https://www.re-booking.cl/booking";
 
   const html = `
 <!DOCTYPE html>
@@ -400,10 +400,10 @@ export async function sendAppointmentReminder(params: SendAppointmentReminderPar
     ${appointmentId ? `
     <div style="text-align: center; margin-bottom: 20px;">
       <p style="color: #888; font-size: 13px; margin-bottom: 12px;">Confirma tu asistencia:</p>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app"}/api/public/confirm-attendance?id=${appointmentId}&action=confirm" style="display: inline-block; background: #0F8B8D; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; margin-right: 8px;">
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl"}/api/public/confirm-attendance?id=${appointmentId}&action=confirm" style="display: inline-block; background: #0F8B8D; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; margin-right: 8px;">
         ✓ Asistire
       </a>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://barberia-kappa-weld.vercel.app"}/cancel/${appointmentId}" style="display: inline-block; background: #333; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl"}/cancel/${appointmentId}" style="display: inline-block; background: #333; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">
         ✕ No podre ir
       </a>
     </div>
