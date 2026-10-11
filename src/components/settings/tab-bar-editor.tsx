@@ -69,7 +69,7 @@ export function TabBarEditor({ target, role }: { target: "me" | { role: TabRole 
   const rest = available.filter((t) => !keys.includes(t.key));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {/* Vista previa */}
       <div className="rounded-2xl border border-gray-100 bg-brand-light p-2">
         <ul className="flex items-stretch justify-around">
@@ -87,9 +87,9 @@ export function TabBarEditor({ target, role }: { target: "me" | { role: TabRole 
       {/* Elegidos, en orden */}
       <div className="space-y-1.5">
         {keys.map((k, i) => { const d = byKey(k); const I = TAB_ICONS[d.icon] || Menu; return (
-          <div key={k} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-2.5 py-1.5">
+          <div key={k} className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-2 py-1">
             <I className="h-4 w-4 flex-shrink-0 text-brand-blue" strokeWidth={1.75} />
-            <span className="flex-1 truncate text-sm font-semibold text-brand-dark">{d.label}</span>
+            <span className="flex-1 truncate text-[13px] font-semibold text-brand-dark">{d.label}</span>
             <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className="rounded p-1 text-brand-gray hover:text-brand-dark disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
             <button type="button" aria-label="Bajar" disabled={i === keys.length - 1} onClick={() => move(i, 1)} className="rounded p-1 text-brand-gray hover:text-brand-dark disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
             <button type="button" aria-label="Quitar" disabled={keys.length <= 1} onClick={() => setKeys((x) => x.filter((y) => y !== k))} className="rounded p-1 text-brand-gray hover:text-red-500 disabled:opacity-30"><X className="h-3.5 w-3.5" /></button>
@@ -110,9 +110,9 @@ export function TabBarEditor({ target, role }: { target: "me" | { role: TabRole 
                 type="button"
                 disabled={keys.length >= MAX_TABS}
                 onClick={() => setKeys((x) => [...x, t.key])}
-                className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-brand-gray transition-colors hover:border-brand-blue/50 hover:text-brand-dark disabled:opacity-40"
+                className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-gray transition-colors hover:border-brand-blue/50 hover:text-brand-dark disabled:opacity-40"
               >
-                <Plus className="h-3 w-3" />{t.label}
+                <Plus className="h-2.5 w-2.5" />{t.label}
               </button>
             ))}
           </div>

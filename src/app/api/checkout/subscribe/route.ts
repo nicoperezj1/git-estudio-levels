@@ -76,7 +76,7 @@ async function handlePost(req: NextRequest) {
 
   const { data: planConfig } = await supabase
     .from("plan_limits")
-    .select("name, price_clp, max_professionals, max_branches, included_professionals, extra_professional_price_clp")
+    .select("*") // incluye seat_prices (migracion 109) si existe
     .eq("plan", plan)
     .single();
 

@@ -1,0 +1,18 @@
+import { netoMensualFor, calculateSubscriptionAmount } from "../src/lib/subscription-pricing";
+let bad = 0;
+const eq = (n: string, g: unknown, w: unknown) => { const ok = JSON.stringify(g) === JSON.stringify(w); if (!ok) { bad++; console.log("FALLA", n, JSON.stringify(g), "esperaba", JSON.stringify(w)); } else console.log("ok", n); };
+const pro = { price_clp: 42990, included_professionals: 4, extra_professional_price_clp: 6000, max_professionals: 20, seat_prices: { "6": 49990 } };
+const proOld = { price_clp: 49990, included_professionals: 6, extra_professional_price_clp: 6000, max_professionals: 20 };
+const starter = { price_clp: 26990, included_professionals: 2, extra_professional_price_clp: 5000, max_professionals: 5 };
+eq("pro 4", netoMensualFor(pro, 4), 42990);
+eq("pro 5", netoMensualFor(pro, 5), 48990);
+eq("pro 6 (promo)", netoMensualFor(pro, 6), 49990);
+eq("pro 7", netoMensualFor(pro, 7), 55990);
+eq("pro 10", netoMensualFor(pro, 10), 73990);
+eq("7+ igual que antes (Pro viejo)", [7, 10, 20].map((n) => netoMensualFor(pro, n)), [7, 10, 20].map((n) => netoMensualFor(proOld, n)));
+eq("starter 2..5", [2, 3, 4, 5].map((n) => netoMensualFor(starter, n)), [26990, 31990, 36990, 41990]);
+eq("sin seat_prices en null", netoMensualFor({ ...pro, seat_prices: null }, 6), 54990);
+const a = calculateSubscriptionAmount(pro, 6, "monthly");
+eq("monto mensual 6 con IVA", a.totalMensual, Math.round(49990 * 1.19));
+eq("extraCount", a.extraCount, 2);
+process.exit(bad ? 1 : 0);

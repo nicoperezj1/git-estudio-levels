@@ -13,6 +13,7 @@ interface Plan {
   max_professionals: number;
   included_professionals: number | null;
   extra_professional_price_clp: number | null;
+  seat_prices?: Record<string, number> | null;
 }
 
 interface Subscription {

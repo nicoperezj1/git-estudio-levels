@@ -17,6 +17,9 @@ export interface PlanPricingConfig {
   included_professionals: number | null;
   extra_professional_price_clp: number | null;
   max_professionals: number;
+  // Precios fijos por cantidad (ej. promocion de Pro con 6 profesionales: {"6": 49990}). Desde la mayor cantidad
+  // indicada se suma extra_professional_price_clp por cada profesional mas. Si falta, todo es lineal como siempre.
+  seat_prices?: Record<string, number> | null;
 }
 
 export interface SubscriptionAmount {
@@ -31,17 +34,32 @@ export interface SubscriptionAmount {
 const IVA_RATE = 0.19;
 const ANNUAL_DISCOUNT = 0.2; // 20% off sobre 12 meses
 
+/** Precio neto mensual (sin IVA) para esa cantidad de profesionales. */
+export function netoMensualFor(plan: PlanPricingConfig, professionals: number): number {
+  const included = plan.included_professionals ?? plan.max_professionals;
+  const extraPrice = plan.extra_professional_price_clp ?? 0;
+  const tiers = plan.seat_prices && typeof plan.seat_prices === "object" ? plan.seat_prices : null;
+  if (tiers) {
+    const keys = Object.keys(tiers).map(Number).filter((k) => Number.isFinite(k) && Number(tiers[String(k)]) > 0).sort((a, b) => a - b);
+    if (keys.length > 0) {
+      const top = keys[keys.length - 1];
+      if (professionals >= top) return Number(tiers[String(top)]) + (professionals - top) * extraPrice;
+      if (tiers[String(professionals)] != null) return Number(tiers[String(professionals)]);
+    }
+  }
+  return plan.price_clp + Math.max(0, professionals - included) * extraPrice;
+}
+
 export function calculateSubscriptionAmount(
   plan: PlanPricingConfig,
   professionals: number,
   billingPeriod: BillingPeriod
 ): SubscriptionAmount {
   const included = plan.included_professionals ?? plan.max_professionals;
-  const extraPrice = plan.extra_professional_price_clp ?? 0;
 
   const extraCount = Math.max(0, professionals - included);
-  const extraTotal = extraCount * extraPrice;
-  const netoMensual = plan.price_clp + extraTotal;
+  const netoMensual = netoMensualFor(plan, professionals);
+  const extraTotal = netoMensual - plan.price_clp;
   const totalMensual = Math.round(netoMensual * (1 + IVA_RATE));
 
   const monto =
