@@ -90,7 +90,7 @@ export function SupportWidget({ role }: { role?: string }) {
   return (
     <>
       <div
-        className={`fixed z-40 left-0 max-lg:bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:left-auto lg:right-0 lg:bottom-6 transition-transform duration-300 ease-out ${
+        className={`group fixed z-40 left-0 max-lg:bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:left-auto lg:right-0 lg:bottom-6 transition-transform duration-300 ease-out ${
           expanded ? "translate-x-4 lg:-translate-x-6" : "-translate-x-1/2 lg:translate-x-1/2"
         } ${open ? "pointer-events-none opacity-0" : ""}`}
       >
@@ -121,9 +121,9 @@ export function SupportWidget({ role }: { role?: string }) {
             aria-label="Ocultar el botón de ayuda"
             title="Ocultar (la ayuda sigue en el menú)"
             onClick={() => { try { localStorage.setItem(OFF_KEY, "1"); } catch { /* sin almacenamiento */ } setOff(true); }}
-            className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-gray-800 text-white shadow ring-2 ring-white hover:bg-black"
+            className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white/90 text-gray-400 shadow-sm ring-1 ring-black/10 transition-opacity hover:text-gray-700 lg:opacity-0 lg:group-hover:opacity-100 lg:focus:opacity-100"
           >
-            <X className="h-3 w-3" />
+            <X className="h-2.5 w-2.5" strokeWidth={2.5} />
           </button>
         )}
       </div>
