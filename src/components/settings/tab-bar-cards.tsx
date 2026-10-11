@@ -1,23 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { TabBarEditor } from "@/components/settings/tab-bar-editor";
 import type { TabRole } from "@/lib/mobile-tabs";
 
 const box = "rounded-2xl border border-gray-100 bg-white p-4 md:p-5 space-y-3";
 
-// Mi Perfil: los atajos propios de la barra inferior del celular.
+// Mi Perfil: los atajos propios de la barra inferior del celular. Solo se ve en el celular y plegada.
 export function MyTabBarCard() {
   const { effectiveRole, role } = useAuth();
+  const [open, setOpen] = useState(false);
   const r = effectiveRole || role || "barber";
   return (
-    <div className={box}>
-      <div>
-        <h2 className="font-bold text-brand-dark">Barra inferior del celular</h2>
-        <p className="text-xs text-brand-gray">Elige hasta 4 atajos para tu barra. Solo salen los que tu cargo y tu plan permiten.</p>
-      </div>
-      <TabBarEditor target="me" role={r} />
+    <div className="rounded-2xl border border-gray-100 bg-white lg:hidden">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-brand-dark">Barra inferior del celular</h2>
+          <p className="truncate text-[11px] text-brand-gray">Elige tus 4 atajos favoritos</p>
+        </div>
+        <ChevronDown className={`h-4 w-4 flex-shrink-0 text-brand-gray transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="border-t border-gray-50 px-4 pb-4 pt-3">
+          <TabBarEditor target="me" role={r} />
+        </div>
+      )}
     </div>
   );
 }

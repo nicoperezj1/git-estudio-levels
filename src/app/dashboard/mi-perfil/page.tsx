@@ -171,9 +171,6 @@ export default function MiPerfilPage() {
     <div className="p-3 md:p-6 max-w-2xl space-y-3 md:space-y-6 animate-fade-in">
       <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Mi Perfil</h1>
 
-      {/* Barra inferior del celular */}
-      <MyTabBarCard />
-
       {/* Basic info */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
         <div className="flex items-center gap-4">
@@ -240,6 +237,9 @@ export default function MiPerfilPage() {
           {saving ? "Guardando..." : "Guardar cambios"}
         </button>
       </div>
+
+      {/* Barra inferior del celular (solo se ve en el celular) */}
+      <MyTabBarCard />
 
       {/* Mi tema: cada usuario elige el suyo; "Igual que el negocio" usa el del administrador. */}
       <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-5 space-y-3">
