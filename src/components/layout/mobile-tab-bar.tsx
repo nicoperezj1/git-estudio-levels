@@ -1,46 +1,51 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarCheck, CalendarDays, Home, Menu, PiggyBank, ShoppingCart, Users, Wallet } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useTenant } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
+import { resolveTabs, type TabPrefs } from "@/lib/mobile-tabs";
+import { TAB_ICONS } from "@/components/layout/tab-icons";
 
-// Barra inferior para celular (Fase 1 de la app móvil). Atajos al pulgar según el rol; "Más" abre el menú
-// completo de siempre (el mismo del lateral). Solo se ve en pantallas chicas (lg:hidden) y no en el
-// Standby, que es una pantalla completa de tablet. En escritorio no cambia nada.
-type Tab = { label: string; href: string; icon: any; feature?: string };
-
-const TABS: Record<string, Tab[]> = {
-  barber: [
-    { label: "Mi agenda", href: "/dashboard/mi-agenda", icon: CalendarCheck },
-    { label: "Calendario", href: "/dashboard/calendario", icon: CalendarDays },
-    { label: "Clientes", href: "/dashboard/clientes", icon: Users },
-    { label: "Billetera", href: "/dashboard/mi-billetera", icon: PiggyBank },
-  ],
-  receptionist: [
-    { label: "Calendario", href: "/dashboard/calendario", icon: CalendarDays },
-    { label: "Venta", href: "/dashboard/pos", icon: ShoppingCart },
-    { label: "Clientes", href: "/dashboard/clientes", icon: Users },
-    { label: "Caja", href: "/dashboard/caja", icon: Wallet, feature: "cash_register" },
-  ],
-  admin: [
-    { label: "Inicio", href: "/dashboard", icon: Home },
-    { label: "Calendario", href: "/dashboard/calendario", icon: CalendarDays },
-    { label: "Venta", href: "/dashboard/pos", icon: ShoppingCart },
-    { label: "Clientes", href: "/dashboard/clientes", icon: Users },
-  ],
-};
+// Barra inferior para celular. Atajos al pulgar: cada usuario elige hasta 4 (Mi Perfil), el administrador fija los
+// del negocio por rol (Configuracion) y, si nadie eligio, quedan los de siempre segun el rol. Solo salen los que
+// el rol y el plan permiten. "Más" abre el menu completo (el mismo del lateral). Solo se ve en pantallas chicas
+// (lg:hidden) y no en el Standby. En escritorio no cambia nada.
+export const TABS_CHANGED_EVENT = "rb:tabs-changed";
+const CACHE_KEY = "rb_tab_prefs";
 
 export const OPEN_MENU_EVENT = "rb:open-menu";
 
 export function MobileTabBar({ role }: { role: string }) {
   const pathname = usePathname() || "";
-  const { hasPlanFeature } = useTenant();
+  const { hasPlanFeature, tenant } = useTenant();
+  const [prefs, setPrefs] = useState<TabPrefs | null>(null);
+
+  const load = useCallback(() => {
+    fetch("/api/mobile-tabs")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || d.error) return;
+        const next: TabPrefs = { mine: d.mine || null, tenant: d.tenant || null };
+        setPrefs(next);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(next)); } catch { /* sin almacenamiento */ }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Lo ultimo que se supo se muestra al instante; luego se actualiza desde el servidor.
+    try { const c = localStorage.getItem(CACHE_KEY); if (c) setPrefs(JSON.parse(c)); } catch { /* ignorar */ }
+    load();
+    window.addEventListener(TABS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(TABS_CHANGED_EVENT, load);
+  }, [load]);
+
   if (pathname.startsWith("/dashboard/standby")) return null;
 
-  const key = role === "super_admin" ? "admin" : role;
-  const tabs = (TABS[key] || TABS.barber).filter((t) => !t.feature || hasPlanFeature(t.feature));
+  const tabs = resolveTabs(role, prefs, { hasPlanFeature, plan: tenant?.plan });
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname === href || pathname.startsWith(href + "/"));
 
   return (
@@ -50,7 +55,8 @@ export function MobileTabBar({ role }: { role: string }) {
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <ul className="mx-auto flex max-w-xl items-stretch justify-around">
-        {tabs.map(({ label, href, icon: Icon }) => {
+        {tabs.map(({ label, href, icon }) => {
+          const Icon = TAB_ICONS[icon] || Menu;
           const active = isActive(href);
           return (
             <li key={href} className="flex-1">

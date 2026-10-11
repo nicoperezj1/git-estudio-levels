@@ -324,7 +324,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     // in localStorage and the NEXT person to log in on this browser keeps seeing that
     // other business's data (real leak: an Estudio Levels admin saw Saray Business
     // clients and services because of a leftover override).
-    try { localStorage.removeItem("tenant_override"); } catch {}
+    try { localStorage.removeItem("tenant_override"); localStorage.removeItem("rb_tab_prefs"); } catch {}
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

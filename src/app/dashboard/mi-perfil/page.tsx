@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { MyTabBarCard } from "@/components/settings/tab-bar-cards";
 import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
 import { useToast } from "@/components/ui/toast";
@@ -169,6 +170,9 @@ export default function MiPerfilPage() {
   return (
     <div className="p-3 md:p-6 max-w-2xl space-y-3 md:space-y-6 animate-fade-in">
       <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Mi Perfil</h1>
+
+      {/* Barra inferior del celular */}
+      <MyTabBarCard />
 
       {/* Basic info */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">

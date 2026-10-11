@@ -2,6 +2,7 @@
 
 import { BookingRuleCard } from "@/components/settings/booking-rule-card";
 import { NotificationsCard } from "@/components/settings/notifications-card";
+import { TeamTabBarCard } from "@/components/settings/tab-bar-cards";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -999,6 +1000,9 @@ export default function ConfiguracionPage() {
 
       {/* Avisos y notificaciones (centro de avisos). Solo administrador. */}
       {isAdmin && <NotificationsCard />}
+
+      {/* Barra inferior del celular por cargo. Solo administrador. */}
+      {isAdmin && <TeamTabBarCard />}
 
       {/* Caja y Standby (Fase 5). Solo administrador. */}
       {isAdmin && cajaSec && (
