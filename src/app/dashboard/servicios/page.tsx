@@ -7,7 +7,8 @@ import { useTenant } from "@/lib/tenant-context";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCurrency } from "@/lib/utils";
 import { compressImage } from "@/lib/image-compress";
-import { GripVertical } from "lucide-react";
+import { GripVertical, ChevronDown, MoreHorizontal, Scissors, User, Clock } from "lucide-react";
+import { IconTile } from "@/components/ui/premium";
 
 interface Service {
   id: string;
@@ -62,6 +63,10 @@ export default function ServiciosPage() {
 
   // Carpetas colapsadas (por categoria). Vacio = todas expandidas por defecto.
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  // "Ver N mas" por categoria y menu de acciones (···) de la fila abierta.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const PREVIEW_ROWS = 5;
   const toggleCategoryCollapsed = (key: string) => {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
@@ -445,29 +450,29 @@ export default function ServiciosPage() {
   };
 
   return (
-    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
+    <div className="mx-auto max-w-7xl space-y-3 p-3 md:space-y-6 md:p-8 animate-fade-in">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-brand-dark">Servicios</h1>
-          <p className="text-brand-gray text-sm">Gestiona el menu de servicios de tu negocio</p>
+          <h1 className="text-xl font-bold tracking-tight text-brand-dark md:text-3xl">Servicios</h1>
+          <p className="mt-0.5 text-xs text-brand-gray md:text-sm">Gestiona el menú de servicios de tu negocio</p>
         </div>
         <button onClick={openNew}
-          className="px-4 py-2 bg-brand-blue text-white rounded-xl hover:bg-brand-blue/90 text-sm font-medium transition-colors">
-          Nuevo Servicio
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-blue to-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-blue/25 transition-all hover:brightness-110">
+          + Nuevo servicio
         </button>
       </div>
 
       {/* Active services */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-        <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="font-bold text-brand-dark">Servicios Activos ({activeServices.length})</h2>
-          <span className="text-xs text-brand-gray hidden md:block">Arrastra ⋮⋮ para ordenar · así se ve en tu link de reserva</span>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-xs font-semibold text-brand-gray">{activeServices.length} activos{serviceGroups.length > 1 ? ` · ${serviceGroups.length} categorías` : ""}</p>
+          <span className="hidden text-xs text-brand-gray md:block">Arrastra ⋮⋮ para ordenar · así se ve en tu link de reserva</span>
           <span className="text-xs text-brand-gray md:hidden">Mantén presionado para mover</span>
         </div>
         {loading ? (
           <div className="p-8"><Spinner /></div>
         ) : (
-          <div ref={listRef} className="divide-y select-none">
+          <div ref={listRef} className="space-y-3 select-none">
             {(() => {
               // Contador de posicion dentro de visibleFlat (unico espacio de indices
               // compartido por render, drag&drop y touch — ver visibleFlat mas arriba).
@@ -475,7 +480,7 @@ export default function ServiciosPage() {
               return serviceGroups.map((group) => {
                 const isCollapsed = collapsedCategories.has(group.key);
                 return (
-                  <div key={group.key}>
+                  <div key={group.key} className="overflow-hidden rounded-2xl border border-gray-100 bg-white">
                     {/* Encabezado de carpeta — siempre visible, incluso colapsada. Solo
                         se muestra si hay mas de una categoria o alguna con nombre, para
                         no agregar ruido visual a un negocio que no usa categorias. */}
@@ -493,8 +498,8 @@ export default function ServiciosPage() {
                         }}
                         onDragEnd={() => { if (dragCat && overCat) moveCategory(dragCat, overCat); setDragCat(null); setOverCat(null); }}
                         onClick={() => toggleCategoryCollapsed(group.key)}
-                        className={`w-full flex items-center gap-2 px-3 md:px-4 py-2.5 transition-colors text-left cursor-pointer ${
-                          dragCat === group.key ? "opacity-50 bg-brand-blue/5" : overCat === group.key && (dragCat || dragIndex !== null) ? "bg-brand-blue/10 border-t-2 border-t-brand-blue" : "bg-gray-50 hover:bg-gray-100"
+                        className={`w-full flex items-center gap-3 px-3 md:px-4 py-3 transition-colors text-left cursor-pointer ${
+                          dragCat === group.key ? "opacity-50 bg-brand-blue/5" : overCat === group.key && (dragCat || dragIndex !== null) ? "bg-brand-blue/10 border-t-2 border-t-brand-blue" : "bg-white hover:bg-brand-blue/[0.03]"
                         }`}
                       >
                         {group.key !== CATEGORY_NONE ? (
@@ -502,20 +507,27 @@ export default function ServiciosPage() {
                             <GripVertical className="w-4 h-4" />
                           </span>
                         ) : <span className="w-4" />}
-                        <span className={`text-gray-400 transition-transform ${isCollapsed ? "" : "rotate-90"}`}>▸</span>
-                        <span className="font-semibold text-sm text-brand-dark">{group.label}</span>
-                        <span className="text-xs text-brand-gray">({group.items.length})</span>
+                        <IconTile Icon={group.key === CATEGORY_NONE || /sal[oó]n/i.test(group.label) ? Scissors : User} tone="teal" size={36} />
+                        <div className="min-w-0">
+                          <p className="truncate text-[15px] font-bold text-brand-dark">{group.label}</p>
+                          <p className="text-xs text-brand-gray">{group.items.length} {group.items.length === 1 ? "servicio" : "servicios"}</p>
+                        </div>
+                        <ChevronDown className={`ml-auto h-5 w-5 flex-shrink-0 text-brand-gray transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
                         {group.key !== CATEGORY_NONE && (
-                          <span className="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                             <button type="button" aria-label="Subir categoría" onClick={() => stepCategory(group.key, -1)} className="px-1.5 py-0.5 text-xs text-gray-400 hover:text-brand-dark hover:bg-white rounded">▲</button>
                             <button type="button" aria-label="Bajar categoría" onClick={() => stepCategory(group.key, 1)} className="px-1.5 py-0.5 text-xs text-gray-400 hover:text-brand-dark hover:bg-white rounded">▼</button>
                           </span>
                         )}
                       </div>
                     )}
-                    {!isCollapsed && group.items.map((s) => {
+                    {!isCollapsed && (() => {
+                      const expanded = expandedGroups.has(group.key);
+                      const hidden = !expanded && group.items.length > PREVIEW_ROWS + 1 ? group.items.length - PREVIEW_ROWS : 0;
+                      const rows = group.items.map((s, i) => {
                       flatIndex += 1;
                       const index = flatIndex;
+                      if (hidden && i >= PREVIEW_ROWS) return null;
                       return (
                         <div
                           key={s.id}
@@ -527,54 +539,72 @@ export default function ServiciosPage() {
                           onTouchStart={(e) => handleTouchStart(e, index)}
                           onTouchMove={(e) => handleTouchMove(e)}
                           onTouchEnd={handleTouchEnd}
-                          className={`p-3 md:p-4 flex items-center gap-2 md:gap-3 transition-all border-t ${
+                          className={`relative px-3 md:px-4 py-3 flex items-center gap-2 md:gap-3 transition-all border-t border-gray-50 ${
                             dragIndex === index
                               ? "opacity-50 bg-brand-blue/5 scale-[0.98]"
                               : overIndex === index && dragIndex !== null
                               ? "border-t-2 border-t-brand-blue bg-brand-blue/5"
-                              : "hover:bg-gray-50 cursor-grab"
+                              : "hover:bg-brand-blue/[0.03] cursor-grab"
                           } ${touchDragging && dragIndex === index ? "shadow-lg z-10 relative" : ""}`}
                           style={touchDragging && dragIndex === index ? { transform: `translateY(${touchOffsetY}px)` } : undefined}
                         >
-                          {/* Drag handle */}
-                          <span className="w-5 text-right text-[11px] tabular-nums text-gray-400/50 select-none flex-shrink-0">{positionById.get(s.id)}</span>
-                          <div className="cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-600 p-1" title="Arrastra para ordenar">
-                            <GripVertical className="w-5 h-5" />
+                          <div className="cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-600" title="Arrastra para ordenar">
+                            <GripVertical className="w-4 h-4" />
                           </div>
 
-                          {/* Service info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium text-brand-dark text-sm md:text-base truncate">{s.name}</p>
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] md:text-xs font-medium flex-shrink-0">
-                                {s.duration} min
-                              </span>
-                            </div>
-                            {s.description && (
-                              <p className="text-xs text-brand-gray mt-0.5 truncate hidden md:block">{s.description}</p>
-                            )}
+                          {/* Nombre + duracion */}
+                          <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+                            <p className="font-semibold text-brand-dark text-sm md:text-[15px] truncate">{s.name}</p>
+                            <span className="inline-flex items-center gap-1 text-xs text-brand-gray flex-shrink-0">
+                              <Clock className="h-3.5 w-3.5" strokeWidth={1.75} />{s.duration} min
+                            </span>
                           </div>
 
-                          {/* Price + Actions */}
-                          <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-                            <p className="text-sm md:text-lg font-bold text-brand-dark">{formatCurrency(Number(s.price))}</p>
-                            <div className="hidden md:flex gap-1">
-                              <button onClick={() => openEdit(s)}
-                                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">Editar</button>
-                              <button onClick={() => toggleActive(s)}
-                                className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">Eliminar</button>
-                            </div>
-                            {/* Mobile: tap to open edit */}
-                            <button onClick={() => openEdit(s)}
-                              className="md:hidden p-2 text-brand-gray hover:text-brand-dark">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                              </svg>
+                          {/* Precio + menu */}
+                          <p className="flex-shrink-0 text-sm md:text-base font-bold tabular-nums text-brand-dark">{formatCurrency(Number(s.price))}</p>
+                          <div className="relative flex-shrink-0">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMenuId(menuId === s.id ? null : s.id); }}
+                              aria-label="Acciones"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-brand-gray hover:border-brand-blue/40 hover:text-brand-dark"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
                             </button>
+                            {menuId === s.id && (
+                              <>
+                                <button aria-label="Cerrar" className="fixed inset-0 z-20 cursor-default" onClick={() => setMenuId(null)} />
+                                <div className="absolute right-0 z-30 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                                  <button onClick={() => { setMenuId(null); openEdit(s); }} className="block w-full px-3.5 py-2 text-left text-sm text-brand-dark hover:bg-gray-50">Editar</button>
+                                  <button onClick={() => { setMenuId(null); toggleActive(s); }} className="block w-full px-3.5 py-2 text-left text-sm text-red-500 hover:bg-red-50">Eliminar</button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
-                    })}
+                    });
+                    return (
+                      <>
+                        {rows}
+                        {hidden > 0 && (
+                          <button
+                            onClick={() => setExpandedGroups((prev) => new Set(prev).add(group.key))}
+                            className="flex w-full items-center justify-center gap-1.5 border-t border-gray-50 bg-brand-blue/[0.03] py-2.5 text-sm font-semibold text-brand-dark hover:bg-brand-blue/[0.07]"
+                          >
+                            Ver {hidden} servicios más <ChevronDown className="h-4 w-4" />
+                          </button>
+                        )}
+                        {expanded && group.items.length > PREVIEW_ROWS + 1 && (
+                          <button
+                            onClick={() => setExpandedGroups((prev) => { const n = new Set(prev); n.delete(group.key); return n; })}
+                            className="flex w-full items-center justify-center gap-1.5 border-t border-gray-50 py-2 text-xs font-semibold text-brand-gray hover:text-brand-dark"
+                          >
+                            Ver menos
+                          </button>
+                        )}
+                      </>
+                    );
+                    })()}
                   </div>
                 );
               });
@@ -585,7 +615,7 @@ export default function ServiciosPage() {
 
       {/* Inactive services */}
       {inactiveServices.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 opacity-75">
+        <div className="rounded-2xl border border-gray-100 bg-white opacity-75">
           <div className="p-4 border-b">
             <h2 className="font-bold text-brand-gray">Inactivos ({inactiveServices.length})</h2>
           </div>
