@@ -1436,7 +1436,7 @@
             <div data-seats-menu="" style="position: absolute; left: 0; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid #E8E2D8; border-radius: 12px; padding: 6px; box-shadow: 0 26px 48px -26px rgba(16,32,31,.5); max-height: 212px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; opacity: 0; transform: translateY(-6px) scale(.98); transform-origin: top center; pointer-events: none; transition: opacity .2s ease, transform .22s cubic-bezier(.2,.8,.2,1); z-index: 30;">
             <button data-seat-opt="4" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 13.5px; color: #fff; background: #0A6E6B; border: none; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background .16s ease, color .16s ease;">4 profesionales</button>
             <button data-seat-opt="5" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 13.5px; color: #32423F; background: transparent; border: none; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background .16s ease, color .16s ease;">5 profesionales</button>
-            <button data-seat-opt="6" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 13.5px; color: #32423F; background: transparent; border: none; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background .16s ease, color .16s ease;">6 profesionales · recomendado</button>
+            <button data-seat-opt="6" data-promo-opt="1" data-label="6 profesionales · recomendado" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 14.5px; font-weight: 700; color: #7A4B00; background: #FFF1CC; border: 1px solid #F3D58A; padding: 12px 12px; border-radius: 10px; cursor: pointer; transition: background .16s ease, color .16s ease;"><span>6 profesionales · recomendado</span><span style="flex: 0 0 auto; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: #fff; background: #D97706; border-radius: 999px; padding: 3px 8px;">PROMO −$5.000</span></button>
             <button data-seat-opt="7" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 13.5px; color: #32423F; background: transparent; border: none; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background .16s ease, color .16s ease;">7 profesionales</button>
             <button data-seat-opt="8" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 13.5px; color: #32423F; background: transparent; border: none; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background .16s ease, color .16s ease;">8 profesionales</button>
             <button data-seat-opt="9" type="button" style="display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; font-family: Karla, system-ui, sans-serif; font-size: 13.5px; color: #32423F; background: transparent; border: none; padding: 9px 12px; border-radius: 9px; cursor: pointer; transition: background .16s ease, color .16s ease;">9 profesionales</button>
@@ -2155,6 +2155,12 @@ class Component extends DCLogic {
         const v = w.getAttribute('data-value');
         opts.forEach((o) => {
           const on = o.getAttribute('data-seat-opt') === v;
+          if (o.hasAttribute('data-promo-opt')) {
+            // La opcion en promocion se distingue siempre: dorada, y mas intensa al elegirla.
+            o.style.background = on ? '#D97706' : '#FFF1CC';
+            o.style.color = on ? '#fff' : '#7A4B00';
+            return;
+          }
           o.style.background = on ? '#0A6E6B' : 'transparent';
           o.style.color = on ? '#fff' : '#32423F';
         });
@@ -2176,13 +2182,13 @@ class Component extends DCLogic {
       opts.forEach((o) => o.addEventListener('click', (e) => {
         e.stopPropagation();
         w.setAttribute('data-value', o.getAttribute('data-seat-opt'));
-        label.textContent = o.textContent;
+        label.textContent = o.getAttribute('data-label') || o.textContent;
         paintOpts();
         closeAll(null);
         onChange();
       }));
       opts.forEach((o) => {
-        o.addEventListener('mouseenter', () => { if (o.style.background !== 'rgb(10, 110, 107)') o.style.background = '#F4F8F7'; });
+        o.addEventListener('mouseenter', () => { if (o.hasAttribute('data-promo-opt')) { o.style.background = '#FFE6A3'; return; } if (o.style.background !== 'rgb(10, 110, 107)') o.style.background = '#F4F8F7'; });
         o.addEventListener('mouseleave', paintOpts);
       });
       paintOpts();
