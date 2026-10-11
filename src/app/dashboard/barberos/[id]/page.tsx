@@ -45,6 +45,21 @@ export default function EditProfessionalPage() {
   // hidden.
   const scheduleOnly = effectiveRole === "receptionist";
 
+  // Negocios con un solo profesional (quien atiende): no necesitan modalidad, comision ni arriendo.
+  const [attendingCount, setAttendingCount] = useState<number | null>(null);
+  useEffect(() => {
+    let t = tenant?.id || "";
+    if (!t) { try { t = JSON.parse(localStorage.getItem("tenant_override") || "{}").tenantId || ""; } catch { /* sin override */ } }
+    fetch(`/api/barberos${t ? `?tenantId=${t}` : ""}`)
+      .then((r) => r.json())
+      .then((list) => {
+        if (!Array.isArray(list)) return;
+        setAttendingCount(list.filter((p: any) => p.role === "barber" || (p.role === "admin" && p.also_attends_clients)).length);
+      })
+      .catch(() => {});
+  }, [tenant?.id]);
+  const soloProfessional = attendingCount !== null && attendingCount <= 1;
+
   useEffect(() => {
     fetch(`/api/barberos/${params.id}`)
       .then((r) => r.json())
@@ -243,11 +258,13 @@ export default function EditProfessionalPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">{data.name}</h1>
+          {!soloProfessional && (
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
             data.work_mode === "commission" ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700"
           }`}>
             {data.work_mode === "commission" ? "Comisión" : "Arriendo"}
           </span>
+          )}
         </div>
       </div>
 
@@ -412,6 +429,7 @@ export default function EditProfessionalPage() {
 
       {!isReceptionistProfile && (<>
       {/* Work mode selector */}
+      {!soloProfessional && (<>
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
         <h2 className="font-bold text-gray-800">Modalidad de Trabajo</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -530,6 +548,8 @@ export default function EditProfessionalPage() {
           </div>
         </div>
       )}
+
+      </>)}
 
       {/* Work Schedule */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
