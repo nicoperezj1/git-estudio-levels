@@ -118,6 +118,38 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Los breaks del horario se muestran en el calendario como bloques (solo lectura): asi se ven en todas las
+  // vistas, ocupan cupos en "Espacios a esa hora" y se dibujan junto a las citas.
+  if (wantBlocks && DATE_RE.test(from) && DATE_RE.test(to)) {
+    try {
+      const [{ data: schedRows }, breakTable] = await Promise.all([
+        supabase.from("barber_schedule").select("barber_id, day_of_week, is_working, break_start, break_end").in("barber_id", ids),
+        loadBreaks(supabase, ids),
+      ]);
+      const sched = new Map<string, any>();
+      for (const r of (schedRows || []) as any[]) sched.set(`${r.barber_id}-${r.day_of_week}`, r);
+      let n = 0;
+      for (let d = new Date(`${from}T12:00:00Z`); d <= new Date(`${to}T12:00:00Z`) && n < 5000; d = new Date(d.getTime() + 86400000)) {
+        const day = d.toISOString().slice(0, 10);
+        const dow = d.getUTCDay();
+        for (const id of ids) {
+          const row = sched.get(`${id}-${dow}`);
+          if (row && row.is_working === false) continue;
+          const list = breaksForDay(breakTable, id, { day_of_week: dow, break_start: row?.break_start, break_end: row?.break_end });
+          list.forEach((br, i) => {
+            blocks.push({
+              id: `brk-${id}-${day}-${i}`, barber_id: id, date: day, all_day: false,
+              start_time: br.start, end_time: br.end, reason: br.name || "Break", spots: br.spots, is_break: true,
+            });
+            n++;
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[calendar/barber-data] breaks failed:", e);
+    }
+  }
+
   const schedules: Record<string, any[]> = {};
   if (wantSchedules) {
     for (const id of ids) schedules[id] = [];

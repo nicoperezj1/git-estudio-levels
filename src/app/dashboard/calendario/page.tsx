@@ -165,6 +165,7 @@ export default function CalendarioPage() {
   const { confirm } = useConfirm();
   // Las vacaciones se ven como bloqueos de todo el dia pero se cambian en Mi negocio > Vacaciones.
   const openBlockEditor = (b: any) => {
+    if (String(b?.id || "").startsWith("brk-")) { showToast("Es un break del horario: se cambia en Profesionales > Horario de Trabajo", "success"); return; }
     if (String(b?.id || "").startsWith("vac-")) { showToast("Son vacaciones del profesional: se cambian en Mi negocio > Vacaciones", "success"); return; }
     setEditingBlock(b);
   };
@@ -513,9 +514,11 @@ export default function CalendarioPage() {
     const held: { start: number; end: number }[] = occ.map((x) => ({ start: x.start, end: x.end }));
     let blockedSpots = 0;
     for (const b of rangeBlocks) {
-      if (b.barber_id !== barberId || b.date !== day || b.all_day || !b.start_time || !b.end_time || !(Number(b.spots) > 0)) continue;
+      if (b.barber_id !== barberId || b.date !== day || b.all_day || !b.start_time || !b.end_time) continue;
       const bs = toMinStr(b.start_time), be = toMinStr(b.end_time);
-      if (be > s0 && bs < e0) { for (let i = 0; i < Number(b.spots); i++) held.push({ start: bs, end: be }); blockedSpots = Math.max(blockedSpots, Number(b.spots)); }
+      // Un bloqueo o break sin "cupos" ocupa todos los cupos del horario.
+      const nSpots = Number(b.spots) > 0 ? Number(b.spots) : slotCap;
+      if (be > s0 && bs < e0) { for (let i = 0; i < nSpots; i++) held.push({ start: bs, end: be }); blockedSpots = Math.max(blockedSpots, nSpots); }
     }
     const taken = Math.min(slotCap, peakOverlap(held, s0, e0));
     return { names: occ.map((x) => x.name), taken, free: Math.max(0, slotCap - taken), blockedSpots };
@@ -529,7 +532,7 @@ export default function CalendarioPage() {
       const l = lanes[a.id];
       if (!l || l.cols < 2) continue;
       const as = toMinStr(a.start_time), ae = toMinStr(a.end_time);
-      if (blockList.some((b) => b.all_day || (Number(b.spots) > 0 && toMinStr(b.end_time) > as && toMinStr(b.start_time) < ae))) continue;
+      if (blockList.some((b) => b.all_day || (b.start_time && b.end_time && toMinStr(b.end_time) > as && toMinStr(b.start_time) < ae))) continue;
       const used = new Set(list.filter((o) => lanes[o.id] && toMinStr(o.end_time) > as && toMinStr(o.start_time) < ae).map((o) => wrap ? lanes[o.id].lane % l.cols : lanes[o.id].lane));
       for (let lane = 0; lane < l.cols; lane++) {
         if (used.has(lane)) continue;
@@ -1738,12 +1741,6 @@ export default function CalendarioPage() {
                       const parts: (JSX.Element | null)[] = [];
                       if (open !== null) parts.push(shade(gridTopMin, open, "before"));
                       if (close !== null) parts.push(shade(close, gridBotMin, "after"));
-                      const brks = sched.breaks ?? (sched.break_start && sched.break_end ? [{ start: sched.break_start, end: sched.break_end, name: null, spots: null }] : []);
-                      brks.forEach((br: any, bi: number) => {
-                        const bs = toMin(br.start);
-                        const be = toMin(br.end);
-                        if (bs !== null && be !== null) parts.push(shade(bs, be, `break-${bi}`, br.name || undefined));
-                      });
                       return parts;
                     })()}
 
