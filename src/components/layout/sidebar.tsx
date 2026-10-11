@@ -283,6 +283,24 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
         }))
         .filter((section) => section.items.length > 0);
 
+  // Lo que el plan no incluye no estorba el menu: se junta en "Funciones Pro" (plegado), siguen visibles pero aparte.
+  const proItems: Array<{ name: string; href: string; icon: any }> = [];
+  const mainSections = filteredSections
+    .map((section) => ({
+      ...section,
+      items: section.items.flatMap((item) => {
+        if ((item as any).locked) { proItems.push({ name: item.name, href: item.href, icon: item.icon }); return []; }
+        if (item.children) {
+          const open = item.children.filter((c) => !(c as any).locked);
+          item.children.filter((c) => (c as any).locked).forEach((c) => proItems.push({ name: c.name, href: c.href, icon: c.icon }));
+          return [{ ...item, children: open.length > 0 ? open : undefined }];
+        }
+        return [item];
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+  const [proOpen, setProOpen] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
     if (saved === "true") setCollapsed(true);
@@ -339,7 +357,7 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
 
   const renderNav = (showLabels: boolean) => (
     <nav className="flex-1 overflow-y-auto px-3 pb-4 pt-3">
-      {filteredSections.map((section, sIdx) => {
+      {mainSections.map((section, sIdx) => {
         const isOpen = openSections[section.title] !== false;
 
         return (
@@ -449,6 +467,43 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
           </div>
         );
       })}
+
+      {/* Funciones que el plan actual no incluye (visibles, pero fuera del camino) */}
+      {showLabels && proItems.length > 0 && (
+        <div className="mb-2 mt-1 border-t border-black/5 pt-3 dark:border-white/5">
+          <button
+            onClick={() => setProOpen((v) => !v)}
+            className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-semibold text-brand-gray transition-colors hover:text-brand-dark"
+          >
+            <span className="flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Funciones Pro
+              <span className="rounded-full bg-brand-dark/[0.06] px-1.5 py-px text-[10px]">{proItems.length}</span>
+            </span>
+            <ChevronDown className={cn("h-3 w-3 transition-transform", !proOpen && "-rotate-90")} />
+          </button>
+          {proOpen && (
+            <ul className="mt-1 space-y-px">
+              {proItems.map((it) => (
+                <li key={it.href}>
+                  <div title="Disponible en un plan superior" className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-[6px] text-[12.5px] text-brand-gray/60">
+                    <it.icon className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
+                    <span className="flex-1 truncate">{it.name}</span>
+                    <span className="rounded border border-brand-gray/30 px-1 py-px text-[9px] font-medium tracking-wide text-brand-gray/70">PRO</span>
+                  </div>
+                </li>
+              ))}
+              {isAtLeast("admin") && (
+                <li>
+                  <Link href="/dashboard/configuracion/facturacion" onClick={() => setMobileOpen(false)} className="block rounded-lg px-3 py-1.5 text-[12px] font-semibold text-brand-blue hover:underline">
+                    Ver planes y mejorar →
+                  </Link>
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
     </nav>
   );
 

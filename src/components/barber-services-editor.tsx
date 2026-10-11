@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/utils";
+import { useTenant } from "@/lib/tenant-context";
 
 interface Service {
   id: string;
@@ -15,10 +16,14 @@ export function BarberServicesEditor({ barberId, showToast }: { barberId: string
   const [services, setServices] = useState<Service[]>([]);
   const [assigned, setAssigned] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const { tenant, loading: tenantLoading } = useTenant();
 
   useEffect(() => {
+    if (tenantLoading) return;
+    // Solo los servicios de ESTE negocio (el super admin, sin indicarlo, recibia los de todos).
+    const q = tenant?.id ? `&tenantId=${tenant.id}` : "";
     Promise.all([
-      fetch("/api/services?all=true").then((r) => r.json()),
+      fetch(`/api/services?all=true${q}`).then((r) => r.json()),
       fetch(`/api/barber-service-assignments?barberId=${barberId}`).then((r) => r.json()),
     ]).then(([svcs, assignedIds]) => {
       const activeServices = Array.isArray(svcs) ? svcs.filter((s: any) => s.active !== false) : [];
@@ -30,7 +35,7 @@ export function BarberServicesEditor({ barberId, showToast }: { barberId: string
         setAssigned(assignedIds);
       }
     });
-  }, [barberId]);
+  }, [barberId, tenant?.id, tenantLoading]);
 
   const toggle = (serviceId: string) => {
     if (assigned.includes(serviceId)) {

@@ -201,7 +201,7 @@ export default function ServiciosPage() {
     const categoryToSave = resolveCategoryOnSubmit() || null;
 
     if (editingService) {
-      await fetch(`/api/services/${editingService.id}`, {
+      const res = await fetch(`/api/services/${editingService.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -212,9 +212,14 @@ export default function ServiciosPage() {
           category: categoryToSave,
         }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || "No se pudo guardar el servicio", "error");
+        return;
+      }
       showToast("Servicio actualizado", "success");
     } else {
-      await fetch("/api/services", {
+      const res = await fetch("/api/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -224,8 +229,14 @@ export default function ServiciosPage() {
           duration: parseInt(form.duration),
           category: categoryToSave,
           sort_order: activeServices.length,
+          tenantId: tenant?.id || undefined, // el super admin crea en el negocio que esta viendo
         }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || "No se pudo crear el servicio", "error");
+        return;
+      }
       showToast("Servicio creado", "success");
     }
 
