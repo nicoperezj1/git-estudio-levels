@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   if (!session.userId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const supabase = createAdminSupabase();
   const body = await req.json();
-  const { clientId, barberId, date, startTime, endTime: customEndTime, serviceIds, notes } = body;
+  const { clientId, barberId, date, startTime, endTime: customEndTime, serviceIds, notes, staff_note } = body;
 
   // El negocio sale del profesional, y debe ser el de quien crea la cita (super_admin con cualquiera).
   const { data: barberProfile } = await supabase.from("profiles").select("tenant_id").eq("id", barberId).single();
@@ -109,6 +109,12 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Nota corta del equipo (migracion 105); si la columna aun no existe, la cita se crea igual sin nota.
+  if (typeof staff_note === "string" && staff_note.trim()) {
+    const { error: snErr } = await supabase.from("appointments").update({ staff_note: staff_note.trim().slice(0, 200) }).eq("id", appointment.id);
+    if (snErr) console.error("staff_note:", snErr.message);
+  }
 
   // Dos personas pueden tomar el ultimo cupo a la vez: si nos pasamos, esta cita se deshace.
   if (await exceededAfterInsert(supabase, barberId, resolvedTenantId, date, start, end)) {
