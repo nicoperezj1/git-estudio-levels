@@ -158,7 +158,7 @@ export default function CalendarioPage() {
   // roja). Al hacer click en un bloqueo se abre este panel con nombre + duracion +
   // eliminar, en vez del toast de solo lectura que habia antes.
   const [editingBlock, setEditingBlock] = useState<{
-    id: string; barberId: string; reason: string; allDay: boolean; startTime: string; endTime: string; spots?: number;
+    id: string; barberId: string; reason: string; allDay: boolean; startTime: string; endTime: string; spots?: number; series_id?: string | null;
   } | null>(null);
   const [savingBlock, setSavingBlock] = useState(false);
   const { showToast } = useToast();
@@ -385,6 +385,14 @@ export default function CalendarioPage() {
   const [eventName, setEventName] = useState("");
   // Cupos que ocupa el bloqueo nuevo (0 = todo el horario). Solo con cupos por bloque.
   const [blockSpots, setBlockSpots] = useState(0);
+  // Bloqueo repetido: none | daily | weekly | biweekly | monthly | yearly | custom
+  const [repeatMode, setRepeatMode] = useState("none");
+  const [repeatEvery, setRepeatEvery] = useState(1);
+  const [repeatUnit, setRepeatUnit] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
+  const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>([]);
+  const [repeatEndKind, setRepeatEndKind] = useState<"until" | "count">("until");
+  const [repeatUntil, setRepeatUntil] = useState("");
+  const [repeatCount, setRepeatCount] = useState(10);
   const [eventNotes, setEventNotes] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -900,12 +908,16 @@ export default function CalendarioPage() {
           startTime: popupData.startTime,
           endTime: popupData.endTime,
           reason: eventName || "Bloqueo",
+          ...(buildRepeatRule(day) ? { repeat: buildRepeatRule(day) } : {}),
           ...(slotCap > 1 && blockSpots > 0 && blockSpots < slotCap ? { spots: Math.max(1, Math.min(blockSpots, spacesAt(popupData.barberId, day, popupData.startTime, popupData.endTime).free)) } : {}),
         }),
       });
       if (blockRes.ok) {
-        showToast("Bloqueo creado", "success");
+        const made = await blockRes.json().catch(() => ({}));
+        showToast(made?.count > 1 ? `Bloqueo creado (${made.count} fechas)` : "Bloqueo creado", "success");
         setBlockSpots(0);
+        setRepeatMode("none");
+        setRepeatUntil("");
       } else {
         const err = await blockRes.json().catch(() => ({}));
         showToast(err.error || "No se pudo crear el bloqueo", "error");
@@ -921,6 +933,27 @@ export default function CalendarioPage() {
   // native HTML5 drag (onDrop) and the touch long-press-drag below, so both paths stay
   // in sync. Preserves the appointment's real duration instead of assuming a fixed
   // 45min block, and surfaces a toast if the server rejects the move.
+  // Regla de repeticion elegida en la pestana Bloquear (null = no se repite).
+  const buildRepeatRule = (startDay: string) => {
+    if (repeatMode === "none") return null;
+    const preset: Record<string, { freq: "daily" | "weekly" | "monthly" | "yearly"; interval: number }> = {
+      daily: { freq: "daily", interval: 1 }, weekly: { freq: "weekly", interval: 1 }, biweekly: { freq: "weekly", interval: 2 },
+      monthly: { freq: "monthly", interval: 1 }, yearly: { freq: "yearly", interval: 1 },
+    };
+    const base = repeatMode === "custom" ? { freq: repeatUnit, interval: Math.max(1, repeatEvery) } : preset[repeatMode];
+    if (!base) return null;
+    return {
+      ...base,
+      ...(base.freq === "weekly" && repeatMode === "custom" && repeatWeekdays.length ? { weekdays: repeatWeekdays } : {}),
+      ...(repeatEndKind === "count" ? { count: Math.max(1, repeatCount) } : { until: repeatUntil || defaultRepeatUntil(startDay, repeatMode === "custom" ? repeatUnit : base.freq) }),
+    };
+  };
+  const defaultRepeatUntil = (startDay: string, freq: string) => {
+    const [y, m, d] = startDay.split("-").map(Number);
+    const add = freq === "yearly" ? { y: 5, m: 0 } : freq === "monthly" ? { y: 1, m: 0 } : { y: 0, m: 3 };
+    return new Date(Date.UTC(y + add.y, m - 1 + add.m, d)).toISOString().slice(0, 10);
+  };
+
   const moveAppointmentTo = async (apptId: string, barberId: string, y: number) => {
     const appt = appointments.find((a: any) => a.id === apptId);
     const sm = appt?.start_time?.match(/(\d{2}):(\d{2})/);
@@ -2162,6 +2195,60 @@ export default function CalendarioPage() {
                       })()}
                     </div>
                   )}
+                  {/* Repetir */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-500 block">Repetir</label>
+                    <select value={repeatMode} onChange={(e) => { setRepeatMode(e.target.value); if (e.target.value === "custom" && repeatWeekdays.length === 0) setRepeatWeekdays([new Date(`${popupDay || date}T12:00:00`).getDay()]); }}
+                      className="w-full border rounded-xl px-3 py-2.5 text-sm">
+                      <option value="none">No se repite</option>
+                      <option value="daily">Todos los días</option>
+                      <option value="weekly">Todas las semanas</option>
+                      <option value="biweekly">Cada 2 semanas</option>
+                      <option value="monthly">Todos los meses</option>
+                      <option value="yearly">Todos los años</option>
+                      <option value="custom">Personalizado…</option>
+                    </select>
+                    {repeatMode === "custom" && (
+                      <div className="space-y-2 rounded-xl bg-gray-50 p-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-gray-500">Cada</span>
+                          <input type="number" min={1} max={60} value={repeatEvery} onChange={(e) => setRepeatEvery(Math.max(1, Number(e.target.value) || 1))} className="w-16 rounded-lg border px-2 py-1.5 text-sm" />
+                          <select value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as any)} className="rounded-lg border px-2 py-1.5 text-sm">
+                            <option value="daily">días</option>
+                            <option value="weekly">semanas</option>
+                            <option value="monthly">meses</option>
+                            <option value="yearly">años</option>
+                          </select>
+                        </div>
+                        {repeatUnit === "weekly" && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {[[1, "L"], [2, "M"], [3, "X"], [4, "J"], [5, "V"], [6, "S"], [0, "D"]].map(([n, l]) => {
+                              const on = repeatWeekdays.includes(n as number);
+                              return (
+                                <button key={n} type="button" onClick={() => setRepeatWeekdays((w) => (on ? w.filter((x) => x !== n) : [...w, n as number]))}
+                                  className={`h-8 w-8 rounded-full text-xs font-semibold ${on ? "bg-brand-blue text-white" : "bg-white text-gray-500 border"}`}>{l}</button>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <p className="text-[11px] text-gray-400">Ej.: fin de semana por medio = cada 2 semanas + S y D.</p>
+                      </div>
+                    )}
+                    {repeatMode !== "none" && (
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <select value={repeatEndKind} onChange={(e) => setRepeatEndKind(e.target.value as any)} className="rounded-lg border px-2 py-1.5 text-sm">
+                          <option value="until">Termina el</option>
+                          <option value="count">Termina tras</option>
+                        </select>
+                        {repeatEndKind === "until" ? (
+                          <input type="date" value={repeatUntil || defaultRepeatUntil(popupDay || date, repeatMode === "custom" ? repeatUnit : repeatMode === "biweekly" ? "weekly" : repeatMode)} min={popupDay || date}
+                            onChange={(e) => setRepeatUntil(e.target.value)} className="rounded-lg border px-2 py-1.5 text-sm" />
+                        ) : (
+                          <><input type="number" min={1} max={400} value={repeatCount} onChange={(e) => setRepeatCount(Math.max(1, Number(e.target.value) || 1))} className="w-20 rounded-lg border px-2 py-1.5 text-sm" /><span className="text-gray-500">veces</span></>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 
@@ -2598,6 +2685,28 @@ export default function CalendarioPage() {
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {editingBlock.series_id && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t">
+                  <span className="w-full text-[10px] text-brand-gray">Este bloqueo se repite:</span>
+                  {([["following", "Eliminar este y los siguientes"], ["series", "Eliminar toda la serie"]] as const).map(([scope, label]) => (
+                    <button
+                      key={scope}
+                      onClick={async () => {
+                        const ok = await confirm({ title: label, message: scope === "series" ? "Se eliminan todos los bloqueos de esta repetición." : "Se elimina este bloqueo y los que vienen después en la repetición.", confirmText: "Eliminar", variant: "danger" });
+                        if (!ok) return;
+                        await fetch(`/api/barber/blocks?id=${editingBlock.id}&scope=${scope}`, { method: "DELETE" });
+                        showToast("Bloqueos eliminados", "success");
+                        setEditingBlock(null);
+                        await fetchAppointments();
+                      }}
+                      className="rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-medium text-red-500 hover:bg-red-50"
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               )}
 
