@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     wantBlocks
       ? supabase
           .from("barber_blocks")
-          .select("id, barber_id, date, all_day, start_time, end_time, reason, spots")
+          .select("id, barber_id, date, all_day, start_time, end_time, reason, spots, series_id")
           .in("barber_id", ids)
           .gte("date", from)
           .lte("date", to)
@@ -83,6 +83,14 @@ export async function GET(req: NextRequest) {
   // Sin la migracion 102 (columna spots) se repite la consulta sin ella.
   let blocksData: any[] = (blocksRes.data || []) as any[];
   let blocksError = blocksRes.error;
+  if (blocksError && wantBlocks && /series_id/.test(blocksError.message)) {
+    // Falta la migracion 106 (series_id): se consulta sin esa columna, conservando spots.
+    const retry = await supabase
+      .from("barber_blocks")
+      .select("id, barber_id, date, all_day, start_time, end_time, reason, spots")
+      .in("barber_id", ids).gte("date", from).lte("date", to).order("date", { ascending: true });
+    blocksData = (retry.data || []) as any[]; blocksError = retry.error;
+  }
   if (blocksError && wantBlocks && /spots/.test(blocksError.message)) {
     const retry = await supabase
       .from("barber_blocks")
