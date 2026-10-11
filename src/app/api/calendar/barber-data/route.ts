@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { loadBreaks, breaksForDay } from "@/lib/breaks";
 
 // Datos del calendario de varios profesionales en UNA llamada (antes eran 1 llamada por
 // profesional y por mes para bloqueos, y otra por profesional para horarios; con 8
@@ -115,6 +116,9 @@ export async function GET(req: NextRequest) {
     for (const r of (schedRes.data || []) as any[]) schedules[r.barber_id]?.push(r);
     // Sin horario guardado: valores por defecto (igual que /api/barber-schedule).
     for (const id of ids) if (schedules[id].length === 0) schedules[id] = defaultSchedule(id);
+    // Varios breaks por dia (migracion 106); sin ella queda el break unico de siempre.
+    const breakTable = await loadBreaks(supabase, ids);
+    for (const id of ids) schedules[id] = schedules[id].map((d: any) => ({ ...d, breaks: breaksForDay(breakTable, id, d) }));
   }
 
   return NextResponse.json({ blocks, schedules });

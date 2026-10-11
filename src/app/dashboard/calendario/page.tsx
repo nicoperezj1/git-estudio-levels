@@ -113,7 +113,7 @@ export default function CalendarioPage() {
   // Used to dim (grey out) the slots OUTSIDE their shift on the grid, so out-of-hours
   // time reads as unavailable at a glance (David's feedback), without needing a manual
   // block there.
-  const [schedules, setSchedules] = useState<Record<string, { is_working: boolean; start_time: string | null; end_time: string | null; break_start: string | null; break_end: string | null }>>({});
+  const [schedules, setSchedules] = useState<Record<string, { is_working: boolean; start_time: string | null; end_time: string | null; break_start: string | null; break_end: string | null; breaks?: Array<{ start: string; end: string; name: string | null; spots: number | null }> }>>({});
   const [loading, setLoading] = useState(true);
   // Minutes since midnight for the "current time" line (like Setmore). Refreshed every
   // minute so the line creeps down through the day on its own.
@@ -624,6 +624,7 @@ export default function CalendarioPage() {
           end_time: day.end_time || null,
           break_start: day.break_start || null,
           break_end: day.break_end || null,
+          breaks: Array.isArray(day.breaks) ? day.breaks : undefined,
         };
       }
     }
@@ -1676,7 +1677,7 @@ export default function CalendarioPage() {
                         const m = t?.match(/(\d{2}):(\d{2})/);
                         return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
                       };
-                      const shade = (fromMin: number, toMinutes: number, key: string) => {
+                      const shade = (fromMin: number, toMinutes: number, key: string, label?: string) => {
                         const a = Math.max(fromMin, gridTopMin);
                         const b = Math.min(toMinutes, gridBotMin);
                         if (b <= a) return null;
@@ -1689,7 +1690,9 @@ export default function CalendarioPage() {
                               height: `${((b - a) / 60) * HOUR_HEIGHT}px`,
                               background: "rgba(148,163,184,0.18)",
                             }}
-                          />
+                          >
+                            {label && <span className="block truncate px-1.5 pt-0.5 text-[9px] font-medium text-gray-400">{label}</span>}
+                          </div>
                         );
                       };
                       // No schedule info → don't shade (assume available, avoids greying
@@ -1702,9 +1705,12 @@ export default function CalendarioPage() {
                       const parts: (JSX.Element | null)[] = [];
                       if (open !== null) parts.push(shade(gridTopMin, open, "before"));
                       if (close !== null) parts.push(shade(close, gridBotMin, "after"));
-                      const bs = toMin(sched.break_start);
-                      const be = toMin(sched.break_end);
-                      if (bs !== null && be !== null) parts.push(shade(bs, be, "break"));
+                      const brks = sched.breaks ?? (sched.break_start && sched.break_end ? [{ start: sched.break_start, end: sched.break_end, name: null, spots: null }] : []);
+                      brks.forEach((br: any, bi: number) => {
+                        const bs = toMin(br.start);
+                        const be = toMin(br.end);
+                        if (bs !== null && be !== null) parts.push(shade(bs, be, `break-${bi}`, br.name || undefined));
+                      });
                       return parts;
                     })()}
 
