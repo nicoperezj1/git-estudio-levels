@@ -65,6 +65,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission> = {
       "/dashboard/clientes",
       "/dashboard/mi-billetera",
       "/dashboard/mi-perfil",
+      "/dashboard/soporte",
     ],
     features: [
       "calendar_own", "clients_own", "commissions_own", "standby",
