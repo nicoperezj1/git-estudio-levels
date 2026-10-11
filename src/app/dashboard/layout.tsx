@@ -87,7 +87,7 @@ export default async function DashboardLayout({
               </SuspendedGate>
             </ErrorBoundary>
             {!isSuspended && <PushNotificationPrompt />}
-            <SupportWidget />
+            <SupportWidget role={profile?.role || "barber"} />
             {!isSuspended && <QuickActions userRole={profile?.role || "barber"} />}
             {!isSuspended && <MobileTabBar role={profile?.role || "barber"} />}
             {!isSuspended && <CommandPalette />}
