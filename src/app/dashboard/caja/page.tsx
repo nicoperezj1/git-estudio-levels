@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/components/ui/toast";
+import { StatCard, inputClass, primaryButton } from "@/components/ui/premium";
+import { Wallet, TrendingUp, TrendingDown, Banknote, CreditCard, Receipt, Hash } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useTenant } from "@/lib/tenant-context";
 import { useAuth } from "@/lib/auth-context";
@@ -492,16 +494,16 @@ export default function CajaPage() {
   }).format(new Date(`${selectedDate}T12:00:00Z`));
 
   return (
-    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 max-w-4xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-3 p-3 md:space-y-6 md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <ReceptionistGreeting className="mb-0.5" />
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Caja Diaria</h1>
-          <p className="text-gray-500 text-sm">{isToday ? todayLabel : selectedDateLabel}</p>
+          <h1 className="text-xl font-bold tracking-tight text-brand-dark md:text-3xl">Caja diaria</h1>
+          <p className="mt-0.5 text-xs text-brand-gray md:text-sm">{isToday ? todayLabel : selectedDateLabel}</p>
         </div>
         {lockEnabled && (
           <button type="button" onClick={lockCaja}
-            className="px-3 py-2 rounded-lg text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-brand-dark hover:border-brand-blue/40">
             🔒 Apagar caja
           </button>
         )}
@@ -509,20 +511,20 @@ export default function CajaPage() {
         {isAdmin && (
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setSelectedDate(todayInChile())}
-              className={`px-3 py-2 rounded-lg text-sm font-medium ${isToday ? "bg-brand-blue text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+              className={`rounded-xl px-3 py-2 text-sm font-semibold ${isToday ? "bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "border border-gray-200 bg-white text-brand-gray hover:text-brand-dark"}`}>
               Hoy
             </button>
             <button type="button" onClick={() => setSelectedDate(dateStrOffset(todayInChile(), -1))}
-              className={`px-3 py-2 rounded-lg text-sm font-medium ${selectedDate === dateStrOffset(todayInChile(), -1) ? "bg-brand-blue text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+              className={`rounded-xl px-3 py-2 text-sm font-semibold ${selectedDate === dateStrOffset(todayInChile(), -1) ? "bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "border border-gray-200 bg-white text-brand-gray hover:text-brand-dark"}`}>
               Ayer
             </button>
-            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm text-gray-600">
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-brand-gray">
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
               </svg>
               <input type="date" value={selectedDate} max={todayInChile()}
                 onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-                className="text-sm text-gray-600 bg-transparent outline-none" />
+                className="bg-transparent text-sm text-brand-dark outline-none" />
             </div>
           </div>
         )}
@@ -535,10 +537,10 @@ export default function CajaPage() {
       )}
 
       {/* Status */}
-      <div className={`rounded-lg p-4 border-2 ${
-        data?.isOpen ? "border-green-300 bg-green-50" :
-        data?.register?.status === "closed" ? "border-gray-300 bg-gray-50" :
-        "border-yellow-300 bg-yellow-50"
+      <div className={`rounded-2xl border p-4 ${
+        data?.isOpen ? "border-emerald-500/30 bg-emerald-500/10" :
+        data?.register?.status === "closed" ? "border-gray-200 bg-gray-50" :
+        "border-amber-500/30 bg-amber-500/10"
       }`}>
         <div className="flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${
@@ -546,7 +548,7 @@ export default function CajaPage() {
             data?.register?.status === "closed" ? "bg-gray-400" :
             "bg-yellow-500"
           }`} />
-          <span className="font-medium text-gray-800">
+          <span className="font-semibold text-brand-dark">
             {data?.isOpen ? "Caja Abierta" :
              data?.register?.status === "closed" ? "Caja Cerrada" :
              "Caja No Abierta"}
@@ -568,15 +570,15 @@ export default function CajaPage() {
 
       {/* Descuento por planilla: aprobar con el codigo del profesional */}
       {isToday && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
-          <h3 className="font-bold text-gray-800">Descuento por planilla</h3>
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 md:p-5">
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">Descuento por planilla</h3>
           <p className="text-xs text-gray-500 mb-3">Ingresa el código que te da el profesional. Recién ahí se descuenta el stock y se anota en su libro.</p>
           <div className="flex gap-2">
             <input value={planillaCode} onChange={(e) => setPlanillaCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
               onKeyDown={(e) => { if (e.key === "Enter") approvePlanilla(); }}
-              placeholder="CÓDIGO" className="w-40 border border-gray-200 rounded-xl px-3 py-2 text-center font-mono tracking-widest" />
+              placeholder="CÓDIGO" className={`${inputClass} w-40 text-center font-mono tracking-widest`} />
             <button onClick={() => approvePlanilla()} disabled={planillaCode.length !== 6 || planillaBusy}
-              className="px-4 py-2 bg-brand-blue text-white rounded-xl text-sm font-medium disabled:opacity-40">
+              className={primaryButton}>
               {planillaBusy ? "Aprobando…" : "Aprobar"}
             </button>
           </div>
@@ -595,18 +597,17 @@ export default function CajaPage() {
 
       {/* Open register — solo aplica al dia de hoy */}
       {isToday && !data?.register && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-          <h3 className="font-bold text-gray-800 mb-4">Abrir Caja</h3>
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 md:p-6">
+          <h3 className="mb-4 text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">Abrir caja</h3>
           <div className="flex gap-3 items-end">
             <div className="flex-1">
-              <label className="block text-sm text-gray-600 mb-1">Monto inicial en caja (efectivo)</label>
+              <label className="mb-1 block text-xs font-semibold text-brand-gray">Monto inicial en caja (efectivo)</label>
               <input type="number" min="0" step="1000" value={openingAmount}
                 onChange={(e) => setOpeningAmount(e.target.value)}
                 placeholder="Ej: 50000"
-                className="w-full border rounded-lg px-3 py-2" />
+                className={inputClass} />
             </div>
-            <button onClick={openRegister}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+            <button onClick={openRegister} className={`${primaryButton} px-6`}>
               Abrir Caja
             </button>
           </div>
@@ -616,23 +617,11 @@ export default function CajaPage() {
       {/* Summary (when open or closed) */}
       {data?.register && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 uppercase">Apertura</p>
-              <p className="text-xl font-bold">{formatCurrency(data.summary.openingAmount)}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 uppercase">Ingresos Efectivo</p>
-              <p className="text-xl font-bold text-green-600">+{formatCurrency(data.summary.cashIncome)}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 uppercase">Egresos Efectivo</p>
-              <p className="text-xl font-bold text-red-600">-{formatCurrency(data.summary.cashExpense)}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center border-2 border-blue-200">
-              <p className="text-xs text-gray-500 uppercase">Esperado en Caja</p>
-              <p className="text-xl font-bold text-blue-600">{formatCurrency(data.summary.expectedCash)}</p>
-            </div>
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-4">
+            <StatCard label="Apertura" value={formatCurrency(data.summary.openingAmount)} Icon={Wallet} tone="slate" />
+            <StatCard label="Ingresos efectivo" value={`+${formatCurrency(data.summary.cashIncome)}`} Icon={TrendingUp} tone="green" />
+            <StatCard label="Egresos efectivo" value={`-${formatCurrency(data.summary.cashExpense)}`} Icon={TrendingDown} tone="red" />
+            <StatCard label="Esperado en caja" value={formatCurrency(data.summary.expectedCash)} Icon={Banknote} tone="teal" />
           </div>
           {!!data.summary.adjustmentsTotal && data.summary.adjustmentsTotal !== 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
@@ -646,19 +635,10 @@ export default function CajaPage() {
           )}
 
           {/* Additional stats */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 uppercase">Ventas Tarjeta</p>
-              <p className="text-lg font-bold text-purple-600">{formatCurrency(data.summary.cardIncome)}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 uppercase">Total Ventas</p>
-              <p className="text-lg font-bold">{formatCurrency(data.summary.totalIncome)}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 uppercase">Operaciones</p>
-              <p className="text-lg font-bold">{data.summary.transactionCount}</p>
-            </div>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 md:gap-4">
+            <StatCard label="Ventas tarjeta" value={formatCurrency(data.summary.cardIncome)} Icon={CreditCard} tone="violet" />
+            <StatCard label="Total ventas" value={formatCurrency(data.summary.totalIncome)} Icon={Receipt} tone="teal" />
+            <StatCard label="Operaciones" value={data.summary.transactionCount} Icon={Hash} tone="slate" />
           </div>
 
           {/* Rental barbers' own cash — informational, NOT part of the salon till. */}
@@ -678,23 +658,23 @@ export default function CajaPage() {
 
           {/* Close register — solo aplica al dia de hoy */}
           {isToday && data.isOpen && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 border-2 border-yellow-200">
-              <h3 className="font-bold text-gray-800 mb-4">Cerrar Caja</h3>
-              <p className="text-sm text-gray-500 mb-4">Cuenta el efectivo en caja y registra el monto.</p>
+            <div className="rounded-2xl border border-amber-500/30 bg-white p-4 md:p-6">
+              <h3 className="mb-1 text-[13px] font-bold uppercase tracking-[0.12em] text-brand-dark">Cerrar caja</h3>
+              <p className="mb-4 text-sm text-brand-gray">Cuenta el efectivo en caja y registra el monto.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Monto contado ($)</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Monto contado ($)</label>
                   <input type="number" min="0" step="100" value={closingAmount}
                     onChange={(e) => setClosingAmount(e.target.value)}
                     placeholder={String(data.summary.expectedCash)}
-                    className="w-full border rounded-lg px-3 py-2" />
+                    className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Notas (opcional)</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Notas (opcional)</label>
                   <input type="text" value={closingNotes}
                     onChange={(e) => setClosingNotes(e.target.value)}
                     placeholder="Observaciones del cierre..."
-                    className="w-full border rounded-lg px-3 py-2" />
+                    className={inputClass} />
                 </div>
               </div>
               <button onClick={closeRegister}
@@ -707,7 +687,7 @@ export default function CajaPage() {
 
           {/* Closed result */}
           {data.register.status === "closed" && data.register.closing_amount !== null && (
-            <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 border-2 ${
+            <div className={`rounded-2xl border border-gray-100 bg-white p-4 md:p-6 border-2 ${
               Number(data.register.difference) === 0 ? "border-green-300" :
               Number(data.register.difference) > 0 ? "border-blue-300" : "border-red-300"
             }`}>
@@ -804,7 +784,7 @@ export default function CajaPage() {
             const colors: Record<string, string> = { standby: "bg-indigo-50 text-indigo-700", pos: "bg-sky-50 text-sky-700", manual: "bg-violet-50 text-violet-700", finanzas: "bg-rose-50 text-rose-700", ajustes: "bg-amber-50 text-amber-700", caja: "bg-gray-100 text-gray-600", otro: "bg-gray-100 text-gray-500" };
 
             return (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+              <div className="rounded-2xl border border-gray-100 bg-white">
                 <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3">
                   <h3 className="font-bold text-gray-800">Movimientos del Dia ({filtered.length})</h3>
                   <div className="flex flex-wrap items-center gap-2">
