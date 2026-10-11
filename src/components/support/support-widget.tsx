@@ -12,9 +12,16 @@ import { SupportForm } from "@/components/support/support-form";
 const SHOW_MS = 6000;      // visible al entrar
 const IDLE_MS = 3500;      // tras acercarse o subir el scroll, vuelve a esconderse a los 3,5 s
 
-export function SupportWidget() {
+// Pantalla de inicio de cada rol: ahi (y solo ahi) aparece el boton. En el resto, la ayuda sigue en el menu (Ayuda y soporte).
+const HOME_BY_ROLE: Record<string, string> = { barber: "/dashboard/mi-agenda", receptionist: "/dashboard/caja" };
+const OFF_KEY = "support_widget_off";
+
+export function SupportWidget({ role }: { role?: string }) {
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(true);
+  // El usuario puede cerrar el boton para siempre (X); la ayuda sigue en el menu.
+  const [off, setOff] = useState(true);
+  useEffect(() => { try { setOff(localStorage.getItem(OFF_KEY) === "1"); } catch { setOff(false); } }, []);
   const pathname = usePathname() || "";
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hovering = useRef(false);
@@ -75,12 +82,18 @@ export function SupportWidget() {
   // Al cambiar de pantalla asoma un instante y se vuelve a esconder.
   useEffect(() => { reveal(2500); }, [pathname, reveal]);
 
-  if (pathname.startsWith("/dashboard/soporte")) return null;
-  const compact = pathname.startsWith("/dashboard/pos") || pathname.startsWith("/dashboard/standby");
+  const home = HOME_BY_ROLE[role || ""] || "/dashboard";
+  if (off || pathname !== home) return null;
+  const compact = false;
   const expanded = shown && !open;
 
   return (
     <>
+      <div
+        className={`fixed z-40 left-0 max-lg:bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:left-auto lg:right-0 lg:bottom-6 transition-transform duration-300 ease-out ${
+          expanded ? "translate-x-4 lg:-translate-x-6" : "-translate-x-1/2 lg:translate-x-1/2"
+        } ${open ? "pointer-events-none opacity-0" : ""}`}
+      >
       <button
         type="button"
         onPointerDown={() => { wasHidden.current = !shown; }}
@@ -93,23 +106,34 @@ export function SupportWidget() {
         onMouseLeave={() => { hovering.current = false; hideSoon(1200); }}
         onFocus={() => setShown(true)}
         aria-label="¿Necesitas ayuda?"
-        style={{ bottom: compact ? "calc(8rem + env(safe-area-inset-bottom, 0px))" : undefined }}
-        className={`fixed z-40 flex items-center rounded-full bg-gradient-to-r from-brand-blue to-emerald-500 font-bold text-white shadow-lg shadow-brand-blue/30 transition-all duration-300 ease-out left-0 max-lg:bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:left-auto lg:right-0 ${compact ? "lg:bottom-28" : "lg:bottom-6"} ${
+        className={`relative flex items-center rounded-full bg-gradient-to-r from-brand-blue to-emerald-500 font-bold text-white shadow-lg shadow-brand-blue/30 transition-all duration-300 ease-out ${
           expanded
-            ? `translate-x-4 lg:-translate-x-6 opacity-100 ${compact ? "h-11 w-11 justify-center" : "gap-2 py-2.5 pl-4 pr-4 text-sm"}`
-            : "-translate-x-1/2 lg:translate-x-1/2 opacity-70 h-11 w-11 justify-center hover:opacity-100"
+            ? `opacity-100 ${compact ? "h-11 w-11 justify-center" : "gap-2 py-2.5 pl-4 pr-4 text-sm"}`
+            : "opacity-70 h-11 w-11 justify-center hover:opacity-100"
         } ${open ? "pointer-events-none opacity-0" : ""}`}
       >
         <LifeBuoy className="h-5 w-5 flex-shrink-0" strokeWidth={1.75} />
         {expanded && !compact && <span className="whitespace-nowrap">¿Necesitas ayuda?</span>}
       </button>
+        {expanded && (
+          <button
+            type="button"
+            aria-label="Ocultar el botón de ayuda"
+            title="Ocultar (la ayuda sigue en el menú)"
+            onClick={() => { try { localStorage.setItem(OFF_KEY, "1"); } catch { /* sin almacenamiento */ } setOff(true); }}
+            className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-gray-800 text-white shadow ring-2 ring-white hover:bg-black"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={() => setOpen(false)}>
-          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-brand-dark">¿Necesitas ayuda?</h2>
+                <h2 className="text-base font-bold text-brand-dark">¿Necesitas ayuda?</h2>
                 <p className="text-xs text-brand-gray">Cuéntanos qué pasó y lo solucionamos.</p>
               </div>
               <button onClick={() => setOpen(false)} aria-label="Cerrar" className="rounded-full p-1.5 text-brand-gray hover:bg-gray-100">

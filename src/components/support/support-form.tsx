@@ -7,6 +7,9 @@ import { SUPPORT_AREAS, SUPPORT_MAX_IMAGES, SUPPORT_MAX_TOTAL_BYTES } from "@/li
 import { compressImage } from "@/lib/image-compress";
 import { inputClass, primaryButton, ghostButton } from "@/components/ui/premium";
 
+// Campos compactos; 16 px en celular para que iPhone no haga zoom al escribir.
+const field = `${inputClass} !py-2 !text-[16px] sm:!text-sm`;
+
 interface Shot { id: string; file: File; url: string }
 
 export function SupportForm({ onClose }: { onClose?: () => void }) {
@@ -77,11 +80,11 @@ export function SupportForm({ onClose }: { onClose?: () => void }) {
 
   if (caseId) {
     return (
-      <div className="space-y-4 p-6 text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" strokeWidth={1.5} />
+      <div className="space-y-3 p-4 text-center">
+        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" strokeWidth={1.5} />
         <div>
           <p className="text-sm text-brand-gray">Recibimos tu caso</p>
-          <p className="mt-1 text-3xl font-extrabold tracking-tight text-brand-dark">{caseId}</p>
+          <p className="mt-0.5 text-2xl font-extrabold tracking-tight text-brand-dark">{caseId}</p>
         </div>
         <p className="mx-auto max-w-sm text-sm text-brand-gray">
           Lo vamos a solucionar en <strong className="text-brand-dark">menos de 48 horas</strong> y te contactaremos por
@@ -93,47 +96,39 @@ export function SupportForm({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div>
-        <label className="mb-1.5 block text-xs font-semibold text-brand-gray">¿Dónde ocurrió el problema? *</label>
-        <div className="flex flex-wrap gap-1.5">
-          {SUPPORT_AREAS.map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => setArea(a)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                area === a ? "border-transparent bg-brand-blue text-white shadow-md shadow-brand-blue/25" : "border-gray-200 bg-white text-brand-gray hover:border-brand-blue/50 hover:text-brand-dark"
-              }`}
-            >
-              {a}
-            </button>
-          ))}
+    <form onSubmit={submit} className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-brand-gray">¿Dónde ocurrió? *</label>
+          <select value={area} onChange={(e) => setArea(e.target.value)} className={`${field} ${area ? "" : "text-brand-gray"}`}>
+            <option value="">Elige el área…</option>
+            {SUPPORT_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-brand-gray">Título *</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Ej: No me deja guardar" className={field} />
         </div>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-brand-gray">Título *</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Ej: No me deja guardar una cita" className={inputClass} />
-      </div>
 
       <div>
         <label className="mb-1 block text-xs font-semibold text-brand-gray">Cuéntanos qué pasó *</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          rows={4}
+          rows={3}
           maxLength={4000}
-          placeholder="¿Qué estabas haciendo? ¿Qué esperabas que pasara y qué pasó? Si salió un mensaje rojo, escríbelo."
-          className={`${inputClass} resize-none`}
+          placeholder="¿Qué estabas haciendo y qué pasó? Si salió un mensaje rojo, escríbelo."
+          className={`${field} resize-none`}
         />
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-semibold text-brand-gray">Capturas de pantalla (hasta {SUPPORT_MAX_IMAGES})</label>
+        <label className="mb-1 block text-xs font-semibold text-brand-gray">Capturas (hasta {SUPPORT_MAX_IMAGES}) — nos ayudan a resolverlo más rápido</label>
         <div className="flex flex-wrap gap-2">
           {shots.map((s) => (
-            <div key={s.id} className="relative h-20 w-20 overflow-hidden rounded-xl border border-gray-200">
+            <div key={s.id} className="relative h-14 w-14 overflow-hidden rounded-lg border border-gray-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={s.url} alt="Captura" className="h-full w-full object-cover" />
               <button
@@ -150,29 +145,30 @@ export function SupportForm({ onClose }: { onClose?: () => void }) {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-gray-300 text-brand-gray transition-colors hover:border-brand-blue hover:text-brand-blue"
+              className="flex h-14 w-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-gray-300 text-brand-gray transition-colors hover:border-brand-blue hover:text-brand-blue"
             >
-              <Camera className="h-5 w-5" strokeWidth={1.75} />
-              <span className="text-[10px] font-semibold">Agregar</span>
+              <Camera className="h-4 w-4" strokeWidth={1.75} />
+              <span className="text-[9px] font-semibold">Agregar</span>
             </button>
           )}
         </div>
         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
-        <p className="mt-1.5 text-[11px] text-brand-gray">Una captura de lo que ves nos ayuda a resolverlo más rápido.</p>
+        
       </div>
 
       <div>
         <label className="mb-1 block text-xs font-semibold text-brand-gray">Tu WhatsApp para contactarte *</label>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+56 9 1234 5678" className={inputClass} />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+56 9 1234 5678" className={field} />
       </div>
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm font-medium text-red-500">{error}</p>}
 
-      <p className="text-[11px] text-brand-gray">Solucionamos tu caso en menos de 48 horas y te escribimos por WhatsApp.</p>
-
-      <div className="flex justify-end gap-2">
-        {onClose && <button type="button" onClick={onClose} className={ghostButton}>Cancelar</button>}
-        <button type="submit" disabled={busy} className={primaryButton}>{busy ? "Enviando..." : "Enviar caso"}</button>
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <p className="text-[11px] leading-tight text-brand-gray">Respondemos en menos de 48 h por WhatsApp.</p>
+        <div className="flex flex-shrink-0 gap-2">
+        {onClose && <button type="button" onClick={onClose} className={`${ghostButton} !px-3.5 !py-2`}>Cancelar</button>}
+        <button type="submit" disabled={busy} className={`${primaryButton} !px-4 !py-2`}>{busy ? "Enviando..." : "Enviar caso"}</button>
+        </div>
       </div>
     </form>
   );
