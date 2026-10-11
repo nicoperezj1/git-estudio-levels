@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+import { loadBreaks, breaksForDay } from "@/lib/breaks";
 
 // Datos del calendario de varios profesionales en UNA llamada (antes eran 1 llamada por
 // profesional y por mes para bloqueos, y otra por profesional para horarios; con 8
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
     wantBlocks
       ? supabase
           .from("barber_blocks")
-          .select("id, barber_id, date, all_day, start_time, end_time, reason, spots")
+          .select("id, barber_id, date, all_day, start_time, end_time, reason, spots, series_id")
           .in("barber_id", ids)
           .gte("date", from)
           .lte("date", to)
@@ -82,6 +83,14 @@ export async function GET(req: NextRequest) {
   // Sin la migracion 102 (columna spots) se repite la consulta sin ella.
   let blocksData: any[] = (blocksRes.data || []) as any[];
   let blocksError = blocksRes.error;
+  if (blocksError && wantBlocks && /series_id/.test(blocksError.message)) {
+    // Falta la migracion 106 (series_id): se consulta sin esa columna, conservando spots.
+    const retry = await supabase
+      .from("barber_blocks")
+      .select("id, barber_id, date, all_day, start_time, end_time, reason, spots")
+      .in("barber_id", ids).gte("date", from).lte("date", to).order("date", { ascending: true });
+    blocksData = (retry.data || []) as any[]; blocksError = retry.error;
+  }
   if (blocksError && wantBlocks && /spots/.test(blocksError.message)) {
     const retry = await supabase
       .from("barber_blocks")
@@ -115,6 +124,9 @@ export async function GET(req: NextRequest) {
     for (const r of (schedRes.data || []) as any[]) schedules[r.barber_id]?.push(r);
     // Sin horario guardado: valores por defecto (igual que /api/barber-schedule).
     for (const id of ids) if (schedules[id].length === 0) schedules[id] = defaultSchedule(id);
+    // Varios breaks por dia (migracion 106); sin ella queda el break unico de siempre.
+    const breakTable = await loadBreaks(supabase, ids);
+    for (const id of ids) schedules[id] = schedules[id].map((d: any) => ({ ...d, breaks: breaksForDay(breakTable, id, d) }));
   }
 
   return NextResponse.json({ blocks, schedules });

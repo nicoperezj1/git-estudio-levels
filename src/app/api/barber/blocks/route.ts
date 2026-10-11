@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase, canAccessBarber } from "@/lib/supabase/server";
+import { expandRepeat, isValidDate } from "@/lib/recurrence";
 import { vacationDates } from "@/lib/vacations";
 
 export async function GET(req: NextRequest) {
@@ -52,17 +53,37 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { barberId, date, allDay, startTime, endTime, reason } = body;
+  if (!barberId || !(await canAccessBarber(barberId))) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const spots = Number.isInteger(body.spots) && body.spots >= 1 && body.spots <= 6 && allDay === false ? body.spots : null;
 
-  const row: Record<string, any> = {
+  const base: Record<string, any> = {
     barber_id: barberId,
-    date,
     all_day: allDay !== false,
     start_time: allDay ? null : startTime,
     end_time: allDay ? null : endTime,
     reason: reason || null,
+    ...(spots ? { spots } : {}),
   };
-  let { data, error } = await supabase.from("barber_blocks").insert(spots ? { ...row, spots } : row).select().single();
+
+  // Bloqueo repetido: una fila por fecha, todas con el mismo series_id (migracion 106) para poder borrar la serie.
+  if (body.repeat && isValidDate(date)) {
+    const dates = expandRepeat(date, body.repeat);
+    if (dates.length === 0) return NextResponse.json({ error: "La repetición no es válida" }, { status: 400 });
+    const seriesId = crypto.randomUUID();
+    const rows = dates.map((d) => ({ ...base, date: d, series_id: seriesId }));
+    let { error } = await supabase.from("barber_blocks").insert(rows);
+    if (error && /series_id/.test(error.message)) {
+      // Falta la migracion 106: se crean igual, pero no se podran borrar todas juntas.
+      ({ error } = await supabase.from("barber_blocks").insert(rows.map(({ series_id: _s, ...r }) => r)));
+    }
+    if (error && spots && /spots/.test(error.message)) {
+      return NextResponse.json({ error: "Falta aplicar la migración 102 para bloquear solo algunos cupos" }, { status: 500 });
+    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, count: dates.length, seriesId }, { status: 201 });
+  }
+
+  let { data, error } = await supabase.from("barber_blocks").insert({ ...base, date }).select().single();
   // Falta la migracion 102: no se puede guardar un bloqueo parcial; se avisa en vez de bloquear todo.
   if (error && spots && /spots/.test(error.message)) {
     return NextResponse.json({ error: "Falta aplicar la migración 102 para bloquear solo algunos cupos" }, { status: 500 });
@@ -112,12 +133,28 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+// DELETE ?id=...            -> solo ese bloqueo
+//        ?id=...&scope=following -> ese y los siguientes de su serie
+//        ?id=...&scope=series    -> toda la serie (si el bloqueo no es de una serie, solo ese)
 export async function DELETE(req: NextRequest) {
   const supabase = createAdminSupabase();
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
+  const scope = searchParams.get("scope");
 
   if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+
+  const { data: row } = await supabase.from("barber_blocks").select("*").eq("id", id).maybeSingle();
+  if (!row) return NextResponse.json({ success: true });
+  if (!(await canAccessBarber((row as any).barber_id))) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
+  const seriesId = (row as any).series_id;
+  if (seriesId && (scope === "series" || scope === "following")) {
+    let q = supabase.from("barber_blocks").delete().eq("series_id", seriesId);
+    if (scope === "following") q = q.gte("date", (row as any).date);
+    await q;
+    return NextResponse.json({ success: true });
+  }
 
   await supabase.from("barber_blocks").delete().eq("id", id);
   return NextResponse.json({ success: true });

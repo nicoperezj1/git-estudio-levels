@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadBreaks, breaksForDay, type BreakItem } from "@/lib/breaks";
 import { createAdminSupabase } from "@/lib/supabase/server";
 import { getSlotCapacity, fullSegments, peakOverlap } from "@/lib/capacity";
 import { isOnVacation } from "@/lib/vacations";
@@ -38,8 +39,7 @@ export async function GET(req: NextRequest) {
 
   let openTime: string;
   let closeTime: string;
-  let breakStart: string | null = null;
-  let breakEnd: string | null = null;
+  let dayBreaks: BreakItem[] = [];
 
   if (barberSchedule) {
     // Use per-barber schedule
@@ -48,8 +48,7 @@ export async function GET(req: NextRequest) {
     }
     openTime = barberSchedule.start_time || "10:00";
     closeTime = barberSchedule.end_time || "20:00";
-    breakStart = barberSchedule.break_start || null;
-    breakEnd = barberSchedule.break_end || null;
+    dayBreaks = breaksForDay(await loadBreaks(supabase, [barberId]), barberId, { day_of_week: dayOfWeek, ...(barberSchedule as any) });
   } else {
     // Fallback to tenant's business hours
     // Get barber's tenant
@@ -82,8 +81,7 @@ export async function GET(req: NextRequest) {
   const openMin = parseInt(openTime.split(":")[1]);
   const closeHour = parseInt(closeTime.split(":")[0]);
   const closeMin = parseInt(closeTime.split(":")[1]);
-  const breakStartMin = breakStart ? parseInt(breakStart.split(":")[0]) * 60 + parseInt(breakStart.split(":")[1]) : null;
-  const breakEndMin = breakEnd ? parseInt(breakEnd.split(":")[0]) * 60 + parseInt(breakEnd.split(":")[1]) : null;
+  const toMinutes = (t: string) => parseInt(t.split(":")[0]) * 60 + parseInt(t.split(":")[1]);
 
   // Get barber's custom slot duration
   const { data: barberProfile } = await supabase
@@ -163,11 +161,14 @@ export async function GET(req: NextRequest) {
     if (capacity > 1 && bs >= 1 && bs < capacity) { for (let i = 0; i < bs; i++) capIntervals.push(iv); }
     else busyIntervals.push(iv);
   }
+  // Breaks: con cupos por bloque, un break con `spots` cierra solo esa cantidad de cupos (como un bloqueo parcial).
+  for (const br of dayBreaks) {
+    const iv = { start: toMinutes(br.start), end: toMinutes(br.end) };
+    if (capacity > 1 && br.spots && br.spots >= 1 && br.spots < capacity) { for (let i = 0; i < br.spots; i++) capIntervals.push(iv); }
+    else busyIntervals.push(iv);
+  }
   if (capacity > 1) busyIntervals.push(...fullSegments(capIntervals, capacity));
   else busyIntervals.push(...apptIntervals);
-  if (breakStartMin !== null && breakEndMin !== null) {
-    busyIntervals.push({ start: breakStartMin, end: breakEndMin });
-  }
 
   // Walk the day. When a candidate slot overlaps a busy interval (block/appt/break),
   // RE-ANCHOR the grid to the END of that interval instead of jumping to the next fixed
