@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyIcons } from "@/components/ui/empty-state";
 import { parseCsvText, rowsToClients } from "@/lib/client-import";
 import SourceSelect from "@/components/clients/source-select";
+import { tableStyles as ts, inputClass, primaryButton, ghostButton } from "@/components/ui/premium";
 
 interface Client {
   id: string;
@@ -165,12 +166,14 @@ export default function ClientesPage() {
   // client base by accident. Bulk delete of everything is no longer exposed in the UI.
 
   return (
-    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
-      <div className="flex flex-wrap justify-between items-center gap-3">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Clientes</h1>
+    <div className="mx-auto max-w-7xl space-y-3 p-3 md:space-y-6 md:p-8 animate-fade-in">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-brand-dark md:text-3xl">Clientes</h1>
+          <p className="mt-0.5 text-xs text-brand-gray md:text-sm">Tu base de clientes: busca, edita y revisa su historial.</p>
+        </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+          <button onClick={() => setShowModal(true)} className={primaryButton}>
             Nuevo
           </button>
           {(canSeeMetrics || canImportExport) && (
@@ -179,7 +182,7 @@ export default function ClientesPage() {
                 aria-label="Más opciones"
                 aria-expanded={moreOpen}
                 onClick={() => setMoreOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-brand-dark transition-colors hover:border-brand-blue/40"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -295,7 +298,7 @@ export default function ClientesPage() {
 
       <input type="text" placeholder="Buscar por nombre, email o telefono..."
         value={search} onChange={(e) => handleSearch(e.target.value)}
-        className="w-full border rounded-lg px-4 py-2" />
+        className={inputClass} />
 
       {/* Bulk actions bar */}
       {selectedIds.size > 0 && (
@@ -316,42 +319,42 @@ export default function ClientesPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white">
+        <table className={ts.table}>
+          <thead className={ts.thead}>
             <tr>
-              <th className="p-4 w-10">
+              <th className="w-10 px-5 py-3">
                 <input type="checkbox" checked={clients.length > 0 && selectedIds.size === clients.length}
                   onChange={toggleAll}
                   className="w-4 h-4 rounded border-gray-300" />
               </th>
-              <th className="text-left p-4 font-medium text-gray-600">Nombre</th>
-              <th className="text-left p-4 font-medium text-gray-600">Email</th>
-              <th className="text-left p-4 font-medium text-gray-600">Telefono</th>
-              <th className="text-left p-4 font-medium text-gray-600">Notas</th>
+              <th className={ts.th}>Nombre</th>
+              <th className={ts.th}>Email</th>
+              <th className={ts.th}>Teléfono</th>
+              <th className={ts.th}>Notas</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className={ts.tbody}>
             {loading ? (
               <tr><td colSpan={5}><Spinner /></td></tr>
             ) : clients.length === 0 ? (
-              <tr><td colSpan={5} className="p-4 text-center text-gray-500">No hay clientes</td></tr>
+              <tr><td colSpan={5} className="p-8 text-center text-sm text-brand-gray">No hay clientes</td></tr>
             ) : clients.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="p-4" onClick={(e) => e.stopPropagation()}>
+              <tr key={c.id} className={ts.tr}>
+                <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={selectedIds.has(c.id)}
                     onChange={() => toggleSelect(c.id)}
                     className="w-4 h-4 rounded border-gray-300" />
                 </td>
-                <td className="p-4 font-medium text-blue-600 hover:underline cursor-pointer" onClick={() => router.push(`/dashboard/clientes/${c.id}`)}>
+                <td className="cursor-pointer px-5 py-3.5 font-semibold text-brand-blue hover:underline" onClick={() => router.push(`/dashboard/clientes/${c.id}`)}>
                   {c.name}
                   {c.created_at && (Date.now() - new Date(c.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000 && (
                     <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-[9px] font-bold rounded">NUEVO</span>
                   )}
                 </td>
-                <td className="p-4">{c.email || "-"}</td>
-                <td className="p-4">{c.phone || "-"}</td>
-                <td className="p-4 text-gray-500">{c.notes || "-"}</td>
+                <td className={ts.td}>{c.email || "-"}</td>
+                <td className={ts.td}>{c.phone || "-"}</td>
+                <td className={`${ts.td} text-brand-gray`}>{c.notes || "-"}</td>
               </tr>
             ))}
           </tbody>
@@ -389,31 +392,31 @@ export default function ClientesPage() {
             <h2 className="text-lg font-bold mb-4">Nuevo Cliente</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Nombre</label>
                 <input type="text" required value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Email *</label>
                 <input type="email" required value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono *</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Telefono *</label>
                 <input type="text" required value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Notas</label>
                 <textarea value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2" rows={2} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">¿Cómo nos visitó?</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">¿Cómo nos visitó?</label>
                 <SourceSelect
                   value={formData.source}
                   tenantId={tenant?.id}
@@ -423,7 +426,7 @@ export default function ClientesPage() {
               </div>
               {formData.source === "promotion" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Código de descuento (opcional)</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Código de descuento (opcional)</label>
                   <input type="text" value={formData.sourceDetail}
                     onChange={(e) => setFormData({ ...formData, sourceDetail: e.target.value })}
                     placeholder="Ej: DESCUENTO10"
@@ -432,7 +435,7 @@ export default function ClientesPage() {
               )}
               {formData.source === "influencer" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del influencer (opcional)</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Nombre del influencer (opcional)</label>
                   <input type="text" value={formData.sourceDetail}
                     onChange={(e) => setFormData({ ...formData, sourceDetail: e.target.value })}
                     placeholder="Ej: @influencer"
@@ -444,7 +447,7 @@ export default function ClientesPage() {
                   className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
                 <button type="submit"
                   disabled={!formData.name.trim()}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
+                  className={primaryButton}>Guardar</button>
               </div>
             </form>
           </div>

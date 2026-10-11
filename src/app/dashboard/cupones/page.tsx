@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { PageHeader, Panel, tableStyles as ts, inputClass, primaryButton, ghostButton } from "@/components/ui/premium";
 
 interface Coupon {
   id: string;
@@ -139,61 +140,58 @@ export default function CuponesPage() {
   };
 
   return (
-    <div className="p-3 md:p-6 space-y-3 md:space-y-3 md:space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Cupones</h1>
-        <button onClick={openNew}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-          Nuevo Cupon
-        </button>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-3 p-3 md:space-y-6 md:p-8 animate-fade-in">
+      <PageHeader
+        title="Cupones"
+        subtitle="Códigos de descuento para tus clientes."
+        actions={<button onClick={openNew} className={primaryButton}>Nuevo cupón</button>}
+      />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+      <Panel flush>
+        <div className={ts.wrap}>
+        <table className={ts.table}>
+          <thead className={ts.thead}>
             <tr>
-              <th className="text-left p-4 font-medium text-gray-600">Codigo</th>
-              <th className="text-left p-4 font-medium text-gray-600">Descripcion</th>
-              <th className="text-left p-4 font-medium text-gray-600">Descuento</th>
-              <th className="text-right p-4 font-medium text-gray-600">Min Compra</th>
-              <th className="text-center p-4 font-medium text-gray-600">Usos</th>
-              <th className="text-left p-4 font-medium text-gray-600">Valido Hasta</th>
-              <th className="text-center p-4 font-medium text-gray-600">Estado</th>
-              <th className="text-center p-4 font-medium text-gray-600">Acciones</th>
+              <th className={ts.th}>Código</th>
+              <th className={ts.th}>Descripción</th>
+              <th className={ts.th}>Descuento</th>
+              <th className={ts.thRight}>Min. compra</th>
+              <th className={ts.thCenter}>Usos</th>
+              <th className={ts.th}>Válido hasta</th>
+              <th className={ts.thCenter}>Estado</th>
+              <th className={ts.thCenter}>Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className={ts.tbody}>
             {loading ? (
-              <tr><td colSpan={7}><Spinner /></td></tr>
+              <tr><td colSpan={8}><Spinner /></td></tr>
             ) : coupons.length === 0 ? (
-              <tr><td colSpan={8} className="p-4 text-center text-gray-500">No hay cupones</td></tr>
+              <tr><td colSpan={8} className="p-8 text-center text-sm text-brand-gray">No hay cupones</td></tr>
             ) : coupons.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="p-4 font-mono font-medium">{c.code}</td>
-                <td className="p-4">{c.description || "-"}</td>
-                <td className="p-4">
+              <tr key={c.id} className={ts.tr}>
+                <td className={`${ts.td} font-mono font-semibold`}>{c.code}</td>
+                <td className={ts.td}>{c.description || "-"}</td>
+                <td className={`${ts.td} font-semibold`}>
                   {c.discount_type === "percentage" ? `${c.discount_value}%` : formatCurrency(Number(c.discount_value))}
                 </td>
-                <td className="p-4 text-right">{c.min_purchase ? formatCurrency(Number(c.min_purchase)) : "-"}</td>
-                <td className="p-4 text-center">{c.used_count}/{c.max_uses || "∞"}</td>
-                <td className="p-4">
-                  {c.valid_until ? new Date(c.valid_until).toLocaleDateString("es-CL") : "Sin limite"}
+                <td className={`${ts.td} text-right`}>{c.min_purchase ? formatCurrency(Number(c.min_purchase)) : "-"}</td>
+                <td className={ts.tdCenter}>{c.used_count}/{c.max_uses || "∞"}</td>
+                <td className={ts.td}>
+                  {c.valid_until ? new Date(c.valid_until).toLocaleDateString("es-CL") : "Sin límite"}
                 </td>
-                <td className="p-4 text-center">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    c.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                <td className={ts.tdCenter}>
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                    c.active ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-500"
                   }`}>
                     {c.active ? "Activo" : "Inactivo"}
                   </span>
                 </td>
-                <td className="p-4 text-center">
-                  <div className="flex gap-2 justify-center">
-                    <button onClick={() => openEdit(c)}
-                      className="px-3 py-1 text-xs border rounded-lg hover:bg-gray-100">
+                <td className={ts.tdCenter}>
+                  <div className="flex justify-center gap-2">
+                    <button onClick={() => openEdit(c)} className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-brand-dark hover:border-brand-blue/40">
                       Editar
                     </button>
-                    <button onClick={() => deleteCoupon(c)}
-                      className="px-3 py-1 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50">
+                    <button onClick={() => deleteCoupon(c)} className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-500 hover:bg-red-50">
                       Eliminar
                     </button>
                   </div>
@@ -202,7 +200,8 @@ export default function CuponesPage() {
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      </Panel>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-modal flex items-center justify-center z-50 p-4">
@@ -210,60 +209,60 @@ export default function CuponesPage() {
             <h2 className="text-lg font-bold mb-4">{editingId ? "Editar Cupon" : "Nuevo Cupon"}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Codigo</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Codigo</label>
                 <input type="text" required value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  className="w-full border rounded-lg px-3 py-2 font-mono" />
+                  className={`${inputClass} font-mono`} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Descripcion</label>
                 <input type="text" value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2" />
+                  className={inputClass} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Tipo</label>
                   <select value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2">
+                    className={inputClass}>
                     <option value="percentage">Porcentaje</option>
                     <option value="fixed_amount">Monto Fijo</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Valor</label>
                   <input type="number" required min="0" value={formData.value}
                     onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2" />
+                    className={inputClass} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Compra Minima</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Compra Minima</label>
                   <input type="number" min="0" value={formData.min_purchase}
                     onChange={(e) => setFormData({ ...formData, min_purchase: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2" />
+                    className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Usos Maximos</label>
+                  <label className="mb-1 block text-xs font-semibold text-brand-gray">Usos Maximos</label>
                   <input type="number" min="1" value={formData.max_uses}
                     onChange={(e) => setFormData({ ...formData, max_uses: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2" />
+                    className={inputClass} />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valido Hasta</label>
+                <label className="mb-1 block text-xs font-semibold text-brand-gray">Valido Hasta</label>
                 <input type="date" value={formData.valid_until}
                   onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2" />
+                  className={inputClass} />
               </div>
               <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                  className={ghostButton}>Cancelar</button>
                 <button type="submit"
                   disabled={!formData.code.trim() || !formData.value || parseFloat(formData.value) <= 0}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
+                  className={primaryButton}>Guardar</button>
               </div>
             </form>
           </div>

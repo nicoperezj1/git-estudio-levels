@@ -322,9 +322,9 @@ export default function EditProfessionalPage() {
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Email</label>
-            <div className="flex gap-2">
+            <div className="space-y-1.5">
               <input type="email" value={data.email || ""} onChange={(e) => setData({ ...data, email: e.target.value })}
-                className="flex-1 border rounded-xl px-3 py-2.5 text-sm" />
+                className="w-full border rounded-xl px-3 py-2.5 text-sm" />
               <button
                 onClick={async () => {
                   if (!data.email) { showToast("No tiene email", "error"); return; }
@@ -350,9 +350,9 @@ export default function EditProfessionalPage() {
                   if (result.success) showToast("Email enviado", "success");
                   else showToast(result.error || "Error al enviar", "error");
                 }}
-                className="px-3 py-2 bg-brand-blue/10 text-brand-blue text-xs rounded-xl hover:bg-brand-blue/20 whitespace-nowrap font-medium"
+                className="inline-flex items-center gap-1 rounded-lg px-1 py-0.5 text-xs font-semibold text-brand-blue hover:underline"
               >
-                Enviar credenciales
+                Enviar credenciales por correo →
               </button>
             </div>
           </div>
