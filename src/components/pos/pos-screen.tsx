@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { useTenant } from "@/lib/tenant-context";
 import {
   Sparkles, Package, Search, Plus, Minus, Trash2, ShoppingBag, Tag, Lock, Check, Star,
-  Banknote, CreditCard, ArrowLeftRight, ArrowRight, ArrowUp, ArrowDown,
+  Banknote, CreditCard, ArrowLeftRight, ArrowRight, ArrowUp, ArrowDown, ChevronDown,
 } from "lucide-react";
 import { SaleCelebration } from "@/components/pos/sale-celebration";
 import { CashReductionPrompt } from "@/components/pos/cash-reduction-prompt";
@@ -90,6 +90,8 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
   const [activeTab, setActiveTab] = useState<"services" | "products">("services");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  // Grupos de servicios plegados (solo para ordenar la vista; no cambia nada de la venta).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<"default" | "price_asc" | "price_desc">("default");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedBarber, setSelectedBarber] = useState(standby?.barber.id || "");
@@ -726,6 +728,7 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
             (Nico's request). Otherwise (products, or a specific category filter, or a
             search) fall back to a single flat grid. */}
         {(() => {
+          // Fila compacta: nombre a la izquierda, precio a la derecha. Un toque la agrega a la venta.
           const renderCard = (item: Service | Product) => {
             const type = activeTab === "services" ? "service" : "product";
             const isService = type === "service";
@@ -736,40 +739,35 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
               <button
                 key={item.id}
                 onClick={() => addToCart(item, type)}
-                className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97] ${
-                  inCart
-                    ? "border-brand-blue bg-brand-blue/[0.06] shadow-lg shadow-brand-blue/10 ring-1 ring-brand-blue/40"
-                    : "border-gray-100 bg-white hover:border-brand-blue/40 hover:shadow-lg hover:shadow-black/5"
+                className={`group flex w-full items-center gap-3 border-b border-gray-50 px-4 py-3 text-left transition-colors active:scale-[0.995] ${
+                  inCart ? "bg-brand-blue/[0.07]" : "hover:bg-brand-blue/[0.04]"
                 }`}
               >
-                {/* brillo sutil al pasar el cursor */}
-                <span className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-brand-blue/15 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
-                <div className="relative flex items-start justify-between">
-                  <Monogram name={item.name} tone={isService ? "teal" : "amber"} />
-                  {inCart ? (
-                    <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-brand-blue px-1.5 text-xs font-bold text-white shadow-md">
-                      ×{inCart.quantity}
-                    </span>
-                  ) : (
-                    <span className="flex h-7 w-7 scale-75 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100">
-                      <Plus className="h-4 w-4" strokeWidth={2.25} />
-                    </span>
-                  )}
-                </div>
-                <p className="relative mt-3 line-clamp-2 min-h-[2.5em] text-[15px] font-semibold leading-tight text-brand-dark">{item.name}</p>
-                <div className="relative mt-2 flex items-end justify-between gap-2">
-                  <p className="text-xl font-extrabold tracking-tight text-brand-blue tabular-nums">{formatCurrency(Number(item.price))}</p>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      lowStock ? "bg-red-500/15 text-red-500" : "bg-black/5 text-brand-gray dark:bg-white/10"
-                    }`}
-                  >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-brand-dark">{item.name}</p>
+                  <p className={`mt-0.5 text-[11px] ${lowStock ? "font-semibold text-red-500" : "text-brand-gray"}`}>
                     {isService ? `${(item as Service).duration} min` : `Stock ${stock}`}
-                  </span>
+                  </p>
                 </div>
+                <p className="flex-shrink-0 text-sm font-bold tabular-nums text-brand-dark">{formatCurrency(Number(item.price))}</p>
+                {inCart ? (
+                  <span className="flex h-6 min-w-[28px] flex-shrink-0 items-center justify-center rounded-full bg-brand-blue px-1.5 text-xs font-bold text-white">
+                    ×{inCart.quantity}
+                  </span>
+                ) : (
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue transition-colors group-hover:bg-brand-blue group-hover:text-white">
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  </span>
+                )}
               </button>
             );
           };
+
+          const listBox = (items: Array<Service | Product>) => (
+            <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-gray-100 bg-white md:grid-cols-2 md:[&>*:nth-child(odd)]:border-r md:[&>*:nth-child(odd)]:border-r-gray-50">
+              {items.map(renderCard)}
+            </div>
+          );
 
           const grouped =
             activeTab === "services" &&
@@ -778,14 +776,10 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
             serviceCategories.length > 0;
 
           if (!grouped) {
-            return (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {filteredItems.map(renderCard)}
-              </div>
-            );
+            return listBox(filteredItems as Array<Service | Product>);
           }
 
-          // Build ordered groups: each named category, then "Sin categoria" at the end.
+          // Grupos en orden: cada categoria con nombre y al final "Sin categoria". Se pueden plegar.
           const services = filteredItems as Service[];
           const groups: Array<{ label: string; items: Service[] }> = [];
           for (const cat of serviceCategories) {
@@ -796,20 +790,25 @@ function PosScreenInner({ standby, onLock }: { standby?: StandbyCtx; onLock?: ()
           if (uncategorized.length) groups.push({ label: "Sin categoria", items: uncategorized });
 
           return (
-            <div className="space-y-7">
-              {groups.map((g) => (
-                <div key={g.label}>
-                  <div className="mb-3 flex items-center gap-3">
-                    <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" />
-                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-dark">{g.label}</h3>
-                    <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-semibold text-brand-blue">{g.items.length}</span>
-                    <div className="h-px flex-1 bg-gradient-to-r from-brand-blue/25 to-transparent" />
+            <div className="space-y-4">
+              {groups.map((g) => {
+                const collapsed = collapsedGroups.has(g.label);
+                return (
+                  <div key={g.label}>
+                    <button
+                      type="button"
+                      onClick={() => setCollapsedGroups((prev) => { const n = new Set(prev); if (n.has(g.label)) n.delete(g.label); else n.add(g.label); return n; })}
+                      className="mb-2 flex w-full items-center gap-2.5 text-left"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" />
+                      <h3 className="text-[12px] font-bold uppercase tracking-[0.12em] text-brand-dark">{g.label}</h3>
+                      <span className="rounded-full bg-brand-blue/10 px-2 py-0.5 text-[10px] font-semibold text-brand-blue">{g.items.length}</span>
+                      <ChevronDown className={`ml-auto h-4 w-4 text-brand-gray transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+                    </button>
+                    {!collapsed && listBox(g.items)}
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {g.items.map(renderCard)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           );
         })()}
