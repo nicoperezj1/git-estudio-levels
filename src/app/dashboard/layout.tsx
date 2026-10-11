@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { CommandPalette } from "@/components/command-palette";
 import { QuickActions } from "@/components/quick-actions";
 import { AppLock } from "@/components/app-lock";
+import { SupportWidget } from "@/components/support/support-widget";
 
 export default async function DashboardLayout({
   children,
@@ -86,6 +87,7 @@ export default async function DashboardLayout({
               </SuspendedGate>
             </ErrorBoundary>
             {!isSuspended && <PushNotificationPrompt />}
+            <SupportWidget />
             {!isSuspended && <QuickActions userRole={profile?.role || "barber"} />}
             {!isSuspended && <MobileTabBar role={profile?.role || "barber"} />}
             {!isSuspended && <CommandPalette />}
