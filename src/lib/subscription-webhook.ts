@@ -227,7 +227,7 @@ export async function handleOneTimePayment(paymentId: string, accessToken: strin
       .single();
     const { data: planConfig } = await supabase
       .from("plan_limits")
-      .select("max_professionals, max_branches, price_clp, included_professionals, extra_professional_price_clp")
+      .select("*") // incluye seat_prices (migracion 109) si existe
       .eq("plan", targetPlan)
       .single();
     if (!sub || !planConfig || !professionals) return;

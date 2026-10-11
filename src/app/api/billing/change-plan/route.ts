@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   const targetPlan = plan || subscription.plan;
   const { data: planConfig } = await supabase
     .from("plan_limits")
-    .select("name, price_clp, max_professionals, max_branches, included_professionals, extra_professional_price_clp")
+    .select("*") // incluye seat_prices (migracion 109) si existe
     .eq("plan", targetPlan)
     .single();
 

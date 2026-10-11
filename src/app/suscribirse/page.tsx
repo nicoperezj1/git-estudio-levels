@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { netoMensualFor } from "@/lib/subscription-pricing";
 
 interface Plan {
   plan: string;
@@ -9,6 +10,7 @@ interface Plan {
   max_professionals: number;
   included_professionals: number | null;
   extra_professional_price_clp: number | null;
+  seat_prices?: Record<string, number> | null;
 }
 
 type BillingPeriod = "monthly" | "annual";
@@ -73,10 +75,8 @@ export default function SuscribirsePage() {
   const pricing = useMemo(() => {
     if (!plan) return null;
     const included = plan.included_professionals ?? plan.max_professionals;
-    const extraPrice = plan.extra_professional_price_clp || 0;
     const extraCount = Math.max(0, professionals - included);
-    const extraTotal = extraCount * extraPrice;
-    const netoMensual = plan.price_clp + extraTotal;
+    const netoMensual = netoMensualFor(plan, professionals);
     const totalMensual = Math.round(netoMensual * (1 + IVA_RATE));
     const totalAnual = Math.round(totalMensual * 12 * (1 - ANNUAL_DISCOUNT));
     return {

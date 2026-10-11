@@ -25,7 +25,7 @@ export async function createAnnualRenewalLink(supabase: any, subscriptionId: str
 
   const { data: planConfig } = await supabase
     .from("plan_limits")
-    .select("name, price_clp, max_professionals, included_professionals, extra_professional_price_clp")
+    .select("*") // incluye seat_prices (migracion 109) si existe
     .eq("plan", sub.plan)
     .single();
   if (!planConfig) return { ok: false as const, error: "Plan invalido" };
