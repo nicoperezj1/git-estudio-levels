@@ -16,7 +16,7 @@ import {
   Tablet, CreditCard, Tag, Settings, LogOut, Scissors, Menu, X,
   Heart, Bell, Zap, Image, Star, ChevronLeft, ChevronRight, ChevronDown,
   MessageCircle, Clock, FileText, UserCircle, PiggyBank, ClipboardList,
-  Building2, ShieldCheck, Ticket, Percent, KeyRound, Truck, Briefcase, Plane,
+  Building2, ShieldCheck, Ticket, Percent, KeyRound, Truck, Briefcase, Plane, LifeBuoy,
 } from "lucide-react";
 
 interface NavItem {
@@ -129,6 +129,7 @@ const sections: NavSection[] = [
       },
       { name: "Avisos", href: "/dashboard/avisos", icon: Bell, minRole: "barber" },
       { name: "Mi Perfil", href: "/dashboard/mi-perfil", icon: UserCircle, minRole: "barber" },
+      { name: "Ayuda y soporte", href: "/dashboard/soporte", icon: LifeBuoy, minRole: "barber" },
     ],
   },
   {
@@ -217,12 +218,12 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
       // Inventario (read-only, changes gated behind the admin PIN).
       "/dashboard/caja", "/dashboard/barberos", "/dashboard/inventario", "/dashboard/solicitud",
       // Cada usuario (tambien recepcion) puede entrar a Mi Perfil a elegir su propio tema.
-      "/dashboard/mi-perfil", "/dashboard/avisos",
+      "/dashboard/mi-perfil", "/dashboard/avisos", "/dashboard/soporte",
     ],
     barber: [
       "/dashboard/standby", "/dashboard/mi-agenda", "/dashboard/calendario",
       "/dashboard/clientes", "/dashboard/mi-billetera",
-      "/dashboard/mi-perfil", "/dashboard/avisos",
+      "/dashboard/mi-perfil", "/dashboard/avisos", "/dashboard/soporte",
     ],
   };
 
