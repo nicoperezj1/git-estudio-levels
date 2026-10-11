@@ -30,11 +30,16 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
   const body = await req.json();
   const { name, description, price, duration, sort_order, category, tenantId } = body;
-  const tid = tenantId || await getCurrentTenantId();
+  // Antes no pedia sesion y, para el super admin, guardaba el servicio con el negocio "ALL" (invalido):
+  // se avisaba "creado" pero nunca aparecia. Ahora el negocio sale de la sesion (o del que el super admin esta viendo).
+  const { role, tenantId: resolved } = await resolveTenantForRequest(tenantId);
+  if (!role) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (role !== "admin" && role !== "super_admin") return NextResponse.json({ error: "Solo el administrador puede crear servicios" }, { status: 403 });
+  if (!resolved || resolved === "ALL") return NextResponse.json({ error: "Elige primero el negocio (Viendo como…) para crear el servicio" }, { status: 400 });
 
   const { data, error } = await supabase
     .from("services")
-    .insert({ name, description, price, duration, sort_order: sort_order || 0, category: category || null, tenant_id: tid })
+    .insert({ name, description, price, duration, sort_order: sort_order || 0, category: category || null, tenant_id: resolved })
     .select()
     .single();
 
