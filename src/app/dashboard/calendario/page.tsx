@@ -876,7 +876,7 @@ export default function CalendarioPage() {
           startTime: startISO,
           endTime: endISO,
           serviceIds: [selectedService],
-          notes: eventNotes || undefined,
+          staff_note: eventNotes.trim() || undefined,
           tenantId: tenant?.id || getActiveTenantId(),
         }),
       });
