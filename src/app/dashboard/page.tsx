@@ -218,22 +218,10 @@ export default function DashboardPage() {
         title={`Hola, ${firstName}`}
         subtitle={isToday ? "Aquí tienes el resumen de tu negocio hoy." : `Resumen de tu negocio del ${selectedDateLabel}.`}
         actions={
-          <>
-            <button
-              type="button"
-              onClick={() => setEditingLayout((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-sm font-medium transition md:py-2 ${editingLayout ? "border-brand-blue bg-brand-blue text-white" : "border-gray-100 bg-white text-brand-gray hover:text-brand-dark"}`}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {editingLayout ? "Listo" : "Personalizar"}
-            </button>
-            {editingLayout && (
-              <button type="button" onClick={resetSecs} className="rounded-2xl border border-gray-100 bg-white px-3 py-1.5 text-sm font-medium text-brand-gray hover:text-brand-dark md:py-2">
-                Restaurar todo
-              </button>
-            )}
-            {/* Punto 8: selector de fecha, para consultar el Dashboard de un dia anterior */}
+          // Una sola fila en el celular: [Hoy|Ayer] [fecha] y el icono de Personalizar al final.
+          <div className="flex w-full items-center gap-2 md:w-auto">
             <Segmented
+              size="sm"
               value={dayValue}
               onChange={(v) => setSelectedDate(v === "today" ? todayInChile() : yesterday)}
               options={[
@@ -241,17 +229,33 @@ export default function DashboardPage() {
                 { value: "yesterday", label: "Ayer" },
               ]}
             />
-            <div className="flex items-center gap-2 rounded-2xl border border-gray-100 bg-white px-3 py-1.5 text-sm text-brand-gray md:px-3.5 md:py-2 transition focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10">
-              <CalendarDays className="h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
+            {/* Selector de fecha, para consultar el Dashboard de un dia anterior */}
+            <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-2.5 py-1.5 text-xs text-brand-gray transition focus-within:border-brand-blue focus-within:ring-4 focus-within:ring-brand-blue/10 md:flex-none md:gap-2 md:rounded-2xl md:px-3.5 md:py-2 md:text-sm">
+              <CalendarDays className="h-3.5 w-3.5 flex-shrink-0 md:h-4 md:w-4" strokeWidth={1.75} />
               <input
                 type="date"
                 value={selectedDate}
                 max={todayInChile()}
                 onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-                className="bg-transparent text-sm text-brand-dark outline-none"
+                className="min-w-0 flex-1 bg-transparent text-xs text-brand-dark outline-none md:flex-none md:text-sm"
               />
-            </div>
-          </>
+            </label>
+            {editingLayout && (
+              <button type="button" onClick={resetSecs} className="whitespace-nowrap rounded-xl border border-gray-100 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-gray hover:text-brand-dark md:rounded-2xl md:px-3 md:py-2 md:text-sm">
+                Restaurar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setEditingLayout((v) => !v)}
+              aria-label={editingLayout ? "Terminar de personalizar" : "Personalizar el Dashboard"}
+              title="Personalizar"
+              className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium transition md:rounded-2xl md:px-3 md:py-2 md:text-sm ${editingLayout ? "border-brand-blue bg-brand-blue text-white" : "border-gray-100 bg-white text-brand-gray hover:text-brand-dark"}`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className={editingLayout ? "" : "hidden md:inline"}>{editingLayout ? "Listo" : "Personalizar"}</span>
+            </button>
+          </div>
         }
       />
 
