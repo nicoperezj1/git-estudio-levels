@@ -70,34 +70,40 @@ export async function POST(req: NextRequest) {
   const when = new Date().toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "full", timeStyle: "short" });
   const waDigits = phone.replace(/\D/g, "");
   const waLink = `https://wa.me/${waDigits.length === 9 ? "56" + waDigits : waDigits}`;
-  const row = (k: string, v: string) =>
-    `<tr><td style="padding:6px 0;color:#9CA3AF;font-size:12px;width:130px;vertical-align:top;">${k}</td><td style="padding:6px 0;color:#1F2937;font-size:14px;">${v}</td></tr>`;
+  // Tabla de datos en dos columnas para aprovechar el ancho del correo.
+  const cell = (k: string, v: string) =>
+    `<td style="padding:7px 12px 7px 0;vertical-align:top;width:50%;"><div style="color:#9CA3AF;font-size:11px;text-transform:uppercase;letter-spacing:.6px;">${k}</div><div style="color:#1F2937;font-size:14px;margin-top:2px;word-break:break-word;">${v}</div></td>`;
+  const pair = (a: string, b: string) => `<tr>${a}${b}</tr>`;
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F7FA;margin:0;padding:20px;">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.08);">
-    <div style="background:linear-gradient(135deg,#0F8B8D,#2EC4B6);padding:26px 24px;">
-      <p style="color:rgba(255,255,255,.85);margin:0 0 4px;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Caso de soporte</p>
-      <h1 style="color:#fff;margin:0;font-size:24px;">${esc(caseId)}</h1>
-      <p style="color:rgba(255,255,255,.9);margin:6px 0 0;font-size:13px;">${esc(businessName || "Sin negocio")} · ${esc(when)}</p>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F7FA;margin:0;padding:12px;">
+  <div style="width:100%;max-width:900px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);">
+    <div style="background:linear-gradient(135deg,#0F8B8D,#2EC4B6);padding:18px 24px;">
+      <table style="width:100%;border-collapse:collapse;"><tr>
+        <td style="vertical-align:middle;">
+          <div style="color:rgba(255,255,255,.85);font-size:11px;letter-spacing:1px;text-transform:uppercase;">Caso de soporte</div>
+          <div style="color:#fff;font-size:26px;font-weight:800;margin-top:2px;">${esc(caseId)}</div>
+        </td>
+        <td style="vertical-align:middle;text-align:right;color:rgba(255,255,255,.92);font-size:13px;line-height:1.5;">
+          <strong>${esc(businessName || "Sin negocio")}</strong><br/>${esc(when)}
+        </td>
+      </tr></table>
     </div>
-    <div style="padding:24px;">
-      <p style="margin:0 0 4px;color:#0F8B8D;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">${esc(area)}</p>
-      <h2 style="margin:0 0 14px;color:#111827;font-size:19px;">${esc(title)}</h2>
-      <div style="background:#F9FAFB;border-left:3px solid #0F8B8D;border-radius:8px;padding:14px 16px;color:#1F2937;font-size:14px;line-height:1.55;white-space:pre-wrap;">${esc(description)}</div>
-
-      <table style="width:100%;border-collapse:collapse;margin-top:20px;border-top:1px solid #F3F4F6;">
-        ${row("Quién", `${esc(userName || "-")} <span style="color:#9CA3AF;">(${esc(role || "-")})</span>`)}
-        ${row("Negocio", esc(businessName || "-"))}
-        ${row("WhatsApp", `<a href="${esc(waLink)}" style="color:#0F8B8D;font-weight:700;text-decoration:none;">${esc(phone)}</a>`)}
-        ${row("Correo", esc(userEmail || "-"))}
-        ${row("Pantalla", esc(pageUrl || "-"))}
-        ${row("Dispositivo", `<span style="font-size:12px;color:#6B7280;">${esc(userAgent || "-")}</span>`)}
-        ${row("Capturas", files.length ? `${files.length} adjunta${files.length > 1 ? "s" : ""} (abajo)` : "Sin capturas")}
+    <div style="padding:20px 24px 8px;">
+      <div style="color:#0F8B8D;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">${esc(area)}</div>
+      <h2 style="margin:4px 0 12px;color:#111827;font-size:20px;line-height:1.3;">${esc(title)}</h2>
+      <div style="background:#F9FAFB;border-left:3px solid #0F8B8D;border-radius:8px;padding:14px 16px;color:#1F2937;font-size:15px;line-height:1.55;white-space:pre-wrap;">${esc(description)}</div>
+    </div>
+    <div style="padding:6px 24px 18px;">
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid #F3F4F6;margin-top:10px;">
+        ${pair(cell("Quién", `${esc(userName || "-")} <span style="color:#9CA3AF;">(${esc(role || "-")})</span>`), cell("Negocio", esc(businessName || "-")))}
+        ${pair(cell("WhatsApp", `<a href="${esc(waLink)}" style="color:#0F8B8D;font-weight:700;text-decoration:none;">${esc(phone)}</a>`), cell("Correo", esc(userEmail || "-")))}
+        ${pair(cell("Pantalla", esc(pageUrl || "-")), cell("Capturas", files.length ? `${files.length} adjunta${files.length > 1 ? "s" : ""} (abajo)` : "Sin capturas"))}
+        <tr><td colspan="2" style="padding:7px 0 0;"><div style="color:#9CA3AF;font-size:11px;text-transform:uppercase;letter-spacing:.6px;">Dispositivo</div><div style="color:#6B7280;font-size:12px;margin-top:2px;">${esc(userAgent || "-")}</div></td></tr>
       </table>
     </div>
-    <div style="border-top:1px solid #F3F4F6;padding:14px 24px;text-align:center;">
-      <p style="color:#9CA3AF;font-size:11px;margin:0;">Compromiso: responder en menos de 48 horas por WhatsApp.</p>
+    <div style="border-top:1px solid #F3F4F6;padding:10px 24px;text-align:center;">
+      <span style="color:#9CA3AF;font-size:11px;">Compromiso: responder en menos de 48 horas por WhatsApp.</span>
     </div>
   </div>
 </body></html>`;
