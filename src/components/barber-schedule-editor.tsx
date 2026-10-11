@@ -139,7 +139,7 @@ export function BarberScheduleEditor({ barberId, showToast }: { barberId: string
                       value={b.name}
                       maxLength={40}
                       onChange={(e) => setDayBreaks(dow, (l) => l.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-                      placeholder="Break (ej. Colación)"
+                      placeholder="Nombre (opcional)"
                       className="min-w-0 flex-1 basis-32 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-brand-blue"
                     />
                     <input type="time" value={b.start} onChange={(e) => setDayBreaks(dow, (l) => l.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} className={`${timeCls} w-[6.2rem]`} />
