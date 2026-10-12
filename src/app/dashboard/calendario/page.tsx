@@ -662,6 +662,13 @@ export default function CalendarioPage() {
     return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
   };
 
+  // Suma minutos a una hora "HH:MM" (tope 23:59: una cita no pasa de medianoche).
+  const addMinutesToTime = (t: string, mins: number): string => {
+    const [h, m] = t.split(":").map(Number);
+    const total = Math.min(h * 60 + m + mins, 23 * 60 + 59);
+    return `${Math.floor(total / 60).toString().padStart(2, "0")}:${(total % 60).toString().padStart(2, "0")}`;
+  };
+
   const formatTime12 = (time24: string) => {
     const [h, m] = time24.split(":").map(Number);
     const period = h >= 12 ? "PM" : "AM";
@@ -670,7 +677,10 @@ export default function CalendarioPage() {
   };
 
   // Mouse handlers for drag-to-create
+  // El celular dispara un "mouse" falso despues de cada toque: se ignora para que un toque corto no abra nada.
+  const lastTouchAt = useRef(0);
   const handleMouseDown = (e: React.MouseEvent, barberId: string) => {
+    if (Date.now() - lastTouchAt.current < 1000) return;
     // Don't start drag-to-create if clicking on an existing appointment
     if ((e.target as HTMLElement).closest("[data-appointment]")) return;
     // Only left click
@@ -722,6 +732,8 @@ export default function CalendarioPage() {
     // Auto-select the shortest service
     const shortest = services.length > 0 ? services.reduce((min, s) => s.duration < min.duration ? s : min, services[0]) : null;
     setSelectedService(shortest?.id || "");
+    // Un toque/clic sin arrastrar: el bloque toma la duracion real del servicio (si arrastro, se respeta lo que marco).
+    if (isClick && shortest) setPopupData((p) => ({ ...p, endTime: addMinutesToTime(p.startTime, shortest.duration) }));
     setSelectedClient("");
     setClientSearch("");
     setEventName("");
@@ -740,6 +752,7 @@ export default function CalendarioPage() {
     setPopupTab("service");
     const shortest = services.length > 0 ? services.reduce((min, s) => s.duration < min.duration ? s : min, services[0]) : null;
     setSelectedService(shortest?.id || "");
+    if (shortest) setPopupData({ barberId, startTime, endTime: addMinutesToTime(startTime, shortest.duration), barberName: barber?.name || "" });
     setSelectedClient("");
     setClientSearch("");
     setEventName("");
@@ -817,13 +830,14 @@ export default function CalendarioPage() {
   });
 
   const handleTouchStart = (e: React.TouchEvent, barberId: string) => {
+    lastTouchAt.current = Date.now();
     if ((e.target as HTMLElement).closest("[data-appointment]")) return;
     const touch = e.touches[0];
     const rect = e.currentTarget.getBoundingClientRect();
     const y = touch.clientY - rect.top;
     touchRef.current = { barberId, startY: y, startX: touch.clientX, el: e.currentTarget as HTMLElement, activated: false };
 
-    // Start long-press timer (400ms hold = activate create mode)
+    // Start long-press timer (450ms hold = activate create mode)
     longPressTimer.current = setTimeout(() => {
       if (!touchRef.current) return;
       touchRef.current.activated = true;
@@ -832,7 +846,7 @@ export default function CalendarioPage() {
       setDragStartY(y);
       setDragEndY(y);
       if (navigator.vibrate) navigator.vibrate(30);
-    }, 400);
+    }, 450);
   };
 
   // Cuando se abre el cuadro con un toque, se ignora el "clic" fantasma que el celular dispara justo
@@ -843,18 +857,15 @@ export default function CalendarioPage() {
   useBackToClose(!!editingBlock, () => setEditingBlock(null));
 
   const handleTouchEnd = (e?: React.TouchEvent) => {
+    lastTouchAt.current = Date.now();
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     if (!touchRef.current || !touchRef.current.activated) {
       // Toque corto (sin mover el dedo ni mantener): abre "Agendar / Bloquear" en ese
       // profesional y a esa hora. Mover el dedo es scroll y cancela touchRef antes de llegar aqui.
-      const tap = touchRef.current;
+      // Toque corto: no hace nada (como Google Calendar / Apple Calendar en el celular); asi deslizar para
+      // ver otras horas no abre nada por accidente. Para agendar/bloquear hay que MANTENER presionado.
       touchRef.current = null;
       setDragging(false);
-      if (tap && !showPopup) {
-        e?.preventDefault();
-        popupOpenedAt.current = Date.now();
-        openCreatePopup(tap.barberId, yToTime(tap.startY), yToTime(tap.startY + HOUR_HEIGHT * 0.75));
-      }
       return;
     }
     handleMouseUp();
@@ -2053,7 +2064,13 @@ export default function CalendarioPage() {
                   {new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" })}
                 </span>
                 <input type="time" value={popupData.startTime}
-                  onChange={(e) => setPopupData({ ...popupData, startTime: e.target.value })}
+                  onChange={(e) => {
+                    // Mover la hora de inicio mueve tambien el termino (misma duracion).
+                    const v = e.target.value;
+                    const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+                    const dur = Math.max(toMin(popupData.endTime) - toMin(popupData.startTime), 0);
+                    setPopupData({ ...popupData, startTime: v, endTime: v && dur > 0 ? addMinutesToTime(v, dur) : popupData.endTime });
+                  }}
                   className="border rounded-lg px-2 py-1 text-sm font-bold text-gray-900 w-24" />
                 <span>–</span>
                 <input type="time" value={popupData.endTime}
@@ -2109,7 +2126,13 @@ export default function CalendarioPage() {
                 <>
                   {/* Service selector */}
                   <div>
-                    <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)}
+                    <select value={selectedService} onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedService(id);
+                      // Al elegir el servicio, la hora de termino se ajusta sola a su duracion.
+                      const sv = (barberServices || services).find((x) => x.id === id);
+                      if (sv) setPopupData((p) => ({ ...p, endTime: addMinutesToTime(p.startTime, sv.duration) }));
+                    }}
                       className="w-full border rounded-xl px-3 py-2.5 text-sm">
                       <option value="">Seleccione un servicio</option>
                       {(barberServices || services).map((s) => (
