@@ -190,6 +190,46 @@ export async function sendReceipt(params: SendReceiptParams) {
 }
 
 
+
+// ==================== DISEÑO COMUN (claro, igual que la boleta) ====================
+const MAIL_ACCENT = "#0F8B8D";
+const MAIL_FONT = "'Plus Jakarta Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif";
+
+function mailShell(opts: { label: string; inner: string; businessLogoUrl?: string | null }): string {
+  const logo = opts.businessLogoUrl
+    ? `<img src="${opts.businessLogoUrl}" alt="Logo" height="52" style="display:block;margin:0 auto;height:52px;max-width:220px;width:auto;object-fit:contain;border:0;" />`
+    : `<img src="https://www.re-booking.cl/logo-horizontal.png" alt="re-booking" height="36" style="display:block;margin:0 auto;height:36px;width:auto;border:0;" />`;
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>:root{color-scheme:light only;supported-color-schemes:light only;}</style>
+</head>
+<body bgcolor="#F4F6F8" style="margin:0;padding:0;background:#F4F6F8;font-family:${MAIL_FONT};-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4F6F8" style="background:#F4F6F8;">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF" style="width:100%;max-width:600px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;">
+      <tr><td style="height:4px;background:${MAIL_ACCENT};border-radius:16px 16px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <tr><td align="center" style="padding:32px 36px 8px 36px;">${logo}
+        <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:${MAIL_ACCENT};font-weight:700;margin-top:14px;">${opts.label}</div>
+      </td></tr>
+      <tr><td style="padding:12px 36px 32px 36px;">${opts.inner}</td></tr>
+    </table>
+    <div style="font-size:12px;color:#9CA3AF;margin-top:16px;font-family:${MAIL_FONT};">re-booking · <a href="https://www.re-booking.cl" style="color:#9CA3AF;">re-booking.cl</a></div>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
+function mailRow(label: string, value: string, strong = false): string {
+  return `<tr><td style="padding:10px 0;border-bottom:1px solid #EEF0F2;font-size:13px;color:#6B7280;">${label}</td><td align="right" style="padding:10px 0;border-bottom:1px solid #EEF0F2;font-size:${strong ? 18 : 14}px;color:#111827;font-weight:${strong ? 800 : 600};">${value}</td></tr>`;
+}
+
 interface SendBookingConfirmationParams {
   to: string;
   clientName: string;
@@ -217,47 +257,23 @@ export async function sendBookingConfirmation(params: SendBookingConfirmationPar
     minute: "2-digit",
   });
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a;">
-  <div style="background: #111; padding: 30px; border-radius: 12px; border: 1px solid #333;">
-    <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0F8B8D; padding-bottom: 20px;">
-      ${businessLogoUrl
-        // Business logo on a white card so a dark logo reads on this dark email. Generic
-        // re-booking logo (white) sits directly on the dark header.
-        ? `<div style="display: inline-block; background: #ffffff; padding: 12px 20px; border-radius: 12px; margin-bottom: 10px;"><img src="${businessLogoUrl}" alt="Logo" style="height: 44px; max-width: 220px; object-fit: contain; display: block;" /></div>`
-        : `<img src="https://re-booking.cl/logo-horizontal-white.png" alt="re-booking" style="height: 40px; margin-bottom: 10px;" />`}
-      <p style="color: #0F8B8D; margin: 8px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 3px;">Cita Confirmada</p>
-    </div>
-
-    <p style="color: #ccc; font-size: 16px; margin-bottom: 20px;">Hola <strong style="color: #fff;">${clientName}</strong>, tu cita esta confirmada!</p>
-
-    <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-      <table style="width: 100%; color: #ccc; font-size: 14px;">
-        <tr><td style="padding: 8px 0; color: #888;">Servicio</td><td style="padding: 8px 0; color: #fff; font-weight: bold;">${serviceName}</td></tr>
-        <tr><td style="padding: 8px 0; color: #888;">Profesional</td><td style="padding: 8px 0; color: #fff;">${barberName}</td></tr>
-        <tr><td style="padding: 8px 0; color: #888;">Fecha</td><td style="padding: 8px 0; color: #fff;">${dateStr}</td></tr>
-        <tr><td style="padding: 8px 0; color: #888;">Hora</td><td style="padding: 8px 0; color: #fff; font-weight: bold; font-size: 18px;">${timeStr}</td></tr>
-        <tr><td style="padding: 8px 0; color: #888;">Duracion</td><td style="padding: 8px 0; color: #fff;">${duration} minutos</td></tr>
-        <tr><td style="padding: 8px 0; color: #888;">Precio</td><td style="padding: 8px 0; color: #0F8B8D; font-weight: bold; font-size: 16px;">$${price.toLocaleString("es-CL")}</td></tr>
-      </table>
-    </div>
-
-    <div style="background: #0F8B8D22; border: 1px solid #0F8B8D44; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
-      <p style="color: #0F8B8D; font-size: 13px; margin: 0; text-align: center;">
-        ${appointmentId ? `<a href="https://re-booking.cl/cancel/${appointmentId}" style="color: #0F8B8D; text-decoration: underline;">Cancelar o modificar cita</a> · ` : ""}Contacto: <strong>9 4266 6172</strong>
-      </p>
-    </div>
-
-    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #333;">
-      <p style="color: #888; font-size: 13px; margin: 4px 0;">Te esperamos!</p>
-      <p style="color: #555; font-size: 11px; margin: 4px 0;">re-booking | <a href="https://re-booking.cl" style="color: #0F8B8D;">re-booking.cl</a></p>
-    </div>
-  </div>
-</body>
-</html>`;
+  const html = mailShell({
+    label: "Cita confirmada",
+    businessLogoUrl,
+    inner: `
+    <p style="font-size:16px;color:#374151;margin:12px 0 20px;">Hola <strong style="color:#111827;">${clientName}</strong>, tu cita está confirmada 🎉</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #EEF0F2;">
+      ${mailRow("Servicio", serviceName)}
+      ${mailRow("Profesional", barberName)}
+      ${mailRow("Fecha", dateStr)}
+      ${mailRow("Hora", timeStr, true)}
+      ${mailRow("Duración", `${duration} minutos`)}
+      <tr><td style="padding:10px 0;font-size:13px;color:#6B7280;">Precio</td><td align="right" style="padding:10px 0;font-size:18px;color:${MAIL_ACCENT};font-weight:800;">$${price.toLocaleString("es-CL")}</td></tr>
+    </table>
+    ${appointmentId ? `<div style="text-align:center;margin:26px 0 6px;"><a href="https://www.re-booking.cl/cancel/${appointmentId}" style="display:inline-block;background:${MAIL_ACCENT};color:#FFFFFF;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700;font-size:14px;">Cancelar o modificar cita</a></div>` : ""}
+    <p style="text-align:center;font-size:13px;color:#6B7280;margin:14px 0 0;">¿Dudas? Escríbenos al <strong style="color:#111827;">9 4266 6172</strong></p>
+    <p style="text-align:center;font-size:14px;color:#374151;margin:18px 0 0;">¡Te esperamos!</p>`,
+  });
 
   const resend = getResendClient();
   await resend.emails.send({
@@ -305,33 +321,21 @@ export async function sendRetentionEmail(params: SendRetentionEmailParams) {
     ? `${process.env.NEXT_PUBLIC_APP_URL}/booking`
     : "https://www.re-booking.cl/booking";
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a;">
-  <div style="background: #111; padding: 30px; border-radius: 12px; border: 1px solid #333;">
-    <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0F8B8D; padding-bottom: 20px;">
-      <h1 style="color: #fff; margin: 0; font-size: 28px; font-weight: 900; font-style: italic;">re-booking</h1>
-    </div>
-
-    <p style="color: #fff; font-size: 18px; margin-bottom: 8px;">Hola ${clientName}!</p>
-    <p style="color: #ccc; font-size: 15px; line-height: 1.6; margin-bottom: 20px;">${message}</p>
-
-    ${couponHtml}
-
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${bookingUrl}" style="display: inline-block; background: #0F8B8D; color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: bold; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">
-        Agendar Ahora
-      </a>
-    </div>
-
-    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #333;">
-      <p style="color: #555; font-size: 11px; margin: 4px 0;">re-booking | rebooking.cl</p>
-    </div>
-  </div>
-</body>
-</html>`;
+  const couponBox = couponCode ? `
+    <div style="background:#F0FAFA;border:2px dashed ${MAIL_ACCENT};border-radius:12px;padding:20px;margin:20px 0;text-align:center;">
+      <div style="color:${MAIL_ACCENT};font-size:11px;text-transform:uppercase;letter-spacing:0.14em;font-weight:700;margin-bottom:8px;">Cupón de descuento</div>
+      <div style="color:#111827;font-size:28px;font-weight:800;font-family:monospace;margin-bottom:8px;">${couponCode}</div>
+      <div style="color:#374151;font-size:14px;">${discountType === "percentage" ? `${discountValue}% de descuento` : `$${discountValue?.toLocaleString("es-CL")} de descuento`}</div>
+      ${couponDescription ? `<div style="color:#6B7280;font-size:12px;margin-top:8px;">${couponDescription}</div>` : ""}
+    </div>` : "";
+  const html = mailShell({
+    label: "Te extrañamos",
+    inner: `
+    <p style="font-size:18px;color:#111827;font-weight:700;margin:12px 0 8px;">Hola ${clientName}!</p>
+    <p style="font-size:15px;line-height:1.6;color:#374151;margin:0 0 8px;">${message}</p>
+    ${couponBox}
+    <div style="text-align:center;margin:26px 0 4px;"><a href="${bookingUrl}" style="display:inline-block;background:${MAIL_ACCENT};color:#FFFFFF;text-decoration:none;padding:13px 32px;border-radius:10px;font-weight:700;font-size:15px;">Agendar ahora</a></div>`,
+  });
 
   const resend = getResendClient();
   await resend.emails.send({
@@ -365,57 +369,24 @@ export async function sendAppointmentReminder(params: SendAppointmentReminderPar
     minute: "2-digit",
   });
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a;">
-  <div style="background: #111; padding: 30px; border-radius: 12px; border: 1px solid #333;">
-    <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0F8B8D; padding-bottom: 20px;">
-      <h1 style="color: #fff; margin: 0; font-size: 28px; font-weight: 900; font-style: italic;">re-booking</h1>
-      <p style="color: #0F8B8D; margin: 8px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 3px;">Recordatorio de Cita</p>
+  const appBase = process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl";
+  const html = mailShell({
+    label: "Recordatorio de cita",
+    inner: `
+    <p style="font-size:18px;color:#111827;font-weight:700;margin:12px 0 6px;">Hola ${clientName}!</p>
+    <p style="font-size:15px;line-height:1.6;color:#374151;margin:0 0 20px;">Te recordamos que tienes una cita agendada para mañana:</p>
+    <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:22px;text-align:center;">
+      <div style="font-size:34px;font-weight:800;color:${MAIL_ACCENT};">${timeStr}</div>
+      <div style="font-size:14px;color:#374151;margin:2px 0 14px;">${dateStr}</div>
+      <div style="border-top:1px solid #E5E7EB;padding-top:12px;font-size:13px;color:#6B7280;">Servicio: <strong style="color:#111827;">${serviceName}</strong><br>Profesional: <strong style="color:#111827;">${barberName}</strong></div>
     </div>
-
-    <p style="color: #fff; font-size: 18px; margin-bottom: 8px;">Hola ${clientName}!</p>
-    <p style="color: #ccc; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
-      Te recordamos que tienes una cita agendada para manana:
-    </p>
-
-    <div style="background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center;">
-      <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px;">Tu cita</p>
-      <p style="color: #fff; font-size: 32px; font-weight: bold; margin: 0 0 4px;">${timeStr}</p>
-      <p style="color: #ccc; font-size: 14px; margin: 0 0 16px;">${dateStr}</p>
-      <div style="border-top: 1px solid #333; padding-top: 16px;">
-        <p style="color: #888; font-size: 13px; margin: 4px 0;">Servicio: <strong style="color: #fff;">${serviceName}</strong></p>
-        <p style="color: #888; font-size: 13px; margin: 4px 0;">Profesional: <strong style="color: #fff;">${barberName}</strong></p>
-      </div>
-    </div>
-
-    <div style="background: #0F8B8D11; border: 1px solid #0F8B8D33; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
-      <p style="color: #0F8B8D; font-size: 13px; margin: 0; text-align: center;">
-        Si necesitas cancelar o reprogramar, contactanos al <strong>9 4266 6172</strong>
-      </p>
-    </div>
-
-    ${appointmentId ? `
-    <div style="text-align: center; margin-bottom: 20px;">
-      <p style="color: #888; font-size: 13px; margin-bottom: 12px;">Confirma tu asistencia:</p>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl"}/api/public/confirm-attendance?id=${appointmentId}&action=confirm" style="display: inline-block; background: #0F8B8D; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; margin-right: 8px;">
-        ✓ Asistire
-      </a>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://www.re-booking.cl"}/cancel/${appointmentId}" style="display: inline-block; background: #333; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">
-        ✕ No podre ir
-      </a>
-    </div>
-    ` : ""}
-
-    <div style="text-align: center; padding-top: 20px; border-top: 1px solid #333;">
-      <p style="color: #888; font-size: 13px; margin: 4px 0;">Te esperamos!</p>
-      <p style="color: #555; font-size: 11px; margin: 4px 0;">re-booking | rebooking.cl</p>
-    </div>
-  </div>
-</body>
-</html>`;
+    ${appointmentId ? `<div style="text-align:center;margin:24px 0 4px;">
+      <a href="${appBase}/api/public/confirm-attendance?id=${appointmentId}&action=confirm" style="display:inline-block;background:${MAIL_ACCENT};color:#FFFFFF;text-decoration:none;padding:11px 24px;border-radius:10px;font-weight:700;font-size:14px;margin:0 4px 8px;">✓ Asistiré</a>
+      <a href="${appBase}/cancel/${appointmentId}" style="display:inline-block;background:#F3F4F6;color:#374151;text-decoration:none;padding:11px 24px;border-radius:10px;font-weight:700;font-size:14px;margin:0 4px 8px;">✕ No podré ir</a>
+    </div>` : ""}
+    <p style="text-align:center;font-size:13px;color:#6B7280;margin:14px 0 0;">¿Necesitas reprogramar? Escríbenos al <strong style="color:#111827;">9 4266 6172</strong></p>
+    <p style="text-align:center;font-size:14px;color:#374151;margin:18px 0 0;">¡Te esperamos!</p>`,
+  });
 
   const resend = getResendClient();
   await resend.emails.send({
