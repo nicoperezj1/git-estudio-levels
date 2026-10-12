@@ -463,10 +463,11 @@ interface SendBarberNewAppointmentParams {
   serviceName: string;
   date: Date;
   businessName?: string | null;
+  businessLogoUrl?: string | null;
 }
 
 export async function sendBarberNewAppointment(params: SendBarberNewAppointmentParams) {
-  const { to, barberName, clientName, serviceName, date, businessName } = params;
+  const { to, barberName, clientName, serviceName, date, businessName, businessLogoUrl } = params;
 
   const dateStr = new Date(date).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
   const timeStr = new Date(date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
@@ -480,6 +481,7 @@ export async function sendBarberNewAppointment(params: SendBarberNewAppointmentP
     <div style="background: linear-gradient(135deg, #0F8B8D, #2EC4B6); padding: 28px 24px; text-align: center;">
       <img src="https://re-booking.cl/logo-horizontal-white.png" alt="re-booking" style="height: 30px; max-width: 220px; object-fit: contain; margin-bottom: 12px;" />
       <h1 style="color: white; margin: 0; font-size: 20px;">Nueva cita agendada</h1>
+      ${businessLogoUrl ? `<div style="display: inline-block; background: #ffffff; border-radius: 12px; padding: 8px 14px; margin-top: 14px;"><img src="${businessLogoUrl}" alt="${businessName || "Logo"}" style="height: 34px; max-width: 160px; object-fit: contain; display: block;" /></div>` : ""}
     </div>
     <div style="padding: 28px 24px;">
       <p style="color: #1F2937; font-size: 15px; margin: 0 0 20px;">Hola <strong>${barberName}</strong>, te agendaron una nueva cita:</p>
@@ -496,9 +498,6 @@ export async function sendBarberNewAppointment(params: SendBarberNewAppointmentP
       <a href="${appUrl}/dashboard/mi-agenda" style="display: block; text-align: center; background: #0F8B8D; color: white; padding: 13px 24px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px;">
         Ver mi agenda
       </a>
-    </div>
-    <div style="border-top: 1px solid #F3F4F6; padding: 14px 24px; text-align: center;">
-      <p style="color: #9CA3AF; font-size: 11px; margin: 0;">${businessName ? `${businessName} · ` : ""}re-booking</p>
     </div>
   </div>
 </body>
