@@ -1,12 +1,4 @@
-import { Resend } from "resend";
-
-function getResendClient() {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY no configurada");
-  }
-  return new Resend(apiKey);
-}
+import { getResendClient } from "@/lib/resend-client";
 
 interface SendReceiptParams {
   to: string;
@@ -163,11 +155,7 @@ export async function sendReceipt(params: SendReceiptParams) {
         <div style="font-size:13px;color:#6B7280;margin-top:14px;">¡Gracias por tu preferencia!</div>
       </td></tr>
 
-      <tr><td style="padding:24px 36px 28px 36px;">
-        <div style="border-top:1px solid #EEF0F2;padding-top:18px;text-align:center;font-size:11px;color:#9CA3AF;">
-          Comprobante emitido con <a href="https://re-booking.cl" style="color:${ACCENT};text-decoration:none;font-weight:700;">re-booking</a> · Gestiona. Reserva. Repite el éxito.
-        </div>
-      </td></tr>
+      <tr><td style="padding:0 0 12px 0;font-size:0;line-height:0;">&nbsp;</td></tr>
     </table>
   </td></tr>
 </table>
@@ -219,7 +207,6 @@ function mailShell(opts: { label: string; inner: string; businessLogoUrl?: strin
       </td></tr>
       <tr><td style="padding:12px 36px 32px 36px;">${opts.inner}</td></tr>
     </table>
-    <div style="font-size:12px;color:#9CA3AF;margin-top:16px;font-family:${MAIL_FONT};">re-booking · <a href="https://www.re-booking.cl" style="color:#9CA3AF;">re-booking.cl</a></div>
   </td></tr>
 </table>
 </body>

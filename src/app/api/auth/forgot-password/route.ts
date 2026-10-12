@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
   // Send the reset email using Resend (reliable). If the recovery link couldn't be
   // generated, fall back to the reset page (user can request the code from there / retry).
   try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { getResendClient } = await import("@/lib/resend-client");
+    const resend = getResendClient();
 
     const resetUrl = linkData?.properties?.action_link || `${baseUrl}/reset-password`;
 
