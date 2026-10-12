@@ -20,7 +20,7 @@ export const OPEN_MENU_EVENT = "rb:open-menu";
 
 export function MobileTabBar({ role }: { role: string }) {
   const pathname = usePathname() || "";
-  const { hasPlanFeature, tenant } = useTenant();
+  const { hasPlanFeature, tenant, isOverriding } = useTenant();
   const [prefs, setPrefs] = useState<TabPrefs | null>(null);
 
   const load = useCallback(() => {
@@ -45,7 +45,16 @@ export function MobileTabBar({ role }: { role: string }) {
 
   if (pathname.startsWith("/dashboard/standby")) return null;
 
-  const tabs = resolveTabs(role, prefs, { hasPlanFeature, plan: tenant?.plan });
+  // Super admin sin empresa elegida: atajos de plataforma (lo del negocio aparece al entrar a una empresa).
+  const platformTabs = [
+    { label: "Inicio", href: "/dashboard", icon: "home" },
+    { label: "Empresas", href: "/dashboard/superadmin/tenants", icon: "building" },
+    { label: "Auditoría", href: "/dashboard/superadmin/audit", icon: "shield" },
+    { label: "Perfil", href: "/dashboard/mi-perfil", icon: "user" },
+  ];
+  const tabs = role === "super_admin" && !isOverriding
+    ? platformTabs
+    : resolveTabs(role, prefs, { hasPlanFeature, plan: tenant?.plan });
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname === href || pathname.startsWith(href + "/"));
 
   return (

@@ -273,12 +273,19 @@ export function Sidebar({ userName, userRole, tenantName, isSoloBusiness }: Side
     return { ...item, locked, children: children && children.length > 0 ? children : undefined };
   };
 
+  // Super admin sin empresa elegida ("Viendo como" apagado): solo ve lo de la plataforma. Todo lo del negocio
+  // (calendario, ventas, caja...) aparece cuando entra a una empresa desde Super Admin > Empresas.
+  const platformMode = effectiveRole === "super_admin" && !isOverriding;
+  const PLATFORM_ALLOWED = ["/dashboard", "/dashboard/mi-perfil", "/dashboard/soporte", "/dashboard/configuracion/horarios"];
+  const inPlatformMode = (href: string) => PLATFORM_ALLOWED.includes(href) || href.startsWith("/dashboard/superadmin");
+
   const filteredSections = authLoading && !userRole
     ? sections.map((s) => ({ ...s, items: s.items.slice(0, 1) })).slice(0, 2)
     : sections
         .map((section) => ({
           ...section,
           items: section.items
+            .filter((i) => !platformMode || inPlatformMode(i.href))
             .map(processItem)
             .filter((i): i is NavItem & { locked?: boolean } => i !== null),
         }))

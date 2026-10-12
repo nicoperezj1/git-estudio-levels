@@ -17,6 +17,7 @@ export default function MiPerfilPage() {
   const { user } = useAuth();
   const { tenant, userTheme, setUserTheme } = useTenant();
   const { showToast } = useToast();
+  const isSuper = user?.role === "super_admin";
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -222,6 +223,7 @@ export default function MiPerfilPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        ...(isSuper ? { name: (data.name || "").trim() } : {}),
         bio: data.bio,
         specialties: data.specialties,
         phone: data.phone,
@@ -278,12 +280,18 @@ export default function MiPerfilPage() {
             <input type="file" accept="image/*" onChange={uploadAvatar} className="hidden" disabled={uploadingAvatar} />
           </label>
           <div>
-            <h2 className="text-lg font-bold text-brand-dark">{data.name}</h2>
+            {isSuper ? (
+              <input type="text" value={data.name || ""} onChange={(e) => setData({ ...data, name: e.target.value })}
+                placeholder="Tu nombre" className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-base font-bold text-brand-dark" />
+            ) : (
+              <h2 className="text-lg font-bold text-brand-dark">{data.name}</h2>
+            )}
             <p className="text-sm text-brand-gray">{data.email}</p>
             <p className="text-[11px] text-brand-gray mt-0.5">Toca la foto para cambiarla</p>
           </div>
         </div>
 
+        {!isSuper && (<>
         <div>
           <label className="block text-xs text-brand-gray mb-1">Teléfono</label>
           <input type="text" value={data.phone || ""}
@@ -317,6 +325,8 @@ export default function MiPerfilPage() {
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
         </div>
 
+        </>)}
+
         <button onClick={handleSave} disabled={saving}
           className="w-full py-2.5 bg-brand-blue text-white rounded-xl text-sm font-medium hover:bg-brand-blue/90 disabled:opacity-50">
           {saving ? "Guardando..." : "Guardar cambios"}
@@ -324,7 +334,7 @@ export default function MiPerfilPage() {
       </div>
 
       {/* Barra inferior del celular (solo se ve en el celular) */}
-      <MyTabBarCard />
+      {!isSuper && <MyTabBarCard />}
 
       {/* Mi tema: cada usuario elige el suyo; "Igual que el negocio" usa el del administrador. */}
       <div className="bg-white dark:bg-brand-white rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-5 space-y-3">
@@ -355,6 +365,7 @@ export default function MiPerfilPage() {
       </div>
 
       {/* Link de agenda */}
+      {!isSuper && (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
         <h3 className="font-bold text-brand-dark">Mi link de agenda</h3>
         <p className="text-xs text-brand-gray">Comparte este link en tu Instagram o redes para que tus clientes agenden contigo directo.</p>
@@ -368,8 +379,10 @@ export default function MiPerfilPage() {
           </button>
         </div>
       </div>
+      )}
 
       {/* PIN */}
+      {!isSuper && (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
         <h3 className="font-bold text-brand-dark">PIN Standby</h3>
         <p className="text-xs text-brand-gray">Tu código personal para acceder al modo Standby.</p>
@@ -380,6 +393,7 @@ export default function MiPerfilPage() {
         </div>
         <p className="text-[10px] text-brand-gray text-center">Si necesitas cambiarlo, pídelo a tu administrador.</p>
       </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5 space-y-3">
         <h3 className="font-bold text-brand-dark">Seguridad</h3>
@@ -456,6 +470,7 @@ export default function MiPerfilPage() {
       )}
 
       {/* Eliminar cuenta */}
+      {!isSuper && (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
         <button
           type="button"
@@ -465,6 +480,7 @@ export default function MiPerfilPage() {
           <Trash2 className="h-4 w-4" /> Eliminar mi cuenta
         </button>
       </div>
+      )}
 
       {showDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
