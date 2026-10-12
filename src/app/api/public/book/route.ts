@@ -209,8 +209,8 @@ export async function POST(req: NextRequest) {
       tenantId, kind: "appointment_new",
       userIds: [barberId], // the professional who got the appointment
       roles: ["admin", "receptionist"], // + reception/admins of this business
-      title: "Nueva Cita Agendada",
-      body: `${clientName} - ${serviceNames} con ${barber?.name || "Profesional"} (${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })})`,
+      title: "🚀 ¡Te agendaron una cita!",
+      body: `${clientName} reservó ${serviceNames} a las ${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}. ¡A darle! 💈`,
       url: "/dashboard/agenda",
     });
   } catch (e) {
