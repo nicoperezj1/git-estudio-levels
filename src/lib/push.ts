@@ -1,10 +1,12 @@
 import webpush from "web-push";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { fcmConfigured, sendFcm } from "@/lib/fcm";
 
 // Envio de notificaciones push. Vive aqui (y no solo en la ruta HTTP) para que las rutas del servidor
 // (reserva online, webhook de deposito, cita creada, cliente llego) lo llamen DIRECTO, sin hacer una
 // peticion HTTP sin sesion a /api/push/send. Asi esa ruta puede exigir sesion sin romper los avisos.
-// Cuando exista la app movil, el segundo canal (FCM) se agrega aqui y todos los avisos lo usan.
+// Dos canales: web-push (navegador) y FCM (app movil de iPhone y Android, tabla device_tokens, solo si
+// FIREBASE_SERVICE_ACCOUNT esta en Vercel). Todos los avisos pasan por aqui y usan ambos.
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
@@ -38,7 +40,9 @@ export interface PushResult { sent: number; failed: number; recipients: number; 
 
 export async function sendPush(input: PushInput): Promise<PushResult> {
   if (!input.title) return { sent: 0, failed: 0, recipients: 0, error: "title required" };
-  if (!configure()) return { sent: 0, failed: 0, recipients: 0, error: "VAPID keys not configured" };
+  const webOk = configure();
+  const nativeOk = fcmConfigured();
+  if (!webOk && !nativeOk) return { sent: 0, failed: 0, recipients: 0, error: "VAPID keys not configured" };
 
   const supabase = createAdminSupabase();
   const ids = new Set<string>();
@@ -59,9 +63,6 @@ export async function sendPush(input: PushInput): Promise<PushResult> {
     if (recipients.length === 0) return { sent: 0, failed: 0, recipients: 0, error: "No recipients" };
   }
 
-  const { data: subs } = await supabase.from("push_subscriptions").select("endpoint, p256dh, auth").in("user_id", recipients);
-  if (!subs || subs.length === 0) return { sent: 0, failed: 0, recipients: recipients.length, error: "No push subscriptions for recipients" };
-
   const payload = JSON.stringify({
     title: input.title,
     body: input.body || "",
@@ -72,17 +73,39 @@ export async function sendPush(input: PushInput): Promise<PushResult> {
 
   let sent = 0;
   let failed = 0;
-  for (const sub of subs) {
-    try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
-      sent++;
-    } catch (err: any) {
-      failed++;
-      // Suscripcion vencida: se elimina
-      if (err?.statusCode === 410 || err?.statusCode === 404) {
-        await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+  let hadTargets = false;
+
+  // Canal 1: navegador (web-push)
+  if (webOk) {
+    const { data: subs } = await supabase.from("push_subscriptions").select("endpoint, p256dh, auth").in("user_id", recipients);
+    for (const sub of subs || []) {
+      hadTargets = true;
+      try {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
+        sent++;
+      } catch (err: any) {
+        failed++;
+        // Suscripcion vencida: se elimina
+        if (err?.statusCode === 410 || err?.statusCode === 404) {
+          await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+        }
       }
     }
   }
+
+  // Canal 2: app movil (FCM). Si falta la migracion 110 o no hay telefonos, simplemente no hay nada que enviar.
+  if (nativeOk) {
+    const { data: devices, error: devErr } = await supabase.from("device_tokens").select("token").in("user_id", recipients);
+    const tokens = devErr ? [] : (devices || []).map((d: any) => d.token as string);
+    if (tokens.length > 0) {
+      hadTargets = true;
+      const r = await sendFcm(tokens, { title: input.title, body: input.body, url: input.url });
+      sent += r.sent;
+      failed += r.failed;
+      if (r.invalid.length > 0) await supabase.from("device_tokens").delete().in("token", r.invalid);
+    }
+  }
+
+  if (!hadTargets) return { sent: 0, failed: 0, recipients: recipients.length, error: "No push subscriptions for recipients" };
   return { sent, failed, recipients: recipients.length };
 }
