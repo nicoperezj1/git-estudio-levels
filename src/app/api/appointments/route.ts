@@ -146,8 +146,8 @@ export async function POST(req: NextRequest) {
     ]);
     await notify({
       tenantId: resolvedTenantId, kind: "appointment_new", userIds: [barberId],
-      title: "Nueva Cita Agendada",
-      body: `${client?.name || "Cliente"} - ${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}`,
+      title: "🚀 ¡Te agendaron una cita!",
+      body: `${client?.name || "Cliente"} reservó a las ${start.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}.`,
       url: "/dashboard/mi-agenda",
     });
     if (barber?.email) {

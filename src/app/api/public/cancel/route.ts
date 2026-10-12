@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/server";
+import { notify } from "@/lib/notify";
 
 // POST: Cancel an appointment by ID (public, no auth needed - uses appointment ID as token)
 export async function POST(req: NextRequest) {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   // Get appointment
   const { data: appt } = await supabase
     .from("appointments")
-    .select("id, status, date, start_time, client_id, barber_id")
+    .select("id, status, date, start_time, client_id, barber_id, tenant_id, client:clients(name)")
     .eq("id", appointmentId)
     .single();
 
@@ -43,6 +44,22 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: "Error al cancelar" }, { status: 500 });
+  }
+
+  // Aviso al profesional (y recepcion/admin) de que el cliente cancelo. Nunca rompe la cancelacion.
+  try {
+    const a: any = appt;
+    const hhmm = String(a.start_time || "").match(/(\d{2}:\d{2})/)?.[1] || "";
+    const who = (Array.isArray(a.client) ? a.client[0]?.name : a.client?.name) || "Un cliente";
+    await notify({
+      tenantId: a.tenant_id, kind: "appointment_changed",
+      userIds: a.barber_id ? [a.barber_id] : [], roles: ["admin", "receptionist"],
+      title: "😕 Se canceló una cita",
+      body: `${who} canceló${hhmm ? ` su hora de las ${hhmm}` : " su cita"}. El espacio quedó libre.`,
+      url: "/dashboard/mi-agenda",
+    });
+  } catch (e) {
+    console.error("aviso de cancelacion:", e);
   }
 
   return NextResponse.json({ success: true, message: "Cita cancelada exitosamente" });
