@@ -31,5 +31,17 @@ export async function GET(req: NextRequest) {
   // aqui: si el negocio actualiza su tarjeta y paga, el webhook reactiva todo.
   await supabase.from("tenants").update({ status: "suspended" }).in("id", tenantIds);
 
+  try {
+    const { notifyPlatform, tenantLabel } = await import("@/lib/platform-alerts");
+    const names: string[] = [];
+    for (const id of tenantIds.slice(0, 5)) names.push(await tenantLabel(supabase, id));
+    await notifyPlatform({
+      kind: "tenant_suspended",
+      title: tenantIds.length === 1 ? "Se suspendió un negocio por falta de pago" : `Se suspendieron ${tenantIds.length} negocios por falta de pago`,
+      body: names.join(", ") + (tenantIds.length > 5 ? " y otros" : ""),
+      url: "/dashboard/superadmin/tenants",
+    });
+  } catch {}
+
   return NextResponse.json({ suspended: tenantIds.length });
 }

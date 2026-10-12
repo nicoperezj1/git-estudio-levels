@@ -116,6 +116,17 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
     address: input.address || null,
   });
 
+  // Aviso a los super admin: negocio nuevo.
+  try {
+    const { notifyPlatform } = await import("@/lib/platform-alerts");
+    await notifyPlatform({
+      kind: "tenant_new",
+      title: "Nuevo negocio registrado",
+      body: `${input.name} · plan ${input.plan}${input.status === "trial" ? ` (${input.trialDays || 15} días de prueba)` : " (activo)"}`,
+      url: "/dashboard/superadmin/tenants",
+    });
+  } catch {}
+
   try {
     const { getResendClient } = await import("@/lib/resend-client");
     const resend = getResendClient();

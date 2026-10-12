@@ -158,6 +158,15 @@ export async function handleAuthorizedPayment(authorizedPaymentId: string, acces
       .update({ status: "past_due", grace_until: graceUntil.toISOString() })
       .eq("id", subscription.id);
     await supabase.from("tenants").update({ status: "past_due" }).eq("id", subscription.tenant_id).eq("status", "active");
+    try {
+      const { notifyPlatform, tenantLabel } = await import("@/lib/platform-alerts");
+      await notifyPlatform({
+        kind: "payment_failed",
+        title: "Falló el cobro de un negocio",
+        body: `${await tenantLabel(supabase, subscription.tenant_id)}: la renovación fue rechazada. Tiene 2 días de gracia antes de suspenderse.`,
+        url: "/dashboard/superadmin/tenants",
+      });
+    } catch {}
   }
 }
 

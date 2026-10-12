@@ -137,6 +137,7 @@ const sections: NavSection[] = [
     title: "Super Admin",
     items: [
       { name: "Empresas", href: "/dashboard/superadmin/tenants", icon: Building2, minRole: "super_admin" },
+      { name: "Reuniones", href: "/dashboard/superadmin/reuniones", icon: CalendarDays, minRole: "super_admin" },
       { name: "Auditoría", href: "/dashboard/superadmin/audit", icon: ShieldCheck, minRole: "super_admin" },
       { name: "Sesiones", href: "/dashboard/superadmin/sesiones", icon: Tablet, minRole: "super_admin" },
       { name: "Horarios", href: "/dashboard/configuracion/horarios", icon: Clock, minRole: "super_admin" },

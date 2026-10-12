@@ -20,6 +20,28 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminSupabase();
 
+  // Reuniones de la plataforma que empiezan en la proxima hora (aviso al super admin que la creo). Tolera que falte la migracion 111.
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+    const g = (t: string) => parts.find((p) => p.type === t)?.value || "00";
+    const today = `${g("year")}-${g("month")}-${g("day")}`;
+    const nowMin = (Number(g("hour")) % 24) * 60 + Number(g("minute"));
+    const { data: meetings, error: mErr } = await supabase.from("platform_meetings").select("id, title, start_time, link, created_by").eq("meeting_date", today).is("reminded_at", null);
+    if (!mErr && meetings) {
+      const { sendPush } = await import("@/lib/push");
+      for (const m of meetings as any[]) {
+        const [h, mi] = String(m.start_time).split(":").map(Number);
+        const diff = h * 60 + mi - nowMin;
+        if (diff > 0 && diff <= 75 && m.created_by) {
+          await sendPush({ userId: m.created_by, title: "📅 Reunión pronto", body: `${m.title} · ${m.start_time}`, url: "/dashboard/superadmin/reuniones" });
+          await supabase.from("platform_meetings").update({ reminded_at: new Date().toISOString() }).eq("id", m.id);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[reminders] reuniones:", e);
+  }
+
   // Find appointments in the next 20-28 hours that haven't been reminded
   const now = new Date();
   const in20Hours = new Date(now.getTime() + 20 * 60 * 60 * 1000);

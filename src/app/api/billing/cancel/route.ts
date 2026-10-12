@@ -63,5 +63,15 @@ export async function POST(req: NextRequest) {
     .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
     .eq("id", subscription.id);
 
+  try {
+    const { notifyPlatform, tenantLabel } = await import("@/lib/platform-alerts");
+    await notifyPlatform({
+      kind: "subscription_cancelled",
+      title: "Un negocio canceló su suscripción",
+      body: `${await tenantLabel(supabase, tenantId)} dejó de pagar. Mantiene el acceso hasta el fin del periodo ya pagado.`,
+      url: "/dashboard/superadmin/tenants",
+    });
+  } catch {}
+
   return NextResponse.json({ success: true });
 }
