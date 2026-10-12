@@ -227,6 +227,7 @@ export async function POST(req: NextRequest) {
         clientName,
         serviceName: serviceNames,
         date: start,
+        businessLogoUrl,
       });
     } catch (e) {
       console.error("Error emailing barber (public booking):", e);

@@ -151,6 +151,9 @@ export async function POST(req: NextRequest) {
       url: "/dashboard/mi-agenda",
     });
     if (barber?.email) {
+      const { data: tenantRow } = resolvedTenantId
+        ? await supabase.from("tenants").select("logo_url").eq("id", resolvedTenantId).single()
+        : { data: null };
       const { sendBarberNewAppointment } = await import("@/lib/resend");
       const serviceNames = services.map((s: any) => s.name || "Servicio").join(" + ");
       await sendBarberNewAppointment({
@@ -159,6 +162,7 @@ export async function POST(req: NextRequest) {
         clientName: client?.name || "Cliente",
         serviceName: serviceNames,
         date: start,
+        businessLogoUrl: tenantRow?.logo_url || null,
       });
     }
   } catch (e) {
