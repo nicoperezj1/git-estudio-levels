@@ -88,6 +88,24 @@ export async function disableNativePush(): Promise<void> {
   } catch {}
 }
 
+// Primera vez que esta persona entra a la app en este telefono: se pide el permiso solo ("re-booking quiere
+// enviarte notificaciones"), sin tener que ir a Mi Perfil. Se pregunta una sola vez por persona; si luego la apaga
+// en Mi Perfil o dice que no, no se vuelve a insistir.
+export async function autoEnableNativePush(userId: string | null | undefined): Promise<void> {
+  const fm = plugin();
+  if (!userId || !fm || !platform() || nativePushEnabledFor(userId)) return;
+  const askedKey = `rb_native_push_asked_${userId}`;
+  try {
+    if (localStorage.getItem(askedKey)) return;
+    const perm = await fm.checkPermissions();
+    if (perm?.receive === "denied") return;
+    localStorage.setItem(askedKey, "1");
+    await enableNativePush(userId);
+  } catch {
+    // Si falla, queda el interruptor manual en Mi Perfil.
+  }
+}
+
 let listenersReady = false;
 
 // Al abrir la app: si esta persona tiene los avisos activos, renueva el token (puede cambiar) y deja
