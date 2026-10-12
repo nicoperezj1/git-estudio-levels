@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase, authorizeBarberManagement } from "@/lib/supabase/server";
+import { createAdminSupabase, authorizeBarberManagement, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
 import { slugify } from "@/lib/utils";
 import { pinWriteFields } from "@/lib/pin";
 
@@ -73,6 +73,8 @@ export async function PATCH(
   const auth = await authorizeBarberManagement(params.id, { allowSelf: true });
   if (!auth.ok) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   const selfEditableFields = ["phone", "avatar_url", "bio", "specialties", "intro_video_url", "years_experience", "instagram"];
+  // La cuenta de la plataforma (super admin) puede cambiar su propio nombre desde Mi Perfil.
+  if (auth.self && (await getCurrentUserRoleAndTenant()).role === "super_admin") selfEditableFields.push("name");
 
   const supabase = createAdminSupabase();
   const body = await req.json();
