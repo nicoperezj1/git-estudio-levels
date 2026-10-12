@@ -74,6 +74,61 @@ export default function MiPerfilPage() {
       setPushBusy(false);
     }
   };
+  // Seguridad: cambiar clave (todos) y correo (solo super admin). Se confirma con la clave actual.
+  const [curPw, setCurPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [newPw2, setNewPw2] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mailPw, setMailPw] = useState("");
+  const [newMail, setNewMail] = useState("");
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailMsg, setMailMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const changePassword = async () => {
+    if (pwBusy) return;
+    setPwMsg(null);
+    if (!curPw) return setPwMsg({ ok: false, text: "Escribe tu clave actual." });
+    if (newPw.length < 8) return setPwMsg({ ok: false, text: "La clave nueva debe tener al menos 8 caracteres." });
+    if (newPw !== newPw2) return setPwMsg({ ok: false, text: "Las claves nuevas no coinciden." });
+    setPwBusy(true);
+    try {
+      const sb = createClient();
+      const { data: { user: u } } = await sb.auth.getUser();
+      if (!u?.email) return setPwMsg({ ok: false, text: "No se pudo verificar tu sesión. Vuelve a entrar." });
+      const { error: e1 } = await sb.auth.signInWithPassword({ email: u.email, password: curPw });
+      if (e1) return setPwMsg({ ok: false, text: "La clave actual no es correcta." });
+      const { error: e2 } = await sb.auth.updateUser({ password: newPw });
+      if (e2) return setPwMsg({ ok: false, text: e2.message || "No se pudo cambiar la clave." });
+      setCurPw(""); setNewPw(""); setNewPw2("");
+      setPwMsg({ ok: true, text: "Clave actualizada." });
+    } finally {
+      setPwBusy(false);
+    }
+  };
+  const changeEmail = async () => {
+    if (mailBusy) return;
+    setMailMsg(null);
+    setMailBusy(true);
+    try {
+      const res = await fetch("/api/profile/change-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: mailPw, newEmail: newMail }),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) return setMailMsg({ ok: false, text: r.error || "No se pudo cambiar el correo." });
+      setMailMsg({ ok: true, text: "Correo cambiado. Vuelve a entrar con el correo nuevo." });
+      setTimeout(async () => {
+        await createClient().auth.signOut();
+        router.push("/login");
+        router.refresh();
+      }, 1800);
+    } catch {
+      setMailMsg({ ok: false, text: "No se pudo cambiar el correo. Revisa tu conexión." });
+    } finally {
+      setMailBusy(false);
+    }
+  };
   // Eliminar mi cuenta (requisito de Apple y Google): se confirma con la contrasena.
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -324,6 +379,38 @@ export default function MiPerfilPage() {
           </span>
         </div>
         <p className="text-[10px] text-brand-gray text-center">Si necesitas cambiarlo, pídelo a tu administrador.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5 space-y-3">
+        <h3 className="font-bold text-brand-dark">Seguridad</h3>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-brand-gray">Cambiar clave</p>
+          <input type="password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder="Clave actual" autoComplete="current-password"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+          <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Clave nueva (mínimo 8 caracteres)" autoComplete="new-password"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+          <input type="password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} placeholder="Repite la clave nueva" autoComplete="new-password"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+          {pwMsg && <p className={`text-xs ${pwMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{pwMsg.text}</p>}
+          <button type="button" onClick={changePassword} disabled={pwBusy}
+            className="rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+            {pwBusy ? "Cambiando..." : "Cambiar clave"}
+          </button>
+        </div>
+        {user?.role === "super_admin" && (
+          <div className="space-y-2 border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-brand-gray">Cambiar correo de ingreso</p>
+            <input type="email" value={newMail} onChange={(e) => setNewMail(e.target.value)} placeholder="Correo nuevo" autoComplete="email"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+            <input type="password" value={mailPw} onChange={(e) => setMailPw(e.target.value)} placeholder="Tu clave actual para confirmar" autoComplete="current-password"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" />
+            {mailMsg && <p className={`text-xs ${mailMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{mailMsg.text}</p>}
+            <button type="button" onClick={changeEmail} disabled={mailBusy}
+              className="rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+              {mailBusy ? "Cambiando..." : "Cambiar correo"}
+            </button>
+          </div>
+        )}
       </div>
 
       {inApp && pushAvailable && (
