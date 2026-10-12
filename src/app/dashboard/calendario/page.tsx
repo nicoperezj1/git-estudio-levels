@@ -1159,9 +1159,18 @@ export default function CalendarioPage() {
           </button>
           <button
             onClick={() => setDate(todayInChile())}
+            title="Volver a hoy"
             className={`h-9 rounded-lg px-3.5 text-sm font-semibold transition-all ${isToday ? "bg-brand-blue text-white shadow-lg shadow-brand-blue/25" : "text-brand-dark hover:bg-white"}`}
           >
-            Hoy
+            {(() => {
+              // Dice "Hoy" solo si se ve hoy; si no, el dia que se esta viendo (tocarlo vuelve a hoy).
+              if (isToday) return "Hoy";
+              const diff = Math.round((new Date(date + "T12:00:00").getTime() - new Date(todayInChile() + "T12:00:00").getTime()) / 86400000);
+              if (diff === 1) return "Mañana";
+              if (diff === -1) return "Ayer";
+              const t = new Date(date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "numeric" }).replace(".", "");
+              return t.charAt(0).toUpperCase() + t.slice(1);
+            })()}
           </button>
           <button aria-label="Siguiente" onClick={() => changeDate(1)} className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-gray transition-colors hover:bg-white hover:text-brand-dark">
             <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
