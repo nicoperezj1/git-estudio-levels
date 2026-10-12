@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useIsNativeApp } from "@/lib/native-app";
+import { nativePushAvailable, nativePushEnabledFor, enableNativePush, disableNativePush } from "@/lib/native-push";
 import { biometricAvailable, biometricLockEnabled, biometricVerify, setBiometricLockEnabled } from "@/lib/biometric";
 import { Copy, Camera, Sun, Moon, Monitor, Trash2 } from "lucide-react";
 
@@ -42,6 +43,35 @@ export default function MiPerfilPage() {
     if (ok) {
       setBiometricLockEnabled(true);
       setBioOn(true);
+    }
+  };
+  // Avisos nativos en este telefono (citas nuevas, cancelaciones, cliente llego...), solo dentro de la app.
+  const [pushAvailable, setPushAvailable] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMsg, setPushMsg] = useState("");
+  useEffect(() => {
+    if (!inApp) return;
+    setPushAvailable(nativePushAvailable());
+    setPushOn(nativePushEnabledFor(user?.id));
+  }, [inApp, user?.id]);
+  const togglePush = async () => {
+    if (pushBusy || !user?.id) return;
+    setPushBusy(true);
+    setPushMsg("");
+    try {
+      if (pushOn) {
+        await disableNativePush();
+        setPushOn(false);
+        return;
+      }
+      const r = await enableNativePush(user.id);
+      if (r.ok) setPushOn(true);
+      else if (r.reason === "denied") setPushMsg("No diste permiso. Puedes activarlo en Ajustes del teléfono → re-booking → Notificaciones.");
+      else if (r.reason === "server") setPushMsg("Los avisos al teléfono todavía no están activos en el servidor. Inténtalo más tarde.");
+      else setPushMsg("No se pudieron activar los avisos. Inténtalo de nuevo.");
+    } finally {
+      setPushBusy(false);
     }
   };
   // Eliminar mi cuenta (requisito de Apple y Google): se confirma con la contrasena.
@@ -295,6 +325,28 @@ export default function MiPerfilPage() {
         </div>
         <p className="text-[10px] text-brand-gray text-center">Si necesitas cambiarlo, pídelo a tu administrador.</p>
       </div>
+
+      {inApp && pushAvailable && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-brand-dark">Avisos en este teléfono</p>
+              <p className="text-xs text-brand-gray">Citas nuevas, cancelaciones y cuando llega un cliente, aunque la app esté cerrada.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={pushOn}
+              disabled={pushBusy}
+              onClick={togglePush}
+              className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors disabled:opacity-60 ${pushOn ? "bg-brand-blue" : "bg-gray-300"}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${pushOn ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+          {pushMsg && <p className="mt-2 text-xs text-red-600">{pushMsg}</p>}
+        </div>
+      )}
 
       {inApp && bioAvailable && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-5">
