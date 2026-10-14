@@ -846,7 +846,7 @@ export default function BookingPage() {
             </label>
             <p className="mt-2 text-xs text-brand-gray">
               Usaremos tus datos para gestionar tu cita y avisarte sobre ella. {businessName || "El negocio"} es responsable de tus datos
-              {process.env.NEXT_PUBLIC_LEGAL_PAGES_ENABLED === "1" && (<> — <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="underline">Política de privacidad</a></>)}.
+              {process.env.NEXT_PUBLIC_LEGAL_PAGES_ENABLED !== "0" && (<> — <a href="/privacidad/clientes" target="_blank" rel="noopener noreferrer" className="underline">Aviso de privacidad</a></>)}.
             </p>
 
             {error && <p className="text-red-500 text-sm mt-3 text-center bg-red-50 rounded-lg py-2">{error}</p>}
