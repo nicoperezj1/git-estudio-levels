@@ -120,18 +120,16 @@ export async function GET(req: NextRequest) {
       let t = (saturday ? 10 : 10) * 60 + Math.floor(r() * 3) * 15;
       const closing = (saturday ? 17 : 19) * 60;
       while (t < closing - 30) {
+        let nextT = t + 30;
         if (r() < (isFuture ? 0.45 : 0.62)) {
-          const first = services[Math.floor(r() * services.length)];
-          const chosen = [first];
-          if (services.length > 1 && r() < 0.22) {
-            const second = services[Math.floor(r() * services.length)];
-            if (second.id !== first.id) chosen.push(second);
-          }
+          // Un solo servicio por cita: hay combos como "Corte + Barba" y juntar servicios se veria raro.
+          const chosen = [services[Math.floor(r() * services.length)]];
           const dur = chosen.reduce((s: number, x: any) => s + Number(x.duration || 30), 0);
           if (t + dur > closing) break;
           const client = clients[Math.floor(r() * clients.length)];
           const total = chosen.reduce((s: number, x: any) => s + Number(x.price || 0), 0);
           const endMin = t + dur;
+          nextT = endMin + Math.floor(r() * 3) * 15;
           let status: string;
           if (isFuture) status = r() < 0.6 ? "confirmed" : "scheduled";
           else if (isToday) status = endMin <= nowMin ? "completed" : t <= nowMin ? "in_progress" : r() < 0.6 ? "confirmed" : "scheduled";
@@ -146,7 +144,8 @@ export async function GET(req: NextRequest) {
             barberId: b.id, clientId: client.id, endInstant: chileInstant(y, m, d, Math.floor(endMin / 60), endMin % 60),
           });
         }
-        t += 30 + Math.floor(r() * 4) * 15;
+        // La siguiente cita parte despues de que termina esta (con un respiro de 0 a 30 min).
+        t = nextT;
       }
     });
   }
