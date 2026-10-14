@@ -731,7 +731,7 @@ export default function SuperAdminTenantsPage() {
                   className="mt-0.5" />
                 <span>
                   Habilitar carga de archivos en la ficha de cliente
-                  <span className="block text-[10px] text-brand-gray">PDF/Word por cliente. Pensado para clinicas, kinesiologia y estetica; para barberia no hace falta.</span>
+                  <span className="block text-[10px] text-brand-gray">PDF/Word por cliente. Temporalmente apagado para todos los negocios (falta CLIENT_DOCUMENTS_ENABLED=1 en Vercel).</span>
                 </span>
               </label>
             </div>

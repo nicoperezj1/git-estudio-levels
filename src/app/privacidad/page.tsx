@@ -80,6 +80,7 @@ export default function PrivacidadPage() {
 
 <h2>5. Datos sensibles</h2>
 <h3>5.1 Datos de salud</h3>
+<p><b>Importante:</b> re-booking <b>no está diseñado para guardar información clínica</b>. Por ahora la plataforma no permite subir recetas médicas, exámenes ni fichas clínicas, y los negocios no deben registrar diagnósticos ni resultados en las notas. Si esto cambia en el futuro, actualizaremos esta política y pediremos los consentimientos que correspondan.</p>
 <p>Algunos negocios que usan re-booking prestan servicios de salud (por ejemplo, kinesiología) y pueden registrar información sobre sus pacientes, como notas de atención o fotos. Estos son <b>datos sensibles</b>. Respecto de ellos:</p>
 <ul>
 <li>El <b>responsable</b> es el negocio o profesional que presta la atención; re-booking actúa como <b>encargado</b>.</li>

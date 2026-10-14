@@ -40,7 +40,11 @@ async function authorize(clientId: string) {
     userId,
     role,
     tenantId: client.tenant_id as string,
-    enabled: !!tenant?.client_files_enabled,
+    // Interruptor global (13-oct): mientras no se defina CLIENT_DOCUMENTS_ENABLED=1 en el
+    // servidor, nadie puede subir ni ver documentos, aunque el negocio lo tenga activado.
+    // Motivo: Google Play/App Store tratan una app que guarda recetas o examenes como app
+    // de salud (exige cuenta de organizacion). Los archivos ya subidos NO se borran.
+    enabled: !!tenant?.client_files_enabled && process.env.CLIENT_DOCUMENTS_ENABLED === "1",
   };
 }
 

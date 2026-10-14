@@ -26,7 +26,7 @@ export default function PrivacidadClientesPage() {
 <ul>
 <li><b>Los que entregas al reservar:</b> nombre, correo, teléfono, servicio, profesional, fecha y hora.</li>
 <li><b>Los que el negocio agrega al atenderte:</b> historial de visitas y compras, notas, preferencias, puntos de fidelidad y, si corresponde, fotos o documentos.</li>
-<li><b>Datos de salud:</b> si el negocio presta servicios de salud, puede registrar información de tu atención. Solo se hace con tu consentimiento o cuando la ley lo permite.</li>
+<li><b>Datos de salud:</b> re-booking no está diseñado para guardar información clínica (recetas, exámenes, fichas) y por ahora no permite subir esos documentos. Si un negocio de salud la registra por su cuenta, es responsabilidad del negocio, y solo debe hacerlo con tu consentimiento o cuando la ley lo permite.</li>
 </ul>
 
 <h2>3. ¿Para qué se usan?</h2>
