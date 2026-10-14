@@ -31,7 +31,7 @@ export default function PrivacidadPage() {
 <p><b>Definiciones útiles.</b> <i>Dato personal</i>: información sobre una persona identificada o identificable. <i>Tratamiento</i>: cualquier operación sobre datos (recoger, guardar, usar, enviar, borrar). <i>Responsable</i>: quien decide para qué y cómo se tratan los datos. <i>Encargado</i>: quien trata datos por cuenta y según las instrucciones del responsable. <i>Titular</i>: la persona a quien se refieren los datos. <i>Dato sensible</i>: por ejemplo, datos de salud, biométricos o de menores en ciertos contextos.</p>
 
 <h2>2. Quiénes somos</h2>
-<p>re-booking es una plataforma de gestión de agenda, clientes, ventas, caja y equipo para negocios de servicios. La opera <b>RE-BOOKING SpA</b>, RUT <b>78.511.911-8</b>, Chile (“re-booking”, “nosotros”).</p>
+<p>re-booking es una plataforma de gestión de agenda, clientes, ventas, caja y equipo para negocios de servicios. La opera <b>RE-BOOKING SpA</b>, RUT <b>78.511.911-8</b>, con domicilio en Juan de Dios Malebrán 1889, Puente Alto, Chile (“re-booking”, “nosotros”).</p>
 <p><b>Contacto de privacidad:</b> <b>contactorebooking@gmail.com</b> · Responsable de privacidad: <b>Nicolás Andrés Pérez Jaña</b>, representante de RE-BOOKING SpA.</p>
 
 
@@ -215,7 +215,7 @@ export default function PrivacidadPage() {
 <p>Podemos actualizar esta Política. Si el cambio es importante, te avisaremos en la plataforma o por correo con anticipación razonable. La fecha de “última actualización” aparece al inicio.</p>
 
 <h2>19. Contacto</h2>
-<p><b>RE-BOOKING SpA</b> · RUT <b>78.511.911-8</b> · <b>contactorebooking@gmail.com</b></p>
+<p><b>RE-BOOKING SpA</b> · RUT <b>78.511.911-8</b> · Juan de Dios Malebrán 1889, Puente Alto, Chile · <b>contactorebooking@gmail.com</b></p>
       </div>
     </div>
   );

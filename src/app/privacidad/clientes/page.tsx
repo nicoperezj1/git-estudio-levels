@@ -20,7 +20,7 @@ export default function PrivacidadClientesPage() {
 
 <h2>1. ¿Quién usa tus datos?</h2>
 <p>El <b>negocio</b> donde reservas o te atiendes (por ejemplo, una barbería o un centro de kinesiología) es el <b>responsable</b> de tus datos: decide para qué se usan. re-booking es la plataforma tecnológica que el negocio utiliza y actúa como <b>encargado</b>: guarda y procesa tus datos solo por cuenta y según las instrucciones del negocio.</p>
-<p><b>Negocio:</b> el nombre y los datos de contacto del negocio aparecen en su página de reservas. <b>Plataforma:</b> re-booking, operada por <b>RE-BOOKING SpA</b>, RUT <b>78.511.911-8</b>.</p>
+<p><b>Negocio:</b> el nombre y los datos de contacto del negocio aparecen en su página de reservas. <b>Plataforma:</b> re-booking, operada por <b>RE-BOOKING SpA</b>, RUT <b>78.511.911-8</b>, con domicilio en Juan de Dios Malebrán 1889, Puente Alto.</p>
 
 <h2>2. ¿Qué datos se guardan?</h2>
 <ul>
