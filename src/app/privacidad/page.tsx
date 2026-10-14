@@ -1,25 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-// BORRADOR de la Política de Privacidad (Ley 21.719). Esta página NO es pública hasta que:
-//   1) un abogado revise y apruebe el texto,
-//   2) se completen los datos entre [corchetes] (razón social, RUT, correo de privacidad, plazos),
-//   3) se active la variable de entorno NEXT_PUBLIC_LEGAL_PAGES_ENABLED=1 en Vercel.
-// Mientras tanto responde 404. El documento completo para el abogado esta en el escritorio de Nico
-// ("re-booking - Politica de Privacidad (borrador para abogado)"); las notas internas NO se publican aqui.
+// Politica de Privacidad de re-booking (Ley 19.628; Ley 21.719 desde el 1 dic. 2026). Es publica por defecto: las tiendas de apps
+// (Google Play y App Store) exigen una URL. Para ocultarla de nuevo, poner NEXT_PUBLIC_LEGAL_PAGES_ENABLED=0 en Vercel.
+// Pendiente: revision de un abogado antes del 1 dic. 2026 (ver documentos legales en docs/legal y el borrador completo con notas).
 export const dynamic = "force-dynamic";
 
 const BOX = "text-sm leading-6 text-gray-700 [&_h2]:mt-8 [&_h2]:mb-2 [&_h2]:border-b [&_h2]:border-gray-200 [&_h2]:pb-1 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-brand-dark [&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-semibold [&_h3]:text-brand-dark [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-50 [&_th]:p-2 [&_th]:text-left [&_td]:border [&_td]:border-gray-300 [&_td]:p-2 [&_td]:align-top";
 
 export default function PrivacidadPage() {
-  if (process.env.NEXT_PUBLIC_LEGAL_PAGES_ENABLED !== "1") notFound();
+  if (process.env.NEXT_PUBLIC_LEGAL_PAGES_ENABLED === "0") notFound();
   return (
     <div className="min-h-screen bg-white p-6 md:p-12 max-w-3xl mx-auto">
       <Link href="/landing" className="text-brand-blue text-sm hover:underline">← Volver</Link>
       <h1 className="text-2xl font-bold text-brand-dark mt-6 mb-1">Política de Privacidad</h1>
       <p className="mb-4 text-sm"><Link href="/privacidad/clientes" className="text-brand-blue hover:underline">Aviso de privacidad para clientes de los negocios →</Link></p>
       <div className={BOX}>
-<p className="text-xs text-gray-500">Última actualización: [fecha de publicación] · Versión 1.0</p>
+<p className="text-xs text-gray-500">Última actualización: 13 de octubre de 2026 · Versión 1.0</p>
 
 <h2>1. Introducción y a quién se aplica</h2>
 <p>En re-booking nos tomamos en serio la privacidad. Esta Política explica qué datos personales tratamos, para qué, con qué fundamento, con quién los compartimos, cuánto tiempo los conservamos y cómo puedes ejercer tus derechos, de acuerdo con la legislación chilena de protección de datos personales (Ley N° 19.628 y, desde su entrada en vigencia, la Ley N° 21.719).</p>
@@ -34,8 +31,8 @@ export default function PrivacidadPage() {
 <p><b>Definiciones útiles.</b> <i>Dato personal</i>: información sobre una persona identificada o identificable. <i>Tratamiento</i>: cualquier operación sobre datos (recoger, guardar, usar, enviar, borrar). <i>Responsable</i>: quien decide para qué y cómo se tratan los datos. <i>Encargado</i>: quien trata datos por cuenta y según las instrucciones del responsable. <i>Titular</i>: la persona a quien se refieren los datos. <i>Dato sensible</i>: por ejemplo, datos de salud, biométricos o de menores en ciertos contextos.</p>
 
 <h2>2. Quiénes somos</h2>
-<p>re-booking es una plataforma de gestión de agenda, clientes, ventas, caja y equipo para negocios de servicios. La opera <b>[razón social o nombre completo]</b>, RUT <b>[RUT]</b>, con domicilio en <b>[dirección, comuna, ciudad]</b>, Chile (“re-booking”, “nosotros”).</p>
-<p><b>Contacto de privacidad:</b> <b>[correo de privacidad, por ejemplo privacidad@re-booking.cl]</b> · Responsable de privacidad: <b>[nombre o cargo]</b>.</p>
+<p>re-booking es una plataforma de gestión de agenda, clientes, ventas, caja y equipo para negocios de servicios. La opera <b>RE-BOOKING SpA</b>, RUT <b>78.511.911-8</b>, Chile (“re-booking”, “nosotros”).</p>
+<p><b>Contacto de privacidad:</b> <b>contactorebooking@gmail.com</b> · Responsable de privacidad: <b>Nicolás Andrés Pérez Jaña</b>, representante de RE-BOOKING SpA.</p>
 
 
 <h2>3. Dos papeles distintos: responsable y encargado</h2>
@@ -56,7 +53,7 @@ export default function PrivacidadPage() {
 <h3>4.1 Datos que tú nos entregas</h3>
 <table>
 <tr><th>Categoría</th><th>Datos</th><th>Titulares</th></tr>
-<tr><td>Identificación y contacto</td><td>Nombre, apellidos, correo electrónico, teléfono, RUT [solo si el negocio lo usa para boletas o remuneraciones]</td><td>Administradores, equipo, clientes</td></tr>
+<tr><td>Identificación y contacto</td><td>Nombre, apellidos, correo electrónico, teléfono, RUT (solo si el negocio lo usa para boletas o remuneraciones)</td><td>Administradores, equipo, clientes</td></tr>
 <tr><td>Perfil profesional (opcional)</td><td>Foto, biografía, Instagram, especialidades, años de experiencia, enlace de agenda</td><td>Profesionales</td></tr>
 <tr><td>Agenda y reservas</td><td>Servicio, profesional, fecha y hora, estado de la cita, notas de la cita</td><td>Clientes, profesionales</td></tr>
 <tr><td>Ficha del cliente</td><td>Notas, etiquetas de perfil, preferencias, fotos y documentos que el negocio cargue, historial de visitas, puntos de fidelidad, consentimiento para promociones</td><td>Clientes</td></tr>
@@ -88,8 +85,8 @@ export default function PrivacidadPage() {
 <li>El <b>responsable</b> es el negocio o profesional que presta la atención; re-booking actúa como <b>encargado</b>.</li>
 <li>Solo se tratan con el <b>consentimiento explícito</b> del paciente o cuando la ley lo permita o exija. Las fichas clínicas se rigen también por la Ley N° 20.584 sobre derechos y deberes de los pacientes, cuyas reglas de reserva y conservación el negocio debe cumplir.</li>
 <li>No se incluyen en avisos al celular, correos ni exportaciones generales. Los avisos que llegan a la pantalla bloqueada pueden configurarse sin detalles.</li>
-<li>Las fotos de clientes se guardan en un <b>almacén privado</b> y se muestran mediante enlaces temporales.</li>
-<li>re-booking <b>no es una ficha clínica electrónica certificada</b> ni sustituye las obligaciones del prestador de salud. Los negocios no deben usarlo como único registro clínico. <b>[Confirmar redacción con el abogado]</b></li>
+<li>Las fotos nuevas de clientes se guardan en un <b>almacén privado</b> y se muestran mediante enlaces temporales; estamos migrando las anteriores.</li>
+<li>re-booking <b>no es una ficha clínica electrónica certificada</b> ni sustituye las obligaciones del prestador de salud. Los negocios no deben usarlo como único registro clínico.</li>
 </ul>
 <h3>5.2 Datos biométricos</h3>
 <p>Si activas el bloqueo con <b>Face ID o huella</b> en la app, la verificación ocurre <b>dentro de tu teléfono</b> mediante el sistema de iPhone o Android. re-booking <b>no recibe ni guarda</b> tu rostro ni tu huella; solo recibe la confirmación de que el sistema operativo te reconoció.</p>
@@ -125,7 +122,7 @@ export default function PrivacidadPage() {
 <p>Usamos proveedores que tratan datos por nuestra cuenta y bajo nuestras instrucciones, para que la plataforma funcione:</p>
 <table>
 <tr><th>Proveedor</th><th>Para qué</th><th>Datos</th><th>Ubicación</th></tr>
-<tr><td>Supabase</td><td>Base de datos, autenticación y almacenamiento de archivos</td><td>Todos los datos de la plataforma</td><td>Estados Unidos <b>[confirmar región del proyecto]</b></td></tr>
+<tr><td>Supabase</td><td>Base de datos, autenticación y almacenamiento de archivos</td><td>Todos los datos de la plataforma</td><td>Estados Unidos</td></tr>
 <tr><td>Vercel</td><td>Alojamiento y entrega de la aplicación web</td><td>Datos técnicos y de tráfico</td><td>Estados Unidos</td></tr>
 <tr><td>Resend</td><td>Envío de correos (confirmaciones, recordatorios, boletas, avisos)</td><td>Correo y contenido del mensaje</td><td>Estados Unidos</td></tr>
 <tr><td>Mercado Pago</td><td>Cobro de suscripciones y depósitos de reserva</td><td>Datos de pago (los procesa directamente Mercado Pago)</td><td>Chile / Argentina</td></tr>
@@ -139,20 +136,20 @@ export default function PrivacidadPage() {
 
 
 <h2>9. Transferencias internacionales</h2>
-<p>Algunos proveedores están fuera de Chile (principalmente Estados Unidos). Cuando transferimos datos al extranjero, lo hacemos con proveedores que ofrecen garantías adecuadas de protección y mediante cláusulas contractuales u otros mecanismos que la ley permita. Puedes pedir más información en <b>[correo de privacidad]</b>.</p>
+<p>Algunos proveedores están fuera de Chile (principalmente Estados Unidos). Cuando transferimos datos al extranjero, lo hacemos con proveedores que ofrecen garantías adecuadas de protección y mediante cláusulas contractuales u otros mecanismos que la ley permita. Puedes pedir más información en <b>contactorebooking@gmail.com</b>.</p>
 
 <h2>10. Cuánto tiempo conservamos los datos</h2>
 <table>
 <tr><th>Datos</th><th>Plazo</th></tr>
 <tr><td>Datos de la cuenta y del negocio</td><td>Mientras la cuenta esté activa.</td></tr>
-<tr><td>Tras cancelar la suscripción</td><td>Los mantenemos <b>[30] días</b> para que el negocio pueda exportarlos y luego los eliminamos o anonimizamos, salvo lo que la ley obligue a conservar.</td></tr>
-<tr><td>Ventas, boletas y documentos tributarios</td><td><b>[6] años</b> (obligación tributaria).</td></tr>
-<tr><td>Datos de clientes inactivos</td><td>Los define cada negocio; sugerimos no más de <b>[24] meses</b> sin actividad.</td></tr>
-<tr><td>Fichas con datos de salud</td><td>Según la normativa sanitaria aplicable al prestador (por ejemplo, Ley N° 20.584 y su reglamento) <b>[confirmar plazo]</b>.</td></tr>
-<tr><td>Registros de seguridad y auditoría</td><td><b>[12–24]</b> meses.</td></tr>
+<tr><td>Tras cancelar la suscripción</td><td>Los mantenemos <b>30 días</b> para que el negocio pueda exportarlos y luego los eliminamos o anonimizamos, salvo lo que la ley obligue a conservar.</td></tr>
+<tr><td>Ventas, boletas y documentos tributarios</td><td><b>6 años</b> (obligación tributaria).</td></tr>
+<tr><td>Datos de clientes inactivos</td><td>Los define cada negocio; sugerimos no más de <b>24 meses</b> sin actividad.</td></tr>
+<tr><td>Fichas con datos de salud</td><td>Según la normativa sanitaria aplicable al prestador (por ejemplo, Ley N° 20.584 y su reglamento).</td></tr>
+<tr><td>Registros de seguridad y auditoría</td><td><b>12</b> meses.</td></tr>
 <tr><td>Token del dispositivo (avisos)</td><td>Hasta que cierres sesión, apagues los avisos o elimines tu cuenta.</td></tr>
-<tr><td>Copias de seguridad</td><td>Rotan automáticamente y se eliminan en <b>[X]</b> días.</td></tr>
-<tr><td>Mensajes de soporte</td><td><b>[24]</b> meses.</td></tr>
+<tr><td>Copias de seguridad</td><td>Rotan automáticamente y las copias antiguas se eliminan.</td></tr>
+<tr><td>Mensajes de soporte</td><td><b>24</b> meses.</td></tr>
 </table>
 <p><b>Si eliminas tu cuenta</b> (Mi Perfil → “Eliminar mi cuenta”), cerramos tu acceso y anonimizamos tus datos personales del perfil. Los registros del negocio (citas, ventas, libro contable) <b>no se borran</b>, porque pertenecen al negocio y deben conservarse; quedan asociados a “Cuenta eliminada”.</p>
 
@@ -161,8 +158,8 @@ export default function PrivacidadPage() {
 <ul>
 <li>Comunicaciones <b>cifradas</b> (HTTPS) entre tu dispositivo y la plataforma.</li>
 <li><b>Acceso por sesión y por rol</b>: cada persona ve solo lo que su rol permite, y los datos de cada negocio están <b>separados</b> de los de otros negocios.</li>
-<li>Claves de acceso protegidas por el servicio de autenticación; PIN personal <b>[ajustar redacción tras terminar el reemplazo del PIN por huella]</b>.</li>
-<li><b>Almacén privado</b> para fotos de clientes, con enlaces temporales.</li>
+<li>Claves de acceso gestionadas por el servicio de autenticación del proveedor.</li>
+<li>Las fotos nuevas de clientes se guardan en un <b>almacén privado</b> con enlaces temporales; estamos migrando las anteriores.</li>
 <li><b>Registro de auditoría</b> de operaciones sensibles (caja, descuentos, cambios de plan, accesos).</li>
 <li>Copias de seguridad automáticas.</li>
 <li>Bloqueo opcional de la app con Face ID o huella.</li>
@@ -185,19 +182,19 @@ export default function PrivacidadPage() {
 <li><b>Revocar tu consentimiento</b> en cualquier momento, sin efecto retroactivo.</li>
 <li><b>No ser objeto de decisiones</b> basadas únicamente en tratamiento automatizado que te afecten significativamente.</li>
 </ul>
-<p><b>Cómo:</b> escribe a <b>[correo de privacidad]</b> indicando tu nombre, el correo o celular con que usas el servicio, el negocio al que te refieres (si corresponde) y qué quieres hacer. Si usas la app, puedes <b>eliminar tu cuenta</b> tú mismo desde <i>Mi Perfil → Eliminar mi cuenta</i> y encontrarás instrucciones en <b>www.re-booking.cl/eliminar-cuenta</b>.</p>
+<p><b>Cómo:</b> escribe a <b>contactorebooking@gmail.com</b> indicando tu nombre, el correo o celular con que usas el servicio, el negocio al que te refieres (si corresponde) y qué quieres hacer. Si usas la app, puedes <b>eliminar tu cuenta</b> tú mismo desde <i>Mi Perfil → Eliminar mi cuenta</i> y encontrarás instrucciones en <b>www.re-booking.cl/eliminar-cuenta</b>.</p>
 <p><b>Verificación:</b> podemos pedirte información adicional para confirmar que eres tú. No entregamos datos a quien no podamos identificar.</p>
-<p><b>Plazo:</b> respondemos dentro de <b>[30 días corridos]</b> desde que recibimos tu solicitud completa <b>[confirmar plazo legal y posibilidad de prórroga]</b>. Si los datos son de un negocio, le informaremos y coordinaremos la respuesta.</p>
+<p><b>Plazo:</b> respondemos dentro de <b>30 días corridos</b> desde que recibimos tu solicitud completa. Si los datos son de un negocio, le informaremos y coordinaremos la respuesta.</p>
 <p><b>Reclamo:</b> si no quedas conforme, puedes reclamar ante la <b>Agencia de Protección de Datos Personales</b>.</p>
 
 <h2>14. Niñas, niños y adolescentes</h2>
-<p>re-booking es una herramienta de trabajo dirigida a <b>personas mayores de 18 años</b>. Los menores de edad solo pueden ser clientes de un negocio a través de su padre, madre o representante legal, que debe dar la autorización cuando la ley la exija. Los negocios no deben registrar datos de menores sin esa autorización, y los datos sensibles de menores requieren especial resguardo. <b>[Confirmar con el abogado edades y reglas de consentimiento de la Ley 21.719.]</b> Si crees que un menor nos entregó datos sin autorización, escríbenos y los eliminaremos.</p>
+<p>re-booking es una herramienta de trabajo dirigida a <b>personas mayores de 18 años</b>. Los menores de edad solo pueden ser clientes de un negocio a través de su padre, madre o representante legal, que debe dar la autorización cuando la ley la exija. Los negocios no deben registrar datos de menores sin esa autorización, y los datos sensibles de menores requieren especial resguardo. Si crees que un menor nos entregó datos sin autorización, escríbenos y los eliminaremos.</p>
 
 <h2>15. Cookies y almacenamiento local</h2>
 <p>Usamos solo lo <b>estrictamente necesario</b> para que el servicio funcione:</p>
 <table>
 <tr><th>Elemento</th><th>Para qué</th><th>Duración</th></tr>
-<tr><td>Cookies de sesión (autenticación)</td><td>Mantener tu sesión iniciada y proteger tu cuenta</td><td>Sesión / [X días]</td></tr>
+<tr><td>Cookies de sesión (autenticación)</td><td>Mantener tu sesión iniciada y proteger tu cuenta</td><td>Mientras dura la sesión</td></tr>
 <tr><td>Almacenamiento local del navegador o app</td><td>Recordar tu tema (claro/oscuro), filtros, atajos de la barra inferior y si activaste los avisos en el teléfono</td><td>Hasta que lo borres</td></tr>
 </table>
 <p><b>No usamos</b> cookies de publicidad ni de seguimiento entre sitios. Puedes borrar las cookies desde tu navegador, aunque eso cerrará tu sesión.</p>
@@ -207,7 +204,7 @@ export default function PrivacidadPage() {
 <li><b>Notificaciones:</b> la app te pide permiso para enviarte avisos (citas nuevas, cancelaciones, cliente llegó). Puedes aceptar o rechazar, y cambiarlo en <i>Mi Perfil → Avisos en este teléfono</i> o en los ajustes del teléfono.</li>
 <li><b>Cámara y fotos:</b> solo si decides subir una foto de perfil o de un cliente.</li>
 <li><b>Face ID / huella:</b> opcional; ver sección 5.2.</li>
-<li><b>Sin publicidad y sin rastreo:</b> la app no incluye redes publicitarias ni analítica de terceros con fines de marketing <b>[confirmar]</b>.</li>
+<li><b>Sin publicidad y sin rastreo:</b> la app no incluye redes publicitarias ni analítica de terceros con fines de marketing.</li>
 <li>Las tiendas (Google Play y App Store) tratan datos propios según sus políticas, como responsables independientes.</li>
 </ul>
 
@@ -215,10 +212,10 @@ export default function PrivacidadPage() {
 <p>Podemos enlazar a sitios de terceros (por ejemplo, redes sociales de un profesional o WhatsApp). No controlamos su contenido ni sus políticas de privacidad.</p>
 
 <h2>18. Cambios a esta Política</h2>
-<p>Podemos actualizar esta Política. Si el cambio es importante, te avisaremos en la plataforma o por correo <b>[con X días de anticipación]</b>. La fecha de “última actualización” aparece al inicio.</p>
+<p>Podemos actualizar esta Política. Si el cambio es importante, te avisaremos en la plataforma o por correo con anticipación razonable. La fecha de “última actualización” aparece al inicio.</p>
 
 <h2>19. Contacto</h2>
-<p><b>[Razón social]</b> · RUT <b>[RUT]</b> · <b>[dirección]</b> · <b>[correo de privacidad]</b> · <b>[teléfono, opcional]</b></p>
+<p><b>RE-BOOKING SpA</b> · RUT <b>78.511.911-8</b> · <b>contactorebooking@gmail.com</b></p>
       </div>
     </div>
   );
