@@ -22,6 +22,10 @@
     {
       "path": "/api/cron/platform-alerts",
       "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/demo-refresh",
+      "schedule": "20 */3 * * *"
     }
   ]
 }
