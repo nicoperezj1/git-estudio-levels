@@ -8,6 +8,7 @@ import { parseWallClock } from "@/lib/wallclock";
 import { isOnVacation } from "@/lib/vacations";
 import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
 import { notify } from "@/lib/notify";
+import { sanitizeAttribution, isAdTrackingEnabled } from "@/lib/ad-tracking";
 
 export async function POST(req: NextRequest) {
   const supabase = createAdminSupabase();
@@ -89,7 +90,12 @@ export async function POST(req: NextRequest) {
     return r;
   };
 
+  // Origen del anuncio (migracion 110): solo se guarda si el negocio activo el seguimiento. Si falta la migracion, no pasa nada.
+  const adAttr = sanitizeAttribution(body.adAttribution);
+  const trackAds = !!adAttr && (await isAdTrackingEnabled(supabase, tenantId));
+
   let clientId: string;
+  let clientIsNew = false;
   if (clientEmail) {
     // Reuse an existing client with this email in this business. Was using .single(),
     // which errored (treated as "not found") when duplicates already existed, so every
@@ -115,10 +121,15 @@ export async function POST(req: NextRequest) {
       // Solo se marca al CREAR el cliente; uno que ya existia conserva su origen original.
       const { data: newClient } = await insertClient({ name: clientName, email: clientEmail, phone: clientPhone || null, tenant_id: tenantId, acquisition_source: "link" });
       clientId = newClient!.id;
+      clientIsNew = true;
     }
   } else {
     const { data: newClient } = await insertClient({ name: clientName, phone: clientPhone || null, tenant_id: tenantId, acquisition_source: "link" });
     clientId = newClient!.id;
+    clientIsNew = true;
+  }
+  if (trackAds && clientIsNew) {
+    await supabase.from("clients").update({ first_ad_attribution: adAttr }).eq("id", clientId); // origen del cliente nuevo, una sola vez
   }
 
   // Create appointment
@@ -146,6 +157,10 @@ export async function POST(req: NextRequest) {
   if (await exceededAfterInsert(supabase, barberId, tenantId, date, start, end)) {
     await supabase.from("appointments").delete().eq("id", appointment!.id);
     return NextResponse.json({ error: "Horario no disponible. Selecciona otro." }, { status: 409 });
+  }
+
+  if (trackAds) {
+    await supabase.from("appointments").update({ ad_attribution: adAttr }).eq("id", appointment!.id); // origen de esta reserva
   }
 
   // Marca de "primer profesional disponible" (migracion 095): sirve para medir el cumplimiento

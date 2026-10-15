@@ -32,6 +32,27 @@ type Step = "barber" | "service" | "datetime" | "details" | "confirmed";
 // in the shop); set to true to re-enable.
 const ONLINE_PAYMENT_ON_CONFIRM = false;
 
+// Origen de la reserva (anuncios / link de la biografia): el link trae utm_* y fbclid. Se guardan en el navegador al
+// entrar y se mandan al reservar; el servidor solo los guarda si el negocio activo el seguimiento (migracion 110).
+const AD_STORAGE_KEY = "rb_ad_attr";
+const AD_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "utm_id", "fbclid"];
+function captureAdParams() {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const found: Record<string, string> = {};
+    for (const k of AD_PARAMS) { const v = sp.get(k); if (v) found[k] = v.slice(0, 200); }
+    if (!Object.keys(found).length) return; // sin parametros nuevos: se conserva lo ya guardado en esta visita
+    found.landing = window.location.pathname.slice(0, 120);
+    window.sessionStorage.setItem(AD_STORAGE_KEY, JSON.stringify(found));
+  } catch { /* navegador sin almacenamiento: simplemente no se guarda el origen */ }
+}
+function readAdParams(): Record<string, string> | null {
+  try {
+    const raw = window.sessionStorage.getItem(AD_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export default function BookingPage() {
   const [step, setStep] = useState<Step>("barber");
   const [services, setServices] = useState<Service[]>([]);
@@ -72,6 +93,7 @@ export default function BookingPage() {
     import("@/lib/supabase/client").then(({ createClient }) => createClient().auth.getUser())
       .then(({ data }) => setHasSession(!!data?.user)).catch(() => {});
   }, []);
+  useEffect(() => { captureAdParams(); }, []);
   const preselectSlot = useRef<string>(""); // hora elegida en la vista por horario
   const [depositRequired, setDepositRequired] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(30);
@@ -301,6 +323,7 @@ export default function BookingPage() {
         notes: notes || null,
         autoAssigned,
         marketingConsent,
+        adAttribution: readAdParams(),
       }),
     });
 
