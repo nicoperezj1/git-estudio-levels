@@ -629,7 +629,7 @@ export default function ConfiguracionPage() {
 
       {/* Publicidad: de que anuncio viene cada reserva por link (migracion 110, apagado por defecto) */}
       {isAdmin && (
-        <a href="/dashboard/publicidad" className="flex items-center gap-3 rounded-2xl border border-gray-100 dark:border-white/10 bg-white dark:bg-brand-white p-4 shadow-sm transition-colors hover:border-brand-blue/40">
+        <a href="/dashboard/origen-de-reservas" className="flex items-center gap-3 rounded-2xl border border-gray-100 dark:border-white/10 bg-white dark:bg-brand-white p-4 shadow-sm transition-colors hover:border-brand-blue/40">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue"><Globe className="h-5 w-5" /></div>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-brand-dark">Publicidad</p>

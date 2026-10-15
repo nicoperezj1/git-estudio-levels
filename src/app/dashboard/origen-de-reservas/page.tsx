@@ -36,13 +36,13 @@ export default function PublicidadPage() {
   );
 
   const loadSetting = async () => {
-    const d = await fetch("/api/settings/publicidad", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+    const d = await fetch("/api/settings/origen-de-reservas", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
     setEnabled(!!d.enabled);
     setMigrationMissing(!!d.migrationMissing);
   };
   const loadReport = async (n: number) => {
     setReportError("");
-    const r = await fetch(`/api/publicidad/reporte?days=${n}`, { cache: "no-store" });
+    const r = await fetch(`/api/origen-de-reservas/reporte?days=${n}`, { cache: "no-store" });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setReport(null); setReportError(d.error || "No se pudo cargar el reporte"); return; }
     setReport(d);
@@ -52,7 +52,7 @@ export default function PublicidadPage() {
 
   const toggle = async (next: boolean) => {
     setSaving(true);
-    const r = await fetch("/api/settings/publicidad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next }) });
+    const r = await fetch("/api/settings/origen-de-reservas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next }) });
     const d = await r.json().catch(() => ({}));
     setSaving(false);
     if (!r.ok) { showToast(d.error || "No se pudo guardar", "error"); return; }
@@ -114,11 +114,15 @@ export default function PublicidadPage() {
       </Panel>
 
       <Panel title="Reservas por campaña" subtitle="Reservas hechas por el link de reservas del negocio"
-        action={
-          <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs">
-            <option value={30}>Últimos 30 días</option><option value={90}>Últimos 90 días</option><option value={180}>Últimos 180 días</option>
+flush>
+        <div className="flex items-center gap-2 px-5 pb-3">
+          <label className="text-xs text-brand-gray" htmlFor="ad-days">Período</label>
+          <select id="ad-days" value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs">
+            <option value="30">Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+            <option value="180">Últimos 180 días</option>
           </select>
-        } flush>
+        </div>
         {reportError && <p className="px-5 pb-4 text-sm text-red-600">{reportError}</p>}
         {report && (
           <>

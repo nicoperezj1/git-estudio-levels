@@ -9,7 +9,7 @@ Sirve para **todos los negocios**: todo va por negocio y viene **apagado por def
 
 ## 2. Activar en el negocio de pruebas
 1. En `localhost:3000`, entrar como administrador de "Estudio Levels (pruebas)".
-2. Configuración → tarjeta **Publicidad** → **Abrir**.
+2. Configuración → tarjeta **Publicidad** → **Abrir** (la dirección es `/dashboard/origen-de-reservas`).
 3. Marcar **Guardar el origen de las reservas**. Debe salir "Seguimiento de publicidad activado".
 
 ## 3. Generar el link
