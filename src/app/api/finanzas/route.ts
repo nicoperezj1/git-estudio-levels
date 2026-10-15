@@ -44,12 +44,11 @@ export async function GET(req: NextRequest) {
       endIso: chileDayBoundsUtc(last).endUtc,
     });
   } else {
-    if (from) query = query.gte("created_at", new Date(from).toISOString());
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setDate(toDate.getDate() + 1);
-      query = query.lte("created_at", toDate.toISOString());
-    }
+    // Los dias se miden en hora de Chile. Antes "hasta hoy" cortaba a la medianoche UTC (21:00 en Chile
+    // en horario de verano), y todo lo registrado despues de las 21:00 desaparecia de la lista.
+    const isDay = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    if (isDay(from)) query = query.gte("created_at", chileDayBoundsUtc(from).startUtc);
+    if (isDay(to)) query = query.lt("created_at", chileDayBoundsUtc(to).endUtc);
   }
   if (barberId) query = query.eq("barber_id", barberId);
 
