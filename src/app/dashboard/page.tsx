@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency, todayInChile, dateStrOffset } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState, EmptyIcons } from "@/components/ui/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import { useTenant } from "@/lib/tenant-context";
+import { useToast } from "@/components/ui/toast";
 import { SalesChart, type ChartRange, type ChartPoint } from "@/components/dashboard/sales-chart";
 import { ProductCarousel, type CarouselItem } from "@/components/dashboard/product-carousel";
 import { Eye, EyeOff, SlidersHorizontal, PackageX, ShoppingBag, CalendarCheck, Wallet, UserPlus, RefreshCw, CalendarX, CalendarDays } from "lucide-react";
@@ -93,6 +94,9 @@ export default function DashboardPage() {
   // para ir viendo el crecimiento del negocio de forma comoda.
   const [chartRange, setChartRange] = useState<ChartRange>("7d");
   const [chartLoading, setChartLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
+  const { showToast } = useToast();
   // Personalizar: cajas ocultas + ojito del monto. Se guardan solo en este navegador.
   const [hiddenSecs, setHiddenSecs] = useState<Set<string>>(new Set());
   const [hideAmount, setHideAmount] = useState(false);
@@ -129,31 +133,50 @@ export default function DashboardPage() {
     }
   }, [tenantLoading, tenant, effectiveRole, router]);
 
+  // Carga del Dashboard. La usan la carga inicial, el refresco automatico de cada 30 s y el boton Actualizar.
+  //  - normal: igual que siempre (muestra el giro del grafico salvo que sea "silent").
+  //  - strict: solo da por buena una respuesta correcta; si falla, NO toca lo que se ve y devuelve false.
+  const loadDashboard = useCallback(async (opts?: { silent?: boolean; strict?: boolean }): Promise<boolean> => {
+    const params = new URLSearchParams({ date: selectedDate, range: chartRange });
+    if (tenant?.id) params.set("tenantId", tenant.id);
+    if (!opts?.silent) setChartLoading(true);
+    try {
+      const r = await fetch(`/api/dashboard?${params.toString()}`, { cache: "no-store" });
+      const d = await r.json();
+      if (opts?.strict && (!r.ok || !d || !d.stats)) return false;
+      setData(d);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setLoading(false);
+      setChartLoading(false);
+    }
+  }, [selectedDate, chartRange, tenant?.id]);
+
   useEffect(() => {
     if (tenantLoading) return;
     if (isSuperView) { setLoading(false); return; }
 
-    const fetchDashboard = (opts?: { silent?: boolean }) => {
-      const params = new URLSearchParams({ date: selectedDate, range: chartRange });
-      if (tenant?.id) params.set("tenantId", tenant.id);
-      if (!opts?.silent) setChartLoading(true);
-      fetch(`/api/dashboard?${params.toString()}`, { cache: "no-store" })
-        .then((r) => r.json())
-        .then((d) => setData(d))
-        .finally(() => {
-          setLoading(false);
-          setChartLoading(false);
-        });
-    };
-
-    fetchDashboard();
+    loadDashboard();
 
     // Auto-refresh every 30 seconds — only useful while looking at today; a past day's
     // numbers don't change, so polling them would just be wasted requests.
     if (!isToday) return;
-    const interval = setInterval(() => fetchDashboard({ silent: true }), 30000);
+    const interval = setInterval(() => { if (!refreshingRef.current) loadDashboard({ silent: true }); }, 30000);
     return () => clearInterval(interval);
-  }, [tenant?.id, tenantLoading, selectedDate, isToday, chartRange, isSuperView]);
+  }, [loadDashboard, tenantLoading, isToday, isSuperView]);
+
+  // Boton Actualizar: vuelve a pedir los datos de lo que se esta viendo (mismo dia y rango del grafico), sin recargar.
+  const handleRefresh = async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    const ok = await loadDashboard({ silent: true, strict: true });
+    showToast(ok ? "Actualizado" : "No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.", ok ? "success" : "error");
+    refreshingRef.current = false;
+    setRefreshing(false);
+  };
 
   if (isSuperView) return <SuperAdminDashboard />;
 
@@ -240,6 +263,16 @@ export default function DashboardPage() {
                 className="min-w-0 flex-1 bg-transparent text-xs text-brand-dark outline-none md:flex-none md:text-sm"
               />
             </label>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing || loading || chartLoading}
+              aria-label="Actualizar"
+              title="Actualizar"
+              className="inline-flex flex-shrink-0 items-center rounded-xl border border-gray-100 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-gray transition hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-60 md:rounded-2xl md:px-3 md:py-2 md:text-sm"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
             {editingLayout && (
               <button type="button" onClick={resetSecs} className="whitespace-nowrap rounded-xl border border-gray-100 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-gray hover:text-brand-dark md:rounded-2xl md:px-3 md:py-2 md:text-sm">
                 Restaurar

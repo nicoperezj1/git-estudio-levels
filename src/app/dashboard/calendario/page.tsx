@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { buildConfirmWhatsAppUrl } from "@/lib/whatsapp-confirm";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarX, Sun, SlidersHorizontal, RefreshCw } from "lucide-react";
 import { Segmented, primaryButton } from "@/components/ui/premium";
 import { useBackToClose } from "@/lib/use-back-to-close";
 
@@ -548,23 +548,30 @@ export default function CalendarioPage() {
   // /api/appointments. Sin profesional elegido, se comporta exactamente igual que antes
   // (un solo dia, todos los profesionales).
 
+  // Parametros de la consulta de citas segun lo que se esta viendo (dia o rango, profesional, negocio).
+  // Los usan tanto la carga normal como el boton Actualizar, para pedir exactamente lo mismo.
+  const appointmentsQuery = () => {
+    const t = getActiveTenantId();
+    const params = new URLSearchParams();
+    if (multiDay) {
+      params.set("dateFrom", rangeDates[0]);
+      params.set("dateTo", rangeDates[rangeDates.length - 1]);
+    } else {
+      params.set("date", date);
+    }
+    if (t) params.set("tenantId", t);
+    // A barber only fetches their own appointments (don't ship the whole team's data
+    // to their browser). El filtro de profesional (para admin/recepcion) solo aplica
+    // cuando el usuario no es ya un barbero restringido a si mismo.
+    if (isBarber && user?.id) params.set("barberId", user.id);
+    else if (professionalFilter) params.set("barberId", professionalFilter);
+    return params.toString();
+  };
+
   const fetchAppointments = async () => {
     setLoading(true);
     try {
-      const t = getActiveTenantId();
-      const params = new URLSearchParams();
-      if (multiDay) {
-        params.set("dateFrom", rangeDates[0]);
-        params.set("dateTo", rangeDates[rangeDates.length - 1]);
-      } else {
-        params.set("date", date);
-      }
-      if (t) params.set("tenantId", t);
-      // A barber only fetches their own appointments (don't ship the whole team's data
-      // to their browser). El filtro de profesional (para admin/recepcion) solo aplica
-      // cuando el usuario no es ya un barbero restringido a si mismo.
-      if (isBarber && user?.id) params.set("barberId", user.id);
-      else if (professionalFilter) params.set("barberId", professionalFilter);
+      const params = new URLSearchParams(appointmentsQuery());
       const res = await fetch(`/api/appointments?${params.toString()}`);
       const data = await res.json();
       // Filter out cancelled and no_show appointments
@@ -576,6 +583,35 @@ export default function CalendarioPage() {
     }
     // Also refresh blocks
     setBlocksRefresh((n) => n + 1);
+  };
+
+  // Boton Actualizar: vuelve a pedir las citas y los bloqueos de lo que se esta viendo, sin recargar la pagina
+  // ni cambiar el dia, el profesional o los filtros. Una sola carga a la vez; si falla, deja lo que ya se ve.
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
+  const queryNowRef = useRef("");
+  queryNowRef.current = appointmentsQuery();
+  const handleRefresh = async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    const q = appointmentsQuery();
+    try {
+      const res = await fetch(`/api/appointments?${q}`, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error("respuesta invalida");
+      // Si mientras tanto cambiaron el dia o el filtro, esta respuesta ya no corresponde: no se aplica.
+      if (q === queryNowRef.current) {
+        setAppointments(data.filter((a: any) => !["cancelled", "no_show"].includes(a.status)));
+        setBlocksRefresh((n) => n + 1);
+      }
+      showToast("Actualizado", "success");
+    } catch {
+      showToast("No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.", "error");
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+    }
   };
 
   // Fetch blocks whenever the barber list, date, or refresh trigger changes.
@@ -1194,6 +1230,17 @@ export default function CalendarioPage() {
           {(professionalFilter || fullDay || view === "lista" || !mobileGrid || rangeDays !== 1) && !showFilters && (
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-blue" />
           )}
+        </button>
+
+        <button
+          type="button"
+          aria-label="Actualizar"
+          title="Actualizar"
+          onClick={handleRefresh}
+          disabled={refreshing || loading}
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-brand-gray transition-colors hover:border-brand-blue/40 hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} strokeWidth={2} />
         </button>
 
         {/* Resto de controles: siempre visibles en pantallas medianas; en celular, tras "Filtros". */}
