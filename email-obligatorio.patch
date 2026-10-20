@@ -1,4 +1,4 @@
-From 8233a32a52fa3b2257c972e30122d41b41322154 Mon Sep 17 00:00:00 2001
+From 70a41bcff7bbdd2bf6f5805faf82d11a95c69628 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 15:08:17 +0000
 Subject: [PATCH] Reserva online: correo obligatorio (formulario y rutas de
@@ -7,10 +7,10 @@ Subject: [PATCH] Reserva online: correo obligatorio (formulario y rutas de
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01KxXNhvn1mBj6FYfi3cToA6
 ---
- src/app/api/booking/create-deposit/route.ts | 4 +++-
- src/app/api/public/book/route.ts            | 4 +++-
- src/app/booking/page.tsx                    | 9 +++++----
- 3 files changed, 11 insertions(+), 6 deletions(-)
+ src/app/api/booking/create-deposit/route.ts |  4 +++-
+ src/app/api/public/book/route.ts            | 13 ++++++++++++-
+ src/app/booking/page.tsx                    |  9 +++++----
+ 3 files changed, 20 insertions(+), 6 deletions(-)
 
 diff --git a/src/app/api/booking/create-deposit/route.ts b/src/app/api/booking/create-deposit/route.ts
 index bfdd96a..510a1ed 100644
@@ -35,9 +35,17 @@ index bfdd96a..510a1ed 100644
    }
  
 diff --git a/src/app/api/public/book/route.ts b/src/app/api/public/book/route.ts
-index ccfcae5..e86759b 100644
+index ccfcae5..9dcfd2a 100644
 --- a/src/app/api/public/book/route.ts
 +++ b/src/app/api/public/book/route.ts
+@@ -1,6 +1,6 @@
+ import { isTenantSuspended, isBarberTenantSuspended, TENANT_SUSPENDED_MESSAGE } from "@/lib/tenant-suspension";
+ import { NextRequest, NextResponse } from "next/server";
+-import { createAdminSupabase } from "@/lib/supabase/server";
++import { createAdminSupabase, getCurrentUserRoleAndTenant } from "@/lib/supabase/server";
+ import { sendBookingConfirmation } from "@/lib/resend";
+ import { tryConsumeQuota } from "@/lib/message-quota";
+ import { isSlotFull, exceededAfterInsert } from "@/lib/capacity";
 @@ -10,6 +10,8 @@ import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
  import { notify } from "@/lib/notify";
  import { sanitizeAttribution, isAdTrackingEnabled } from "@/lib/ad-tracking";
@@ -47,15 +55,22 @@ index ccfcae5..e86759b 100644
  export async function POST(req: NextRequest) {
    const supabase = createAdminSupabase();
    const body = await req.json();
-@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
-   const ids: string[] = serviceIds || (serviceId ? [serviceId] : []);
- 
-   // Validate required fields
--  if (ids.length === 0 || !barberId || !date || !startTime || !clientName) {
-+  if (ids.length === 0 || !barberId || !date || !startTime || !clientName || !isValidEmail(clientEmail)) {
+@@ -23,6 +25,15 @@ export async function POST(req: NextRequest) {
      return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
    }
  
++  // El correo es obligatorio para quien reserva online. El personal con sesion (agenda del
++  // profesional, clientes sin correo) queda fuera de la regla.
++  if (!isValidEmail(clientEmail)) {
++    const caller = await getCurrentUserRoleAndTenant();
++    if (!caller.role) {
++      return NextResponse.json({ error: "El correo es obligatorio" }, { status: 400 });
++    }
++  }
++
+   // Get services details
+   const { data: services } = await supabase
+     .from("services")
 diff --git a/src/app/booking/page.tsx b/src/app/booking/page.tsx
 index 4a25e0a..d287cf5 100644
 --- a/src/app/booking/page.tsx
