@@ -1,0 +1,109 @@
+From 8233a32a52fa3b2257c972e30122d41b41322154 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 20 Oct 2026 15:08:17 +0000
+Subject: [PATCH] Reserva online: correo obligatorio (formulario y rutas de
+ reserva)
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01KxXNhvn1mBj6FYfi3cToA6
+---
+ src/app/api/booking/create-deposit/route.ts | 4 +++-
+ src/app/api/public/book/route.ts            | 4 +++-
+ src/app/booking/page.tsx                    | 9 +++++----
+ 3 files changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/src/app/api/booking/create-deposit/route.ts b/src/app/api/booking/create-deposit/route.ts
+index bfdd96a..510a1ed 100644
+--- a/src/app/api/booking/create-deposit/route.ts
++++ b/src/app/api/booking/create-deposit/route.ts
+@@ -13,6 +13,8 @@ import { createAdminSupabase } from "@/lib/supabase/server";
+  * 4. Client pays on MP
+  * 5. Webhook confirms → appointment changes to "confirmed"
+  */
++const isValidEmail = (e: unknown) => typeof e === "string" && /^\S+@\S+\.\S+$/.test(e.trim());
++
+ export async function POST(req: NextRequest) {
+   const supabase = createAdminSupabase();
+   const body = await req.json();
+@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
+     notes,
+   } = body;
+ 
+-  if (!barberId || !serviceIds?.length || !date || !startTime || !clientName || !totalPrice) {
++  if (!barberId || !serviceIds?.length || !date || !startTime || !clientName || !isValidEmail(clientEmail) || !totalPrice) {
+     return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
+   }
+ 
+diff --git a/src/app/api/public/book/route.ts b/src/app/api/public/book/route.ts
+index ccfcae5..e86759b 100644
+--- a/src/app/api/public/book/route.ts
++++ b/src/app/api/public/book/route.ts
+@@ -10,6 +10,8 @@ import { getWindowDays, isBeyondWindow } from "@/lib/booking-window";
+ import { notify } from "@/lib/notify";
+ import { sanitizeAttribution, isAdTrackingEnabled } from "@/lib/ad-tracking";
+ 
++const isValidEmail = (e: unknown) => typeof e === "string" && /^\S+@\S+\.\S+$/.test(e.trim());
++
+ export async function POST(req: NextRequest) {
+   const supabase = createAdminSupabase();
+   const body = await req.json();
+@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
+   const ids: string[] = serviceIds || (serviceId ? [serviceId] : []);
+ 
+   // Validate required fields
+-  if (ids.length === 0 || !barberId || !date || !startTime || !clientName) {
++  if (ids.length === 0 || !barberId || !date || !startTime || !clientName || !isValidEmail(clientEmail)) {
+     return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
+   }
+ 
+diff --git a/src/app/booking/page.tsx b/src/app/booking/page.tsx
+index 4a25e0a..d287cf5 100644
+--- a/src/app/booking/page.tsx
++++ b/src/app/booking/page.tsx
+@@ -288,7 +288,7 @@ export default function BookingPage() {
+           date: selectedDate,
+           startTime: selectedSlot,
+           clientName,
+-          clientEmail: clientEmail || null,
++          clientEmail: clientEmail.trim(),
+           clientPhone: clientPhone || null,
+           notes: notes || null,
+           totalPrice,
+@@ -318,7 +318,7 @@ export default function BookingPage() {
+         date: selectedDate,
+         startTime: selectedSlot,
+         clientName,
+-        clientEmail: clientEmail || null,
++        clientEmail: clientEmail.trim(),
+         clientPhone: clientPhone || null,
+         notes: notes || null,
+         autoAssigned,
+@@ -806,7 +806,7 @@ export default function BookingPage() {
+ 
+             <div className="space-y-4">
+               <div>
+-                <label className="text-sm text-brand-gray mb-1 block">Email</label>
++                <label className="text-sm text-brand-gray mb-1 block">Email *</label>
+                 <input
+                   type="email"
+                   value={clientEmail}
+@@ -823,6 +823,7 @@ export default function BookingPage() {
+                     }
+                   }}
+                   placeholder="tu@email.com (para confirmacion)"
++                  required
+                   className="w-full rounded-xl border border-gray-200 bg-brand-light/50 px-4 py-3 text-brand-dark placeholder:text-brand-gray focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 focus:outline-none"
+                 />
+                 {clientFound && (
+@@ -876,7 +877,7 @@ export default function BookingPage() {
+ 
+             <button
+               onClick={handleBook}
+-              disabled={!clientName.trim() || !clientPhone.trim() || submitting}
++              disabled={!clientName.trim() || !clientPhone.trim() || !/^\S+@\S+\.\S+$/.test(clientEmail.trim()) || submitting}
+               className="w-full mt-6 py-4 rounded-xl bg-brand-blue text-white font-bold text-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+             >
+               {submitting ? "Procesando..." : depositRequired ? `Pagar abono ${formatCurrency(Math.ceil(totalPrice * depositPercentage / 100))}` : "Confirmar Cita"}
+-- 
+2.43.0
+
